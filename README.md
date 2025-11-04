@@ -5,7 +5,7 @@
 
 ## Overview
 - Anonymous emotional support app blending drifting-cloud venting, virtual pet companionship, and mindful plant care.
-- Built for iOS 17+ with SwiftUI, Combine, Core Data/CloudKit; privacy-first, pressure-free community.
+- Built for iOS 17+ (optimised for iOS 26 Liquid Glass) with SwiftUI, Combine, Core Data/CloudKit; privacy-first, pressure-free community.
 - Ships with Chinese/English locale and introduces AI features gradually.
 
 ## Experience Pillars
@@ -42,7 +42,7 @@
 3. **Safety & Compliance**：Consent prompts, encrypted storage, model monitoring, auto-renew compliance reminders.
 
 ## Tech Stack
-- **Client**：SwiftUI, Combine, NavigationStack, Lottie/SpriteKit, AVFoundation, Speech Framework.
+- **Client**：SwiftUI, Combine, NavigationStack, Lottie/SpriteKit, AVFoundation, Speech Framework, Liquid Glass materials (iOS 26).
 - **Data Layer**：URLSession/Alamofire, Core Data cache, optional CloudKit sync.
 - **Backend**：Serverless (Cloud Functions/Supabase) for posts, economy, AI gateway; MongoDB Atlas / Supabase Postgres options.
 - **DevOps**：Fastlane CI, TestFlight, Xcode Cloud UI tests, App Center/Amplitude analytics.
@@ -60,6 +60,12 @@
 - `DesignDocument.md` – full product & technical spec (Chinese).
 - `README.md` – quick overview (English + Chinese tabs).
 - Planned directories: `docs/` (wireframes, APIs), `client/`, `server/`.
+
+## Liquid Glass Notes
+- Adopt Apple’s iOS 26 Liquid Glass material for navigation bars, cards, modals, and controls.
+- Use layered transparency (100/70/40/20%) and ensure typography contrast under varying wallpapers (support Reduce Transparency).
+- Implement subtle reflections/highlights, with performance fallbacks on older devices.
+- Reference the latest Apple iOS 26 design resources (Sketch/Figma) and extend the component library with reusable Liquid Glass variants.
 
 ## Getting Started
 1. Read `DesignDocument.md` for specs, economy, AI plans.
@@ -116,7 +122,7 @@
 3. **安全合规**：语音采集授权提示、加密存储、模型切换监控、试用自动续费合规提醒。
 
 ## 技术栈
-- **客户端**：SwiftUI、Combine、NavigationStack、Lottie/SpriteKit、AVFoundation、Speech Framework。
+- **客户端**：SwiftUI、Combine、NavigationStack、Lottie/SpriteKit、AVFoundation、Speech Framework、Liquid Glass 材质（iOS 26）。
 - **数据层**：URLSession/Alamofire、Core Data 缓存，可选 CloudKit 同步。
 - **后端**：Serverless（Cloud Functions/Supabase）负责帖子、经济、AI 网关；数据库可选 MongoDB Atlas/Supabase Postgres。
 - **工程运维**：Fastlane 自动化、TestFlight 发布、Xcode Cloud UI 测试、App Center/Amplitude 分析。
@@ -134,6 +140,12 @@
 - `DesignDocument.md`：详细产品与技术设计（中文）。  
 - `README.md`：中英简介（折叠版）。  
 - TODO：`docs/` 原型与 API、`client/` 客户端、`server/` 后端等。
+
+## Liquid Glass 设计提示
+- 导航栏、卡片、模态层统一采用 iOS 26 Liquid Glass 半透明模糊材质，并通过透明度分级（100/70/40/20%）管理层级。
+- 复杂背景下增加渐变遮罩保证文字对比度，同时兼容“减少透明度/提高对比度”辅助功能。
+- 控件与动效需呈现柔和高光与折射变化，并在旧设备或性能模式下降级模糊效果。
+- 使用 Apple 官方 iOS 26 设计资源（Sketch/Figma），在组件库建立可复用的 Liquid Glass 变量与动效标注。
 
 ## 起步指南
 1. 阅读 `DesignDocument.md`，掌握规格、经济与 AI 方案。

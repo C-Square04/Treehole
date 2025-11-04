@@ -1,82 +1,149 @@
-# Treehole · 树洞
+# Treehole
 
-## Overview · 项目概览
-- Anonymous emotional support app combining drifting clouds, virtual pets, and plant care to build gentle self-care rituals.  
-  面向希望匿名倾诉与陪伴的用户，结合漂浮云吐槽、虚拟宠物、植物养成等轻疗愈机制。
-- iOS 17+ first release with SwiftUI, Combine, Core Data/CloudKit；prioritise privacy, safety, and a pressure-free community.  
-  首发聚焦 iOS 17+，使用 SwiftUI/Combine/Core Data/CloudKit，强调匿名与安全体验。
-- Multi-language by default (Chinese/English) and gradual rollout of AI capabilities in controlled phases.  
-  默认支持中英双语，AI 能力分阶段灰度上线。
+<details>
+<summary>English Version</summary>
 
-## Experience Pillars · 核心体验支柱
-- **Emotion Release · 情绪释放**：Drifting-cloud posts with instant NPC replies and optional translation toggle.  
-- **Comforting Companions · 温柔陪伴**：Virtual pet & plant loops with mood feedback, rewards, and journaling nook.  
-- **Guided Wellbeing · 引导仪式**：Daily check-ins, journaling prompts, subtle nudges.  
-- **Sustainable Progression · 长期动力**：Currencies, décor, missions, seasonal events.  
-- **Trust & Safety · 信任安全**：Session aliases, layered moderation, transparent privacy controls.
+## Overview
+- Anonymous emotional support app blending drifting-cloud venting, virtual pet companionship, and mindful plant care.
+- Built for iOS 17+ with SwiftUI, Combine, Core Data/CloudKit; privacy-first, pressure-free community.
+- Ships with Chinese/English locale and introduces AI features gradually.
 
-## Feature Highlights · 核心功能
-| Module | 功能模块 | Key Notes · 要点 |
+## Experience Pillars
+- **Emotion Release** – Floating cloud posts, instant NPC replies, translation toggle.
+- **Comforting Companions** – Virtual pet & plant ecosystems with mood feedback and journaling.
+- **Guided Wellbeing** – Daily rituals, journaling prompts, subtle reminders.
+- **Sustainable Progression** – Multi-currency economy, décor unlocks, missions, seasonal events.
+- **Trust & Safety** – Session aliases, layered moderation, transparent privacy controls.
+
+## Feature Highlights
+| Module | Key Notes |
+| --- | --- |
+| Cloud Venting | Anonymous posts, curated guest feed, NPC reply, EN/ZN translation button |
+| Virtual Pet | Hunger = AI quota, décor customization, idle animation, journal nook |
+| Plant Growth | Daily watering, growth stages, themed variants |
+| Voice Layers | Apple TTS baseline → Backend Piper/F5 fallback → Volcengine TTS for subscribers → MegaTTS3 custom voices (future) |
+| Missions & Rewards | Daily/weekly tasks, streak bonuses, surprise gifts |
+| Identity & Privacy | Device-scoped aliases, local username only, data export/delete |
+
+## Monetization
+- **Free Tier**：Cloud venting, check-ins, base pet/plant loops, lightweight voice (Apple TTS or backend Piper/F5).
+- **Pro Plan (Monthly)**：Higher AI chat quota, exclusive décor, monthly food pack, premium Volcengine voice lines, 7-day free trial.
+- **Voice Upgrades**：MegaTTS3-based custom voices planned as advanced add-ons once stable.
+- **Battle Pass & Store**：Tiered rewards, décor bundles, consumables.
+- **One-off Purchases**：Food packs, outfits, themed décor.
+
+## AI & Voice Strategy
+1. **Moderation & NPC**：DeepSeek API primary; OpenAI/GPT-4o-mini or rule-based fallback.
+2. **Voice Layering**：
+   - Apple AVSpeechSynthesizer: instant, offline baseline.
+   - Backend Piper/F5-TTS: guest/free users & outage fallback.
+   - Volcengine (Doubao) TTS: premium voice packs for subscribers with emotion controls.
+   - MegaTTS3: internal pilot → offline packs & custom voice cloning for future paid tiers.
+3. **Safety & Compliance**：Consent prompts, encrypted storage, model monitoring, auto-renew compliance reminders.
+
+## Tech Stack
+- **Client**：SwiftUI, Combine, NavigationStack, Lottie/SpriteKit, AVFoundation, Speech Framework.
+- **Data Layer**：URLSession/Alamofire, Core Data cache, optional CloudKit sync.
+- **Backend**：Serverless (Cloud Functions/Supabase) for posts, economy, AI gateway; MongoDB Atlas / Supabase Postgres options.
+- **DevOps**：Fastlane CI, TestFlight, Xcode Cloud UI tests, App Center/Amplitude analytics.
+
+## Roadmap Snapshot
+| Phase | Focus | Key Deliverables |
 | --- | --- | --- |
-| Cloud Venting | 漂浮云倾诉 | Anonymous posts, NPC response, translation button, curated guest feed |
-| Virtual Pet | 虚拟宠物 | Hunger=AI quota, décor, idle animation, journaling mini-space |
-| Plant Growth | 植物养成 | Daily watering, growth stages, seasonal variants |
-| Voice Layers | 语音体系 | Apple TTS baseline → Backend Piper/F5 fallback → Volcengine TTS for subscribers → MegaTTS3 for future custom voices |
-| Journeys & Missions | 任务体系 | Daily/weekly missions, streak rewards, surprise gifts |
-| Identity & Privacy | 身份与隐私 | Device-scoped aliases, local username storage, export/delete options |
+| A · MVP | Core loop | Guest mode, aliasing, rule-based moderation, base pet/plant |
+| B · Experience | Immersion | Animations, décor, journaling rewards, missions, push + localisation |
+| C · AI Elevation | AI/Voice foundations | DeepSeek moderation, AI pet chat, MegaTTS3 prototype validation |
+| D · Monetization | Revenue systems | Subscription, battle pass, voice store, Volcengine rollout |
+| E · Expansion | Advanced ops | MegaTTS3 custom voice beta, voice journaling, ops tooling |
 
-## Monetization · 变现策略
-- **Free Tier · 免费层**：漂浮云、签到、基础宠物/植物、轻量语音（Apple TTS or backend Piper/F5）。  
-- **Pro Plan · 订阅（月卡）**：Higher AI chat quota, exclusive décor, monthly food packs, premium voice lines via Volcengine TTS, 7-day free trial.  
-- **Voice Upgrades · 声线升级**：Planned MegaTTS3 custom voice packs as advanced paid add-ons post-stabilisation.  
-- **Battle Pass & Store · 战令与商店**：Tiered rewards, décor bundles, consumables.  
-- **One-off Purchases · 单次充值**：Food packs, outfits, theme bundles.
+## Repository Guide
+- `DesignDocument.md` – full product & technical spec (Chinese).
+- `README.md` – quick overview (English + Chinese tabs).
+- Planned directories: `docs/` (wireframes, APIs), `client/`, `server/`.
 
-## AI & Voice Strategy · AI 与语音策略
-1. **Moderation & NPC Replies**：DeepSeek API primary, OpenAI/GPT-4o-mini/local rules as fallback.  
-2. **Voice Layering**：  
-   - Apple AVSpeechSynthesizer for instant, offline-friendly baseline.  
-   - Backend Piper/F5-TTS for guest/free users or outages.  
-   - Volcengine (豆包) TTS for Pro voice packs with emotional parameters.  
-   - MegaTTS3 internal pilot → custom voice cloning & offline packages in later phases.  
-3. **Safety & Compliance**：Voice data consent prompts, encrypted storage, model switch monitoring, trial auto-renew compliance reminders.
+## Getting Started
+1. Read `DesignDocument.md` for specs, economy, AI plans.
+2. Produce wireframes & flows per roadmap before implementation.
+3. Establish voice stack: Apple baseline, backend Piper/F5 fallback, Volcengine credentials, MegaTTS3 pilot env.
+4. Build Milestone A, instrument analytics, then unlock AI/voice per roadmap.
 
-## Tech Stack · 技术栈
-- **Client · 客户端**：SwiftUI, Combine, NavigationStack, Lottie/SpriteKit for motion, AVFoundation, Speech Framework.  
-- **Data Layer · 数据层**：URLSession/Alamofire, Core Data caching, optional CloudKit sync.  
-- **Backend · 后端**：Serverless (Cloud Functions/Supabase) for posts, economy, AI gateway; databases such as MongoDB Atlas / Supabase Postgres.  
-- **DevOps · 工程**：Fastlane automation, TestFlight distribution, Xcode Cloud UI tests, App Center/Amplitude analytics.
+## Communication & Support
+- Capture risks/feedback at milestone reviews.
+- Complete legal/privacy reviews before launching voice cloning.
+- Contributions welcome—maintain bilingual resources for the team.
 
-## Roadmap Snapshot · 迭代里程碑
-| Phase | 目标 | 重点交付 |
+</details>
+
+<details>
+<summary>中文版本</summary>
+
+## 项目概览
+- 面向匿名情绪宣泄与陪伴的 iOS 应用，融合漂浮云吐槽、虚拟宠物、植物养成等自愈机制。
+- 基于 iOS 17+（SwiftUI/Combine/Core Data/CloudKit），强调隐私、安全与无压力社区。
+- 默认中英双语，AI 能力分阶段灰度上线。
+
+## 核心体验支柱
+- **情绪释放**：漂浮云发帖、NPC 秒回、翻译按钮。
+- **温柔陪伴**：虚拟宠物/植物生态，情绪反馈与日记角。
+- **引导仪式**：每日签到、写作提示、柔和提醒。
+- **长期动力**：多货币系统、装饰解锁、任务与节日活动。
+- **信任安全**：会话别名、分层审核、透明隐私说明。
+
+## 核心功能模块
+| 模块 | 要点 |
+| --- | --- |
+| 漂浮云倾诉 | 匿名发帖、精选游客流、NPC 回复、翻译切换 |
+| 虚拟宠物 | 饥饿=AI 配额、家园装饰、闲置动画、日记入口 |
+| 植物养成 | 每日浇水、成长阶段、主题变种 |
+| 语音体系 | Apple TTS 基线 → 后端 Piper/F5 fallback → 豆包 TTS 订阅层 → MegaTTS3 自定义声线（后期） |
+| 任务奖励 | 日/周任务、连续签到、惊喜礼盒 |
+| 身份隐私 | 设备级别名、本地存真实用户名、数据导出/删除 |
+
+## 变现策略
+- **免费层**：漂浮云、签到、基础宠物/植物、轻量语音（Apple TTS 或后端 Piper/F5）。
+- **订阅（月卡/Pro）**：更高 AI 对话额度、专属装饰、月度食物包、豆包高级声线、7 天试用。
+- **声线升级**：MegaTTS3 定制声线作为后期高级增值服务。
+- **战令与商店**：阶梯奖励、装饰礼包、消耗品。
+- **单次充值**：食物包、服饰、主题套装。
+
+## AI 与语音策略
+1. **审核与 NPC**：DeepSeek 为主，OpenAI/GPT-4o-mini 或规则引擎兜底。
+2. **语音分层**：  
+   - Apple AVSpeechSynthesizer：离线即时基线。  
+   - 后端 Piper/F5-TTS：游客/免费用户与故障 fallback。  
+   - 火山引擎豆包 TTS：订阅声线，支持情绪参数。  
+   - MegaTTS3：内部试点 → 离线语音包 + 声线克隆增值。  
+3. **安全合规**：语音采集授权提示、加密存储、模型切换监控、试用自动续费合规提醒。
+
+## 技术栈
+- **客户端**：SwiftUI、Combine、NavigationStack、Lottie/SpriteKit、AVFoundation、Speech Framework。
+- **数据层**：URLSession/Alamofire、Core Data 缓存，可选 CloudKit 同步。
+- **后端**：Serverless（Cloud Functions/Supabase）负责帖子、经济、AI 网关；数据库可选 MongoDB Atlas/Supabase Postgres。
+- **工程运维**：Fastlane 自动化、TestFlight 发布、Xcode Cloud UI 测试、App Center/Amplitude 分析。
+
+## 迭代路线图
+| 阶段 | 目标 | 关键交付 |
 | --- | --- | --- |
-| A · MVP | Core posting & pet loop | Guest mode, aliasing, rule-based moderation, base pet/plant cycles |
-| B · Experience | Immersive polish | Animations, décor, journaling rewards, tasks, push + localisation |
-| C · AI Elevation | AI & Voice foundations | DeepSeek moderation, AI pet chats, MegaTTS3 prototype validation |
-| D · Monetization | 商业化 | Subscription, battle pass, voice store, Volcengine TTS rollout |
-| E · Expansion | 高阶体验 | MegaTTS3 custom voices beta, voice journals, advanced events, ops tooling |
+| A · MVP | 核心闭环 | 游客模式、别名、规则审核、基础宠物/植物 |
+| B · 体验强化 | 沉浸打磨 | 动效、装饰、日记奖励、任务、推送+本地化 |
+| C · AI 提升 | AI/语音基础 | DeepSeek 审核、AI 宠物聊天、MegaTTS3 原型验证 |
+| D · 商业化 | 收益体系 | 订阅、战令、声线商店、豆包声线上线 |
+| E · 拓展运营 | 高阶体验 | MegaTTS3 自定义声线内测、语音日记、运营工具 |
 
-## Repository Guide · 仓库指引
-- `DesignDocument.md`：完整产品与技术设计（中文）。  
-- `README.md`：High-level overview (English + 中文).  
-- 待扩展：`/docs` 用于原型、API 规格；`/client`、`/server` 等目录将随开发逐步补充。
+## 仓库说明
+- `DesignDocument.md`：详细产品与技术设计（中文）。  
+- `README.md`：中英简介（折叠版）。  
+- TODO：`docs/` 原型与 API、`client/` 客户端、`server/` 后端等。
 
-## Getting Started · 起步指南
-1. **Read the Design Document** (`DesignDocument.md`) for detailed specs, economy design, and AI plans.  
-   阅读 `DesignDocument.md` 获取完整规格、经济系统与 AI 策略。  
-2. **Prototype & Wireframes**：Create UI flows based on the roadmap before coding.  
-   根据里程碑绘制关键界面流程图，再进入开发阶段。  
-3. **Establish Voice Infrastructure**：  
-   - Configure Apple TTS fallback and backend Piper/F5 services.  
-   - Set up Volcengine TTS credentials for Pro tier.  
-   - Begin controlled MegaTTS3 deployment tests.  
-4. **Iterate & Measure**：Implement milestone A first, instrument analytics, then follow roadmap with gated AI/voice rollouts.  
-   优先完成里程碑 A，加入埋点监控，再按路线图逐步解锁 AI 与语音能力。
+## 起步指南
+1. 阅读 `DesignDocument.md`，掌握规格、经济与 AI 方案。
+2. 按路线图绘制线框与流程，再进入开发。
+3. 搭建语音体系：Apple TTS → 后端 Piper/F5 → 豆包 TTS → MegaTTS3 试点环境。
+4. 先完成里程碑 A，补充埋点监控，再逐步解锁 AI/语音能力。
 
-## Community & Support · 沟通与支持
-- Document risk/feedback at each milestone review.  
-  每轮里程碑复盘记录风险与反馈。  
-- Prepare legal/privacy reviews before launching voice cloning features.  
-  自定义声线上线前需完成法律与隐私合规审查。  
-- Contributions & localized feedback welcome—maintain both English and Chinese resources for the team.  
-  欢迎贡献与本地化反馈，持续维护中英双语资料。
+## 沟通与支持
+- 每阶段复盘记录风险与反馈。
+- 自定义声线开放前完成法律/隐私审查。
+- 欢迎贡献与本地化建议，持续维护双语资料。
+
+</details>

@@ -51,7 +51,9 @@ class JournalViewModel: ObservableObject {
     // MARK: - Prompt Management
 
     func selectRandomPrompt() {
-        currentPrompt = JournalPrompt.defaultPrompts.randomElement() ?? JournalPrompt.defaultPrompts.first!
+        currentPrompt = JournalPrompt.defaultPrompts.randomElement() ??
+                        JournalPrompt.defaultPrompts.first ??
+                        JournalPrompt(id: "default", text: "How are you feeling today?", category: "general", language: .english)
         draftText = ""
     }
 
@@ -91,15 +93,22 @@ class JournalViewModel: ObservableObject {
     // MARK: - Persistence
 
     func saveEntries() {
-        if let encoded = try? JSONEncoder().encode(entries) {
+        do {
+            let encoded = try JSONEncoder().encode(entries)
             UserDefaults.standard.set(encoded, forKey: "journalEntries")
+        } catch {
+            print("ERROR: Failed to encode journal entries: \(error)")
         }
     }
 
     func loadEntries() {
-        if let data = UserDefaults.standard.data(forKey: "journalEntries"),
-           let loaded = try? JSONDecoder().decode([JournalEntry].self, from: data) {
-            entries = loaded
+        if let data = UserDefaults.standard.data(forKey: "journalEntries") {
+            do {
+                let loaded = try JSONDecoder().decode([JournalEntry].self, from: data)
+                entries = loaded
+            } catch {
+                print("ERROR: Failed to decode journal entries: \(error)")
+            }
         }
     }
 }

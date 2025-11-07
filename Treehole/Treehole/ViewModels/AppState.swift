@@ -75,6 +75,23 @@ class AppState: ObservableObject {
         generateNewAlias()
     }
 
+    func loginWithGoogle(userId: String, email: String?, displayName: String?) {
+        let user = User(
+            id: userId,
+            privateName: email ?? displayName ?? "Google User",
+            authProvider: .google,
+            isGuest: false,
+            subscriptionStatus: .free,
+            themePrefs: ThemePreferences(),
+            createdAt: Date()
+        )
+        currentUser = user
+        isGuest = false
+        isAuthenticated = true
+        saveUserToKeychain(user)
+        generateNewAlias()
+    }
+
     func logout() {
         currentUser = nil
         isAuthenticated = false
@@ -109,18 +126,26 @@ class AppState: ObservableObject {
 
     private func saveUserToKeychain(_ user: User) {
         // In a real app, use Security framework to save to keychain
-        if let encoded = try? JSONEncoder().encode(user) {
+        do {
+            let encoded = try JSONEncoder().encode(user)
             UserDefaults.standard.set(encoded, forKey: "savedUser")
+        } catch {
+            print("ERROR: Failed to encode user for keychain: \(error)")
         }
     }
 
     private func loadUserFromKeychain() {
-        if let data = UserDefaults.standard.data(forKey: "savedUser"),
-           let user = try? JSONDecoder().decode(User.self, from: data) {
-            currentUser = user
-            isAuthenticated = !user.isGuest
-            isGuest = user.isGuest
-            generateNewAlias()
+        if let data = UserDefaults.standard.data(forKey: "savedUser") {
+            do {
+                let user = try JSONDecoder().decode(User.self, from: data)
+                currentUser = user
+                isAuthenticated = !user.isGuest
+                isGuest = user.isGuest
+                generateNewAlias()
+            } catch {
+                print("ERROR: Failed to decode user from keychain: \(error)")
+                loginAsGuest()
+            }
         } else {
             loginAsGuest()
         }
@@ -133,8 +158,9 @@ class AppState: ObservableObject {
     // MARK: - Theme Preferences
 
     func updateThemePreference(_ prefs: ThemePreferences) {
-        currentUser?.themePrefs = prefs
-        if let user = currentUser {
+        if var user = currentUser {
+            user.themePrefs = prefs
+            currentUser = user  // Reassign to trigger @Published
             saveUserToKeychain(user)
         }
     }

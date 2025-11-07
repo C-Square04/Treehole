@@ -72,7 +72,10 @@ class PlantViewModel: ObservableObject {
         guard let index = plants.firstIndex(where: { $0.id == plantId }) else {
             return false
         }
-        plants[index].water()
+        // Copy struct, mutate copy, then reassign to trigger @Published
+        var plant = plants[index]
+        plant.water()
+        plants[index] = plant
         savePlants()
         // Trigger change notification for SwiftUI to update views
         objectWillChange.send()
@@ -109,6 +112,7 @@ class PlantViewModel: ObservableObject {
     // MARK: - Periodic Updates
 
     private func startPeriodicUpdates() {
+        stopPeriodicUpdates() // Stop any existing timer first
         updateTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
             self?.updateAllPlants()
         }
@@ -146,15 +150,22 @@ class PlantViewModel: ObservableObject {
     // MARK: - Persistence
 
     func savePlants() {
-        if let encoded = try? JSONEncoder().encode(plants) {
+        do {
+            let encoded = try JSONEncoder().encode(plants)
             UserDefaults.standard.set(encoded, forKey: "plantStates")
+        } catch {
+            print("ERROR: Failed to encode plants: \(error)")
         }
     }
 
     func loadPlants() {
-        if let data = UserDefaults.standard.data(forKey: "plantStates"),
-           let loaded = try? JSONDecoder().decode([PlantState].self, from: data) {
-            plants = loaded
+        if let data = UserDefaults.standard.data(forKey: "plantStates") {
+            do {
+                let loaded = try JSONDecoder().decode([PlantState].self, from: data)
+                plants = loaded
+            } catch {
+                print("ERROR: Failed to decode plants: \(error)")
+            }
         }
     }
 }

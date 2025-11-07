@@ -97,6 +97,23 @@ struct CloudPostListView: View {
             .navigationDestination(item: $showDetail) { postId in
                 if let post = viewModel.posts.first(where: { $0.id == postId }) {
                     CloudPostDetailView(post: post, viewModel: viewModel)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("Post Not Found")
+                            .font(.headline)
+                        Text("This post may have been deleted")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            showDetail = nil
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $showCreatePost) {

@@ -16,9 +16,25 @@ class PetViewModel: ObservableObject {
 
     private var updateTimer: Timer?
 
-    init(petState: PetState = PetState(id: UUID().uuidString, createdAt: Date())) {
-        self.petState = petState
+    init(petState: PetState? = nil) {
+        // Initialize with default or provided state
+        if let savedState = petState {
+            self.petState = savedState
+        } else {
+            self.petState = PetState(id: UUID().uuidString, createdAt: Date())
+        }
+
         loadDecorations()
+
+        // Try to load from disk
+        loadPetState()
+
+        // If loaded state is empty, ensure we have a valid one
+        if self.petState.id.isEmpty {
+            self.petState = PetState(id: UUID().uuidString, createdAt: Date())
+            savePetState()
+        }
+
         startPeriodicUpdates()
     }
 
@@ -33,8 +49,8 @@ class PetViewModel: ObservableObject {
         petState.feed()
         savePetState()
         showFeedingAnimation = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            self.showFeedingAnimation = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.showFeedingAnimation = false
         }
     }
 
@@ -130,6 +146,7 @@ class PetViewModel: ObservableObject {
     // MARK: - Periodic Updates
 
     private func startPeriodicUpdates() {
+        stopPeriodicUpdates() // Stop any existing timer first
         updateTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.petState.updateHunger()
             self?.objectWillChange.send()
@@ -144,15 +161,22 @@ class PetViewModel: ObservableObject {
     // MARK: - Persistence
 
     func savePetState() {
-        if let encoded = try? JSONEncoder().encode(petState) {
+        do {
+            let encoded = try JSONEncoder().encode(petState)
             UserDefaults.standard.set(encoded, forKey: "petState")
+        } catch {
+            print("ERROR: Failed to encode pet state: \(error)")
         }
     }
 
     func loadPetState() {
-        if let data = UserDefaults.standard.data(forKey: "petState"),
-           let state = try? JSONDecoder().decode(PetState.self, from: data) {
-            petState = state
+        if let data = UserDefaults.standard.data(forKey: "petState") {
+            do {
+                let state = try JSONDecoder().decode(PetState.self, from: data)
+                petState = state
+            } catch {
+                print("ERROR: Failed to decode pet state: \(error)")
+            }
         }
     }
 }

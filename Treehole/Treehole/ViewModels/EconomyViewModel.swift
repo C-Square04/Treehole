@@ -309,28 +309,43 @@ class EconomyViewModel: ObservableObject {
     // MARK: - Persistence
 
     func saveEconomy() {
-        if let encoded = try? JSONEncoder().encode(economy) {
+        do {
+            let encoded = try JSONEncoder().encode(economy)
             UserDefaults.standard.set(encoded, forKey: "economy")
+        } catch {
+            print("ERROR: Failed to encode economy: \(error)")
         }
     }
 
     private func loadEconomy() {
-        if let data = UserDefaults.standard.data(forKey: "economy"),
-           let loaded = try? JSONDecoder().decode(EconomyLedger.self, from: data) {
-            economy = loaded
+        if let data = UserDefaults.standard.data(forKey: "economy") {
+            do {
+                let loaded = try JSONDecoder().decode(EconomyLedger.self, from: data)
+                economy = loaded
+            } catch {
+                print("ERROR: Failed to decode economy: \(error)")
+            }
         }
     }
 
     private func saveDailyTasks() {
-        if let encoded = try? JSONEncoder().encode(dailyTasks) {
+        do {
+            let encoded = try JSONEncoder().encode(dailyTasks)
             UserDefaults.standard.set(encoded, forKey: "dailyTasks")
+        } catch {
+            print("ERROR: Failed to encode daily tasks: \(error)")
         }
     }
 
     private func loadDailyTasks() {
-        if let data = UserDefaults.standard.data(forKey: "dailyTasks"),
-           let loaded = try? JSONDecoder().decode([DailyTask].self, from: data) {
-            dailyTasks = loaded
+        if let data = UserDefaults.standard.data(forKey: "dailyTasks") {
+            do {
+                let loaded = try JSONDecoder().decode([DailyTask].self, from: data)
+                dailyTasks = loaded
+            } catch {
+                print("ERROR: Failed to decode daily tasks: \(error)")
+                createDefaultDailyTasks()
+            }
         } else {
             // Create default daily tasks for Milestone 2
             createDefaultDailyTasks()
@@ -338,30 +353,45 @@ class EconomyViewModel: ObservableObject {
     }
 
     private func saveWeeklyChallenges() {
-        if let encoded = try? JSONEncoder().encode(weeklyChallenges) {
+        do {
+            let encoded = try JSONEncoder().encode(weeklyChallenges)
             UserDefaults.standard.set(encoded, forKey: "weeklyChallenges")
+        } catch {
+            print("ERROR: Failed to encode weekly challenges: \(error)")
         }
     }
 
     private func loadWeeklyChallenges() {
-        if let data = UserDefaults.standard.data(forKey: "weeklyChallenges"),
-           let loaded = try? JSONDecoder().decode([WeeklyChallenge].self, from: data) {
-            weeklyChallenges = loaded
+        if let data = UserDefaults.standard.data(forKey: "weeklyChallenges") {
+            do {
+                let loaded = try JSONDecoder().decode([WeeklyChallenge].self, from: data)
+                weeklyChallenges = loaded
+            } catch {
+                print("ERROR: Failed to decode weekly challenges: \(error)")
+                createDefaultWeeklyChallenges()
+            }
         } else {
             createDefaultWeeklyChallenges()
         }
     }
 
     private func saveInventory() {
-        if let encoded = try? JSONEncoder().encode(inventory) {
+        do {
+            let encoded = try JSONEncoder().encode(inventory)
             UserDefaults.standard.set(encoded, forKey: "inventory")
+        } catch {
+            print("ERROR: Failed to encode inventory: \(error)")
         }
     }
 
     private func loadInventory() {
-        if let data = UserDefaults.standard.data(forKey: "inventory"),
-           let loaded = try? JSONDecoder().decode([InventoryItem].self, from: data) {
-            inventory = loaded
+        if let data = UserDefaults.standard.data(forKey: "inventory") {
+            do {
+                let loaded = try JSONDecoder().decode([InventoryItem].self, from: data)
+                inventory = loaded
+            } catch {
+                print("ERROR: Failed to decode inventory: \(error)")
+            }
         }
     }
 
@@ -380,15 +410,22 @@ class EconomyViewModel: ObservableObject {
     }
 
     private func saveAchievements() {
-        if let encoded = try? JSONEncoder().encode(achievements) {
+        do {
+            let encoded = try JSONEncoder().encode(achievements)
             UserDefaults.standard.set(encoded, forKey: "achievements")
+        } catch {
+            print("ERROR: Failed to encode achievements: \(error)")
         }
     }
 
     private func loadAchievements() {
-        if let data = UserDefaults.standard.data(forKey: "achievements"),
-           let loaded = try? JSONDecoder().decode([String: Bool].self, from: data) {
-            achievements = loaded
+        if let data = UserDefaults.standard.data(forKey: "achievements") {
+            do {
+                let loaded = try JSONDecoder().decode([String: Bool].self, from: data)
+                achievements = loaded
+            } catch {
+                print("ERROR: Failed to decode achievements: \(error)")
+            }
         }
     }
 

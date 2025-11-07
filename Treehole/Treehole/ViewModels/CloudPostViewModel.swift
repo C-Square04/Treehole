@@ -132,22 +132,36 @@ class CloudPostViewModel: ObservableObject {
     // MARK: - Persistence
 
     func savePosts() {
-        if let encoded = try? JSONEncoder().encode(posts) {
+        do {
+            let encoded = try JSONEncoder().encode(posts)
             UserDefaults.standard.set(encoded, forKey: "cloudPosts")
+        } catch {
+            print("ERROR: Failed to encode cloud posts: \(error)")
         }
-        if let encoded = try? JSONEncoder().encode(personalPosts) {
+        do {
+            let encoded = try JSONEncoder().encode(personalPosts)
             UserDefaults.standard.set(encoded, forKey: "personalPosts")
+        } catch {
+            print("ERROR: Failed to encode personal posts: \(error)")
         }
     }
 
     func loadPosts() {
-        if let data = UserDefaults.standard.data(forKey: "cloudPosts"),
-           let loaded = try? JSONDecoder().decode([CloudPost].self, from: data) {
-            posts = loaded
+        if let data = UserDefaults.standard.data(forKey: "cloudPosts") {
+            do {
+                let loaded = try JSONDecoder().decode([CloudPost].self, from: data)
+                posts = loaded
+            } catch {
+                print("ERROR: Failed to decode cloud posts: \(error)")
+            }
         }
-        if let data = UserDefaults.standard.data(forKey: "personalPosts"),
-           let loaded = try? JSONDecoder().decode([CloudPost].self, from: data) {
-            personalPosts = loaded
+        if let data = UserDefaults.standard.data(forKey: "personalPosts") {
+            do {
+                let loaded = try JSONDecoder().decode([CloudPost].self, from: data)
+                personalPosts = loaded
+            } catch {
+                print("ERROR: Failed to decode personal posts: \(error)")
+            }
         }
     }
 }

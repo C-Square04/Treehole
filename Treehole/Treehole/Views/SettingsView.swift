@@ -13,6 +13,7 @@ struct SettingsView: View {
 
     enum SettingsTab {
         case account
+        case security
         case privacy
         case appearance
     }
@@ -36,26 +37,34 @@ struct SettingsView: View {
                         Text("Settings")
                             .font(.title2)
                             .fontWeight(.bold)
-                        HStack(spacing: 12) {
-                            SettingsTabButton(
-                                title: "Account",
-                                icon: "person.crop.circle",
-                                isSelected: selectedTab == .account,
-                                action: { selectedTab = .account }
-                            )
-                            SettingsTabButton(
-                                title: "Privacy",
-                                icon: "lock.fill",
-                                isSelected: selectedTab == .privacy,
-                                action: { selectedTab = .privacy }
-                            )
-                            SettingsTabButton(
-                                title: "Appearance",
-                                icon: "paintpalette.fill",
-                                isSelected: selectedTab == .appearance,
-                                action: { selectedTab = .appearance }
-                            )
-                            Spacer()
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                SettingsTabButton(
+                                    title: "Account",
+                                    icon: "person.crop.circle",
+                                    isSelected: selectedTab == .account,
+                                    action: { selectedTab = .account }
+                                )
+                                SettingsTabButton(
+                                    title: "Security",
+                                    icon: "shield.fill",
+                                    isSelected: selectedTab == .security,
+                                    action: { selectedTab = .security }
+                                )
+                                SettingsTabButton(
+                                    title: "Privacy",
+                                    icon: "lock.fill",
+                                    isSelected: selectedTab == .privacy,
+                                    action: { selectedTab = .privacy }
+                                )
+                                SettingsTabButton(
+                                    title: "Appearance",
+                                    icon: "paintpalette.fill",
+                                    isSelected: selectedTab == .appearance,
+                                    action: { selectedTab = .appearance }
+                                )
+                                Spacer()
+                            }
                         }
                     }
                     .padding()
@@ -66,6 +75,8 @@ struct SettingsView: View {
                             switch selectedTab {
                             case .account:
                                 AccountSettingsView(appState: appState)
+                            case .security:
+                                SecuritySettingsView(appState: appState)
                             case .privacy:
                                 PrivacySettingsView(appState: appState)
                             case .appearance:
@@ -297,8 +308,6 @@ struct PrivacySettingsView: View {
 
 struct AppearanceSettingsView: View {
     @ObservedObject var appState: AppState
-    @State private var isDarkMode: Bool = false
-    @State private var reduceMotion: Bool = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -308,7 +317,14 @@ struct AppearanceSettingsView: View {
                     Label("Dark Mode", systemImage: "moon.fill")
                         .font(.headline)
                     Spacer()
-                    Toggle("", isOn: $isDarkMode)
+                    Toggle("", isOn: Binding(
+                        get: { appState.currentUser?.themePrefs.isDarkMode ?? false },
+                        set: { isDark in
+                            var prefs = appState.currentUser?.themePrefs ?? ThemePreferences()
+                            prefs.isDarkMode = isDark
+                            appState.updateThemePreference(prefs)
+                        }
+                    ))
                 }
                 .padding()
                 .background(Color.white)
@@ -321,7 +337,14 @@ struct AppearanceSettingsView: View {
                     Label("Reduce Motion", systemImage: "hare.fill")
                         .font(.headline)
                     Spacer()
-                    Toggle("", isOn: $reduceMotion)
+                    Toggle("", isOn: Binding(
+                        get: { appState.currentUser?.themePrefs.reduceMotion ?? false },
+                        set: { reduce in
+                            var prefs = appState.currentUser?.themePrefs ?? ThemePreferences()
+                            prefs.reduceMotion = reduce
+                            appState.updateThemePreference(prefs)
+                        }
+                    ))
                 }
                 .padding()
                 .background(Color.white)
@@ -369,6 +392,117 @@ struct AppearanceSettingsView: View {
                         Text("English").tag(ThemePreferences.Language.english)
                         Text("中文").tag(ThemePreferences.Language.simplifiedChinese)
                     }
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+            }
+        }
+    }
+}
+
+struct SecuritySettingsView: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Session Management
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Active Sessions", systemImage: "iphone.and.arrow.forward")
+                            .font(.headline)
+                        Text("Manage devices with access to your account")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+            }
+
+            // Two-Factor Authentication
+            VStack(spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Two-Factor Authentication", systemImage: "checkmark.shield.fill")
+                            .font(.headline)
+                        Text("Add an extra layer of security to your account")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                    Button(action: {}) {
+                        Text("Enable")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+            }
+
+            // Password Management
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Password", systemImage: "key.fill")
+                            .font(.headline)
+                        if !appState.isGuest {
+                            Text("Last changed 2 months ago")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        } else {
+                            Text("Sign in to manage password")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    Spacer()
+                    if !appState.isGuest {
+                        Button(action: {}) {
+                            Text("Change")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+            }
+
+            // Connected Apps
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Connected Apps", systemImage: "link.badge.plus")
+                            .font(.headline)
+                        Text("Manage third-party app permissions")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+            }
+
+            // Account Activity
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Account Activity", systemImage: "clock.fill")
+                            .font(.headline)
+                        Text("View recent account activity and logins")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
                 }
                 .padding()
                 .background(Color.white)

@@ -24,9 +24,9 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     // MARK: - Authorization
 
     func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            DispatchQueue.main.async {
-                self.isAuthorized = granted
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, error in
+            DispatchQueue.main.async { [weak self] in
+                self?.isAuthorized = granted
             }
             if let error = error {
                 print("Notification authorization error: \(error)")
@@ -35,9 +35,9 @@ class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterD
     }
 
     func checkAuthorizationStatus() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                self.isAuthorized = settings.authorizationStatus == .authorized
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            DispatchQueue.main.async { [weak self] in
+                self?.isAuthorized = settings.authorizationStatus == .authorized
             }
         }
     }

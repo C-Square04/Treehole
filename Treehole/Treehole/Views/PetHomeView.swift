@@ -36,42 +36,42 @@ struct PetHomeView: View {
                         Spacer()
                         Button(action: { showDecorationShop = true }) {
                             Image(systemName: "list.bullet")
-                                .foregroundColor(.blue)
+                                .foregroundColor(TreeholeTheme.softPurple)
                         }
                     }
                     .padding()
-                    .background(Color.white.opacity(0.95))
+                    .background(TreeholeTheme.glassLight)
 
                     // Pet Display Area
                     VStack(spacing: 20) {
-                        // Pet Visual
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.7))
-                                .frame(width: 200, height: 200)
+                        // Pet Visual - Interactive 3D Cat
+                        VStack(spacing: 12) {
+                            InteractivePetView(
+                                mood: viewModel.petState.mood,
+                                showFeedingAnimation: viewModel.showFeedingAnimation
+                            )
+                            .frame(height: 280)
 
-                            VStack(spacing: 10) {
-                                // Pet emoji representation
-                                Text("🐱")
-                                    .font(.system(size: 80))
-                                    .scaleEffect(viewModel.showFeedingAnimation ? 1.2 : 1.0)
-                                    .animation(.easeInOut(duration: 0.3), value: viewModel.showFeedingAnimation)
-
-                                Text(viewModel.petState.mood.rawValue)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
+                            Text(viewModel.petState.mood.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(TreeholeTheme.textSecondary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                                .background(TreeholeTheme.glassLight)
+                                .cornerRadius(12)
                         }
+                        .padding(.top, 20)
 
                         // Status Bars
                         VStack(spacing: 12) {
-                            StatusBar(label: "Hunger", value: viewModel.petState.hungerLevel, maxValue: 100, color: .orange)
-                            StatusBar(label: "Energy", value: viewModel.petState.energy, maxValue: 100, color: .yellow)
-                            StatusBar(label: "Level", value: viewModel.petState.level, maxValue: 10, color: .blue)
+                            StatusBar(label: "Hunger", value: viewModel.petState.hungerLevel, maxValue: 100, color: TreeholeTheme.coral)
+                            StatusBar(label: "Energy", value: viewModel.petState.energy, maxValue: 100, color: TreeholeTheme.warmGold)
+                            StatusBar(label: "Level", value: viewModel.petState.level, maxValue: 10, color: TreeholeTheme.softPurple)
                         }
                         .padding()
-                        .background(Color.white.opacity(0.9))
-                        .cornerRadius(12)
+                        .background(TreeholeTheme.glassLight)
+                        .cornerRadius(TreeholeTheme.cornerMedium)
 
                         Spacer()
                     }
@@ -80,19 +80,19 @@ struct PetHomeView: View {
 
                     // Action Buttons
                     HStack(spacing: 12) {
-                        ActionButton(icon: "🍔", label: "Feed", color: .green) {
+                        ActionButton(icon: "🍔", label: "Feed", color: TreeholeTheme.mintCream.opacity(0.8)) {
                             viewModel.feed()
                             _ = economyViewModel.spendFood(5)
                         }
-                        ActionButton(icon: "👋", label: "Pet", color: .blue) {
+                        ActionButton(icon: "👋", label: "Pet", color: TreeholeTheme.skyBlue.opacity(0.8)) {
                             viewModel.pet()
                         }
-                        ActionButton(icon: "😴", label: "Rest", color: .purple) {
+                        ActionButton(icon: "😴", label: "Rest", color: TreeholeTheme.gentleLavender.opacity(0.8)) {
                             viewModel.rest()
                         }
                     }
                     .padding()
-                    .background(Color.white.opacity(0.95))
+                    .background(TreeholeTheme.glassLight)
                 }
             }
             .sheet(isPresented: $showDecorationShop) {
@@ -186,21 +186,35 @@ struct ActionButton: View {
     let label: String
     let color: Color
     let action: () -> Void
+    @State private var isPressed: Bool = false
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isPressed = true
+            }
+            action()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isPressed = false
+                }
+            }
+        }) {
+            VStack(spacing: 8) {
                 Text(icon)
-                    .font(.title2)
+                    .font(.system(size: 32))
                 Text(label)
                     .font(.caption)
-                    .foregroundColor(color)
+                    .fontWeight(.medium)
+                    .foregroundColor(TreeholeTheme.textPrimary)
             }
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(color.opacity(0.1))
-            .cornerRadius(12)
+            .padding(.vertical, 16)
+            .background(color)
+            .cornerRadius(TreeholeTheme.cornerMedium)
+            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
         }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
     }
 }
 

@@ -43,6 +43,8 @@ class JournalViewModel: ObservableObject {
             entry.rewardGranted = true
             economy.addFood(entry.foodReward)
             economy.addDecorToken(entry.decorTokenReward)
+            saveEntries()
+            objectWillChange.send()
         }
     }
 

@@ -74,6 +74,8 @@ class PlantViewModel: ObservableObject {
         }
         plants[index].water()
         savePlants()
+        // Trigger change notification for SwiftUI to update views
+        objectWillChange.send()
         return true
     }
 
@@ -83,6 +85,7 @@ class PlantViewModel: ObservableObject {
         }
         plants[index].experience += amount
         savePlants()
+        objectWillChange.send()
     }
 
     func waterSelectedPlant() -> Bool {
@@ -99,6 +102,7 @@ class PlantViewModel: ObservableObject {
         if !plants[index].decorations.contains(decorationId) {
             plants[index].decorations.append(decorationId)
             savePlants()
+            objectWillChange.send()
         }
     }
 

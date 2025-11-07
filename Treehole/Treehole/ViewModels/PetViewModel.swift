@@ -31,6 +31,7 @@ class PetViewModel: ObservableObject {
     func feed() {
         guard petState.hungerLevel < 100 else { return }
         petState.feed()
+        savePetState()
         showFeedingAnimation = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             self.showFeedingAnimation = false
@@ -40,11 +41,15 @@ class PetViewModel: ObservableObject {
     func pet() {
         petState.mood = .happy
         petState.energy = min(100, petState.energy + 5)
+        savePetState()
+        objectWillChange.send()
     }
 
     func rest() {
         petState.energy = min(100, petState.energy + 30)
         petState.mood = .neutral
+        savePetState()
+        objectWillChange.send()
     }
 
     func addExperience(_ amount: Int) {
@@ -96,6 +101,8 @@ class PetViewModel: ObservableObject {
 
         if economy.removeDecorToken(decoration.price) {
             petState.decorations.append(decorationId)
+            savePetState()
+            objectWillChange.send()
             return true
         }
         return false
@@ -104,11 +111,15 @@ class PetViewModel: ObservableObject {
     func unlockSkin(_ skinId: String) {
         if !petState.unlockedSkins.contains(skinId) {
             petState.unlockedSkins.append(skinId)
+            savePetState()
+            objectWillChange.send()
         }
     }
 
     func changeHomeTheme(_ theme: PetState.HomeTheme) {
         petState.homeTheme = theme
+        savePetState()
+        objectWillChange.send()
     }
 
     // MARK: - Periodic Updates

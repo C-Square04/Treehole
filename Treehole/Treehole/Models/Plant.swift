@@ -102,17 +102,24 @@ struct PlantState: Codable, Identifiable {
     mutating func water() {
         hydrationLevel = min(100, hydrationLevel + 40)
         lastWateredAt = Date()
-        experience += 5
+
+        // Cap experience at 100 per stage
+        let maxExpPerStage = 100
+        experience = min(experience + 5, maxExpPerStage)
 
         // Update growth stage based on experience
         if experience >= 100 && growthStage == .seed {
             growthStage = .sprout
-        } else if experience >= 250 && growthStage == .sprout {
+            experience = 0 // Reset experience for next stage
+        } else if experience >= 100 && growthStage == .sprout {
             growthStage = .growing
-        } else if experience >= 500 && growthStage == .growing {
+            experience = 0
+        } else if experience >= 100 && growthStage == .growing {
             growthStage = .blooming
-        } else if experience >= 1000 && growthStage == .blooming {
+            experience = 0
+        } else if experience >= 100 && growthStage == .blooming {
             growthStage = .mature
+            experience = 0
         }
     }
 

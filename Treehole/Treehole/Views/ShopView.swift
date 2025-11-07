@@ -16,6 +16,7 @@ struct ShopView: View {
         case food
         case decorations
         case tasks
+        case rewards
     }
 
     var body: some View {
@@ -56,26 +57,34 @@ struct ShopView: View {
                         }
 
                         // Tab selector
-                        HStack(spacing: 8) {
-                            ShopTabButton(
-                                title: "Food",
-                                icon: "🍔",
-                                isSelected: selectedTab == .food,
-                                action: { selectedTab = .food }
-                            )
-                            ShopTabButton(
-                                title: "Decor",
-                                icon: "🏠",
-                                isSelected: selectedTab == .decorations,
-                                action: { selectedTab = .decorations }
-                            )
-                            ShopTabButton(
-                                title: "Tasks",
-                                icon: "✓",
-                                isSelected: selectedTab == .tasks,
-                                action: { selectedTab = .tasks }
-                            )
-                            Spacer()
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ShopTabButton(
+                                    title: "Food",
+                                    icon: "🍔",
+                                    isSelected: selectedTab == .food,
+                                    action: { selectedTab = .food }
+                                )
+                                ShopTabButton(
+                                    title: "Decor",
+                                    icon: "🏠",
+                                    isSelected: selectedTab == .decorations,
+                                    action: { selectedTab = .decorations }
+                                )
+                                ShopTabButton(
+                                    title: "Tasks",
+                                    icon: "✓",
+                                    isSelected: selectedTab == .tasks,
+                                    action: { selectedTab = .tasks }
+                                )
+                                ShopTabButton(
+                                    title: "Rewards",
+                                    icon: "⭐",
+                                    isSelected: selectedTab == .rewards,
+                                    action: { selectedTab = .rewards }
+                                )
+                                Spacer()
+                            }
                         }
                     }
                     .padding()
@@ -90,6 +99,8 @@ struct ShopView: View {
                             DecorationsShopView(economyViewModel: economyViewModel, petViewModel: petViewModel)
                         case .tasks:
                             TasksShopView(economyViewModel: economyViewModel)
+                        case .rewards:
+                            RewardsListView(economyViewModel: economyViewModel)
                         }
                     }
                 }

@@ -45,6 +45,11 @@ class PetViewModel: ObservableObject {
         objectWillChange.send()
     }
 
+    func petWithReward(economyViewModel: EconomyViewModel) {
+        pet()
+        economyViewModel.grantPetInteractionReward()
+    }
+
     func rest() {
         petState.energy = min(100, petState.energy + 30)
         petState.mood = .neutral

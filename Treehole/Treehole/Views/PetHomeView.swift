@@ -22,22 +22,43 @@ struct PetHomeView: View {
 
                 VStack(spacing: 0) {
                     // Header with economy info
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(viewModel.petState.name)
-                                .font(.headline)
-                            HStack(spacing: 12) {
-                                Label("\(economyViewModel.economy.food)", systemImage: "carrot.fill")
-                                    .font(.caption)
-                                Label("\(economyViewModel.economy.decorationToken)", systemImage: "star.fill")
-                                    .font(.caption)
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(viewModel.petState.name)
+                                    .font(.headline)
+                                HStack(spacing: 12) {
+                                    Label("\(economyViewModel.economy.food)", systemImage: "carrot.fill")
+                                        .font(.caption)
+                                    Label("\(economyViewModel.economy.decorationToken)", systemImage: "star.fill")
+                                        .font(.caption)
+                                }
+                            }
+                            Spacer()
+                            Button(action: { showDecorationShop = true }) {
+                                Image(systemName: "list.bullet")
+                                    .foregroundColor(TreeholeTheme.softPurple)
                             }
                         }
-                        Spacer()
-                        Button(action: { showDecorationShop = true }) {
-                            Image(systemName: "list.bullet")
-                                .foregroundColor(TreeholeTheme.softPurple)
+
+                        // Login Streak Bonus
+                        HStack(spacing: 12) {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Login Streak: \(economyViewModel.loginStreak) days")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                Text("Earn up to \(min(economyViewModel.loginStreak * 2, 25)) bonus stars daily")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(TreeholeTheme.warmGold.opacity(0.3))
+                        .cornerRadius(8)
                     }
                     .padding()
                     .background(TreeholeTheme.glassLight)
@@ -85,7 +106,7 @@ struct PetHomeView: View {
                             _ = economyViewModel.spendFood(5)
                         }
                         ActionButton(icon: "👋", label: "Pet", color: TreeholeTheme.skyBlue.opacity(0.8)) {
-                            viewModel.pet()
+                            viewModel.petWithReward(economyViewModel: economyViewModel)
                         }
                         ActionButton(icon: "😴", label: "Rest", color: TreeholeTheme.gentleLavender.opacity(0.8)) {
                             viewModel.rest()

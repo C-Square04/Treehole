@@ -115,7 +115,8 @@ struct PlantGardenView: View {
                                                 PlantListItemView(
                                                     plant: plant,
                                                     isSelected: selectedPlantId == plant.id,
-                                                    action: { selectedPlantId = plant.id }
+                                                    action: { selectedPlantId = plant.id },
+                                                    onDelete: { viewModel.deletePlant(plant.id) }
                                                 )
                                             }
                                         }
@@ -144,18 +145,39 @@ struct PlantDetailCardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(plant.name)
                         .font(.headline)
-                    Text(plant.species.emoji + " " + plant.species.description)
+                    Text(plant.species.description)
                         .font(.caption)
                 }
                 Spacer()
-                Text(plant.growthStage.icon)
-                    .font(.title2)
             }
+
+            // Plant Visual Display
+            VStack {
+                PlantVisualView(
+                    growthStage: plant.growthStage,
+                    hydrationLevel: plant.hydrationLevel,
+                    experience: plant.experience
+                )
+            }
+            .frame(height: 280)
+            .frame(maxWidth: .infinity)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.98, green: 0.97, blue: 0.95),
+                        Color(red: 0.95, green: 0.97, blue: 0.93)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(8)
+            .padding(.vertical, 8)
 
             // Status bars
             VStack(spacing: 8) {
                 StatusBar(label: "Hydration", value: plant.hydrationLevel, maxValue: 100, color: .blue)
-                StatusBar(label: "Experience", value: plant.experience, maxValue: 100, color: .green)
+                StatusBar(label: "Growth", value: plant.experience, maxValue: 100, color: .green)
             }
 
             HStack(spacing: 12) {
@@ -189,6 +211,8 @@ struct PlantListItemView: View {
     let plant: PlantState
     let isSelected: Bool
     let action: () -> Void
+    let onDelete: () -> Void
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         Button(action: action) {
@@ -214,6 +238,17 @@ struct PlantListItemView: View {
             .cornerRadius(8)
         }
         .foregroundColor(.primary)
+        .contextMenu {
+            Button(role: .destructive, action: { showDeleteConfirm = true }) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .alert("Delete Plant?", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive, action: onDelete)
+        } message: {
+            Text("Are you sure you want to delete \(plant.name)? This cannot be undone.")
+        }
     }
 }
 

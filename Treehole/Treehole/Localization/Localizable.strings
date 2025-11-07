@@ -1,0 +1,147 @@
+/* English Localizable Strings */
+
+// MARK: - Tab Navigation
+"tab.clouds" = "Clouds";
+"tab.pet" = "Pet";
+"tab.plant" = "Plant";
+"tab.journal" = "Journal";
+"tab.shop" = "Shop";
+
+// MARK: - Authentication
+"auth.login" = "Login";
+"auth.logout" = "Logout";
+"auth.signInWithApple" = "Sign in with Apple";
+"auth.signInWithGoogle" = "Sign in with Google";
+"auth.signInWithEmail" = "Sign in with Email";
+"auth.email" = "Email";
+"auth.password" = "Password";
+"auth.register" = "Register";
+"auth.guest" = "Continue as Guest";
+"auth.guestLimited" = "As a guest, you can view but cannot post or save data";
+
+// MARK: - Cloud Posts
+"cloud.title" = "Floating Clouds";
+"cloud.newPost" = "Share Your Thoughts";
+"cloud.post" = "Post";
+"cloud.delete" = "Delete";
+"cloud.translate" = "Translate";
+"cloud.restore" = "Restore Original";
+"cloud.mood" = "How are you feeling?";
+"cloud.moodHappy" = "Happy";
+"cloud.moodSad" = "Sad";
+"cloud.moodAngry" = "Angry";
+"cloud.moodAnxious" = "Anxious";
+"cloud.moodTired" = "Tired";
+"cloud.moodConfused" = "Confused";
+"cloud.moodHopeful" = "Hopeful";
+"cloud.moodCalm" = "Calm";
+"cloud.reply" = "NPC Reply";
+"cloud.character" = "Character Count: %d/500";
+"cloud.emptyState" = "No clouds yet. Share your thoughts!";
+"cloud.postSuccess" = "Your cloud has been posted!";
+
+// MARK: - Pet
+"pet.title" = "My Companion";
+"pet.feed" = "Feed";
+"pet.pet" = "Pet";
+"pet.rest" = "Rest";
+"pet.hunger" = "Hunger";
+"pet.energy" = "Energy";
+"pet.mood" = "Mood";
+"pet.level" = "Level %d";
+"pet.experience" = "Experience";
+"pet.home" = "Pet Home";
+"pet.decorations" = "Decorations";
+"pet.skins" = "Skins";
+"pet.theme" = "Home Theme";
+"pet.themeDay" = "Daylight";
+"pet.themeNight" = "Night";
+"pet.themeSunset" = "Sunset";
+"pet.themeGarden" = "Garden";
+
+// MARK: - Plant
+"plant.title" = "My Garden";
+"plant.water" = "Water";
+"plant.health" = "Health";
+"plant.hydration" = "Hydration";
+"plant.stage" = "Stage: %@";
+"plant.seed" = "Seed";
+"plant.sprout" = "Sprout";
+"plant.growing" = "Growing";
+"plant.blooming" = "Blooming";
+"plant.mature" = "Mature";
+"plant.lastWatered" = "Last watered: %@";
+"plant.emptyState" = "Create your first plant!";
+"plant.create" = "New Plant";
+
+// MARK: - Journal
+"journal.title" = "My Journal";
+"journal.write" = "Write";
+"journal.newEntry" = "New Entry";
+"journal.prompt" = "Today's Prompt";
+"journal.entries" = "Entries";
+"journal.entryCount" = "%d entries";
+"journal.thisWeek" = "This Week: %d";
+"journal.thisMonth" = "This Month: %d";
+"journal.reward" = "Reward";
+"journal.claimed" = "Claimed";
+"journal.claim" = "Claim Reward";
+"journal.emptyState" = "Start reflecting today!";
+
+// MARK: - Shop
+"shop.title" = "Shop";
+"shop.decorations" = "Decorations";
+"shop.food" = "Pet Food";
+"shop.skins" = "Pet Skins";
+"shop.price" = "Price: %d";
+"shop.owned" = "Owned";
+"shop.purchase" = "Purchase";
+"shop.insufficient" = "Insufficient Balance";
+"shop.currency.food" = "Food";
+"shop.currency.decorToken" = "Decor Tokens";
+"shop.currency.gems" = "Gems";
+
+// MARK: - Tasks
+"task.title" = "Daily Tasks";
+"task.daily" = "Daily Tasks";
+"task.weekly" = "Weekly Challenges";
+"task.completed" = "Completed";
+"task.pending" = "Pending";
+"task.reward" = "Reward";
+"task.complete" = "Complete";
+"task.reset" = "Tasks reset tomorrow";
+"task.progress" = "Progress: %d/%d";
+
+// MARK: - Settings
+"settings.title" = "Settings";
+"settings.account" = "Account";
+"settings.profile" = "Profile";
+"settings.language" = "Language";
+"settings.privacy" = "Privacy";
+"settings.notifications" = "Notifications";
+"settings.about" = "About";
+"settings.version" = "Version";
+"settings.logout" = "Logout";
+"settings.deleteAccount" = "Delete Account";
+"settings.privacyPolicy" = "Privacy Policy";
+"settings.termsOfService" = "Terms of Service";
+"settings.anonymous" = "Anonymous";
+"settings.anonymityExplained" = "Your real name is only visible to you. Others see a random alias.";
+"settings.contentModeration" = "Content Moderation";
+"settings.moderationInfo" = "We use AI and community rules to keep the app safe and kind.";
+
+// MARK: - General
+"general.yes" = "Yes";
+"general.no" = "No";
+"general.close" = "Close";
+"general.save" = "Save";
+"general.cancel" = "Cancel";
+"general.delete" = "Delete";
+"general.edit" = "Edit";
+"general.done" = "Done";
+"general.loading" = "Loading...";
+"general.error" = "Error";
+"general.success" = "Success";
+"general.tryAgain" = "Try Again";
+"general.confirm" = "Confirm";
+"general.confirmDelete" = "Are you sure you want to delete this?";

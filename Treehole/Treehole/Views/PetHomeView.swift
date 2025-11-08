@@ -65,22 +65,26 @@ struct PetHomeView: View {
 
                     // Pet Display Area
                     VStack(spacing: 20) {
-                        // Pet Visual - Interactive 3D Cat
+                        // Pet Visual - 2D Cartoon Cat
                         VStack(spacing: 12) {
-                            InteractivePetView(
+                            CartoonCatView(
                                 mood: viewModel.petState.mood,
                                 showFeedingAnimation: viewModel.showFeedingAnimation
                             )
                             .frame(height: 280)
 
-                            Text(viewModel.petState.mood.rawValue)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(TreeholeTheme.textSecondary)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-                                .background(TreeholeTheme.glassLight)
-                                .cornerRadius(12)
+                            HStack(spacing: 8) {
+                                Image(systemName: "heart.fill")
+                                    .foregroundColor(.red)
+                                Text(viewModel.petState.mood.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(TreeholeTheme.textSecondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(TreeholeTheme.glassLight)
+                            .cornerRadius(12)
                         }
                         .padding(.top, 20)
 
@@ -101,14 +105,33 @@ struct PetHomeView: View {
 
                     // Action Buttons
                     HStack(spacing: 12) {
-                        ActionButton(icon: "🍔", label: "Feed", color: TreeholeTheme.mintCream.opacity(0.8)) {
+                        PetActionButton(
+                            emoji: "🍖",
+                            label: "Feed",
+                            color: Color(red: 0.98, green: 0.85, blue: 0.75),
+                            feedbackText: "Nom nom!"
+                        ) {
                             viewModel.feed()
-                            _ = economyViewModel.spendFood(5)
+                            if economyViewModel.economy.food >= 5 {
+                                _ = economyViewModel.spendFood(5)
+                            }
                         }
-                        ActionButton(icon: "👋", label: "Pet", color: TreeholeTheme.skyBlue.opacity(0.8)) {
+
+                        PetActionButton(
+                            emoji: "✨",
+                            label: "Pet",
+                            color: Color(red: 0.85, green: 0.95, blue: 1.0),
+                            feedbackText: "Purr purr"
+                        ) {
                             viewModel.petWithReward(economyViewModel: economyViewModel)
                         }
-                        ActionButton(icon: "😴", label: "Rest", color: TreeholeTheme.gentleLavender.opacity(0.8)) {
+
+                        PetActionButton(
+                            emoji: "😴",
+                            label: "Rest",
+                            color: Color(red: 0.95, green: 0.92, blue: 1.0),
+                            feedbackText: "Zzz..."
+                        ) {
                             viewModel.rest()
                         }
                     }
@@ -202,40 +225,73 @@ struct StatusBar: View {
     }
 }
 
-struct ActionButton: View {
-    let icon: String
+struct PetActionButton: View {
+    let emoji: String
     let label: String
     let color: Color
+    let feedbackText: String
     let action: () -> Void
-    @State private var isPressed: Bool = false
+
+    @State private var isPressed = false
+    @State private var showFeedback = false
+    @State private var floatingText: String = ""
 
     var body: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                isPressed = true
-            }
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isPressed = false
+        VStack(spacing: 0) {
+            ZStack {
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        isPressed = true
+                    }
+                    action()
+                    floatingText = feedbackText
+                    showFeedback = true
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            isPressed = false
+                        }
+                    }
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showFeedback = false
+                    }
+                }) {
+                    VStack(spacing: 6) {
+                        Text(emoji)
+                            .font(.system(size: 36))
+                        Text(label)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(TreeholeTheme.textPrimary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(color)
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                }
+                .scaleEffect(isPressed ? 0.92 : 1.0)
+
+                // Floating feedback text
+                if showFeedback {
+                    VStack {
+                        Text(floatingText)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(6)
+                            .transition(.scale.combined(with: .opacity))
+                            .offset(y: -30)
+
+                        Spacer()
+                    }
                 }
             }
-        }) {
-            VStack(spacing: 8) {
-                Text(icon)
-                    .font(.system(size: 32))
-                Text(label)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(TreeholeTheme.textPrimary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(color)
-            .cornerRadius(TreeholeTheme.cornerMedium)
-            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
         }
-        .scaleEffect(isPressed ? 0.95 : 1.0)
     }
 }
 

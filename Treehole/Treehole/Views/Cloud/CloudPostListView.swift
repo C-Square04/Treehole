@@ -4,7 +4,6 @@ import SwiftData
 struct CloudPostListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
-    @Query(sort: \CloudPost.createdAt, order: .reverse) private var posts: [CloudPost]
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
     @Query private var weeklyChallenges: [WeeklyChallenge]
@@ -17,11 +16,13 @@ struct CloudPostListView: View {
             ZStack {
                 TreeholeTheme.cloudyBackground.ignoresSafeArea()
 
-                if posts.isEmpty {
+                if viewModel.isLoading && viewModel.remotePosts.isEmpty {
+                    ProgressView(L10n.t("Loading clouds...", "加载云朵中..."))
+                } else if viewModel.remotePosts.isEmpty {
                     EmptyStateView(
                         icon: "cloud",
                         title: L10n.t("No Clouds Yet", "还没有云朵"),
-                        message: L10n.t("Share your first thought — it floats away anonymously.", "分享你的第一个想法吧..."),
+                        message: L10n.t("Be the first to share a thought!", "成为第一个分享想法的人！"),
                         actionLabel: L10n.t("Write a Cloud", "写一朵云"),
                         action: { viewModel.showCreation = true }
                     )
@@ -35,14 +36,18 @@ struct CloudPostListView: View {
                                 .font(.caption)
                                 .foregroundStyle(TreeholeTheme.textSecondary)
                             Spacer()
+                            if viewModel.isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            }
                         }
                         .padding(.horizontal)
                         .padding(.top, TreeholeTheme.spacingTight)
 
                         LazyVStack(spacing: TreeholeTheme.spacingMedium) {
-                            ForEach(posts) { post in
+                            ForEach(viewModel.remotePosts) { post in
                                 NavigationLink(value: post.id) {
-                                    CloudPostCard(post: post, lang: appState.preferredLanguage)
+                                    CloudPostCard(post: post)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -50,12 +55,30 @@ struct CloudPostListView: View {
                         .padding(.horizontal)
                         .padding(.bottom, TreeholeTheme.spacingXL)
                     }
+                    .refreshable {
+                        await viewModel.fetchPosts()
+                    }
+                }
+
+                // Error banner
+                if let error = viewModel.errorMessage {
+                    VStack {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, TreeholeTheme.spacingSmall)
+                            .padding(.vertical, 6)
+                            .background(.red.opacity(0.8), in: Capsule())
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .navigationTitle(L10n.t("Clouds", "云朵"))
             .navigationDestination(for: String.self) { postId in
-                if let post = posts.first(where: { $0.id == postId }) {
-                    CloudPostDetailView(post: post)
+                if let post = viewModel.remotePosts.first(where: { $0.id == postId }) {
+                    CloudPostDetailView(post: post, viewModel: viewModel)
                 } else {
                     ContentUnavailableView("Cloud Not Found", systemImage: "cloud.slash")
                 }
@@ -70,7 +93,8 @@ struct CloudPostListView: View {
                 }
             }
             .sheet(isPresented: $viewModel.showCreation, onDismiss: {
-                if posts.count > previousPostCount {
+                // Check if a new post was added
+                if viewModel.remotePosts.count > previousPostCount {
                     let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                     if let task = dailyTasks.first(where: { $0.type == .post && !$0.isCompleted }) {
                         economyVM.completeTask(task, economy: economy)
@@ -78,13 +102,14 @@ struct CloudPostListView: View {
                     economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
                     try? modelContext.save()
                 }
-                previousPostCount = posts.count
+                previousPostCount = viewModel.remotePosts.count
             }) {
                 CloudPostCreationView(viewModel: viewModel)
             }
-            .onAppear {
+            .task {
+                await viewModel.fetchPosts()
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
-                previousPostCount = posts.count
+                previousPostCount = viewModel.remotePosts.count
                 try? modelContext.save()
             }
         }
@@ -94,19 +119,23 @@ struct CloudPostListView: View {
 // MARK: - Cloud Post Card
 
 private struct CloudPostCard: View {
-    let post: CloudPost
-    let lang: String
+    let post: RemoteCloudPost
 
     var body: some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
             HStack {
-                Text(post.moodTag.emoji)
+                Text(post.mood.emoji)
                     .font(.title3)
                 Text(post.authorAlias)
                     .font(.caption)
                     .foregroundStyle(TreeholeTheme.textLight)
+                if post.isOwn {
+                    Text(L10n.t("(You)", "(你)"))
+                        .font(.caption2)
+                        .foregroundStyle(TreeholeTheme.softPurple)
+                }
                 Spacer()
-                Text(post.createdAt, style: .relative)
+                Text(post.date, style: .relative)
                     .font(.caption2)
                     .foregroundStyle(TreeholeTheme.textLight)
             }

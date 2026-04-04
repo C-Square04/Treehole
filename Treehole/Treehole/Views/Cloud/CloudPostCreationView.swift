@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct CloudPostCreationView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: CloudPostViewModel
@@ -70,11 +69,12 @@ struct CloudPostCreationView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.t("Post", "发布")) {
-                        viewModel.createPost(
-                            context: modelContext,
-                            authorAlias: appState.currentAlias,
-                            language: appState.preferredLanguage
-                        )
+                        Task {
+                            await viewModel.createPost(
+                                authorAlias: appState.currentAlias,
+                                language: appState.preferredLanguage
+                            )
+                        }
                     }
                     .disabled(!viewModel.isValid)
                     .tint(TreeholeTheme.coral)

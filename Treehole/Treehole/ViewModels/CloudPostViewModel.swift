@@ -8,27 +8,66 @@ final class CloudPostViewModel {
     var draftMood: MoodTag = .calm
     var showCreation: Bool = false
 
+    // Remote feed
+    var remotePosts: [RemoteCloudPost] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
+
     var characterCount: Int { draftText.count }
     var isValid: Bool { !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draftText.count <= 500 }
 
-    func createPost(context: ModelContext, authorAlias: String, language: String) {
-        let npcReply = generateNPCReply(for: draftMood, language: language)
-        let post = CloudPost(
-            authorAlias: authorAlias,
-            moodTag: draftMood,
-            text: draftText.trimmingCharacters(in: .whitespacesAndNewlines),
-            npcReplyText: npcReply,
-            sourceLanguage: language
-        )
-        context.insert(post)
-        try? context.save()
-        draftText = ""
-        draftMood = .calm
-        showCreation = false
+    // MARK: - Fetch public feed from Supabase
+
+    func fetchPosts() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            remotePosts = try await SupabaseService.fetchPosts(limit: 50)
+        } catch {
+            errorMessage = error.localizedDescription
+            // Keep existing posts on error (offline graceful degradation)
+        }
+        isLoading = false
     }
 
-    func deletePost(_ post: CloudPost, context: ModelContext) {
-        context.delete(post)
+    // MARK: - Create post (uploads to Supabase)
+
+    func createPost(authorAlias: String, language: String) async {
+        let text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+
+        do {
+            // Get NPC reply from server
+            let npcReply = try await SupabaseService.fetchNPCReply(mood: draftMood.rawValue, language: language)
+
+            // Create post on Supabase
+            let newPost = try await SupabaseService.createPost(
+                authorAlias: authorAlias,
+                moodTag: draftMood,
+                text: text,
+                npcReply: npcReply,
+                language: language
+            )
+
+            // Insert at top of local feed
+            remotePosts.insert(newPost, at: 0)
+            draftText = ""
+            draftMood = .calm
+            showCreation = false
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Delete own post
+
+    func deletePost(id: String) async {
+        do {
+            try await SupabaseService.deletePost(id: id)
+            remotePosts.removeAll { $0.id == id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func resetDraft() {
@@ -36,9 +75,9 @@ final class CloudPostViewModel {
         draftMood = .calm
     }
 
-    // MARK: - NPC Reply Templates
+    // MARK: - Fallback NPC reply (offline)
 
-    func generateNPCReply(for mood: MoodTag, language: String) -> String {
+    func generateNPCReplyOffline(for mood: MoodTag, language: String) -> String {
         let replies: [MoodTag: (zh: String, en: String)] = [
             .happy: ("真好！分享你的喜悦让我也很开心 😊", "That's wonderful! Your happiness brightens my day 😊"),
             .sad: ("听你这样说，我也感到你的伤心。给自己一些温柔吧 💙", "I hear your sadness. Please be gentle with yourself 💙"),
@@ -49,7 +88,6 @@ final class CloudPostViewModel {
             .hopeful: ("你的希望很珍贵！请珍惜这份光芒", "Your hope is precious! Hold onto that light"),
             .calm: ("平静的你，散发着力量。继续保持这份宁静", "Your calm brings peace. That's beautiful"),
         ]
-
         let reply = replies[mood] ?? ("感谢你的分享 💙", "Thank you for sharing 💙")
         return language == "zh-Hans" ? reply.0 : reply.1
     }

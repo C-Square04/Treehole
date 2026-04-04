@@ -1,11 +1,10 @@
 import SwiftUI
-import SwiftData
 
 struct CloudPostDetailView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    let post: CloudPost
+    let post: RemoteCloudPost
+    var viewModel: CloudPostViewModel
     @State private var showDeleteConfirmation = false
 
     var body: some View {
@@ -16,18 +15,23 @@ struct CloudPostDetailView: View {
                 VStack(alignment: .leading, spacing: TreeholeTheme.spacingLarge) {
                     // Header
                     HStack {
-                        Text(post.moodTag.emoji)
+                        Text(post.mood.emoji)
                             .font(.largeTitle)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(post.authorAlias)
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
-                            Text(post.createdAt, style: .date)
+                            Text(post.date, style: .date)
                                 .font(.caption)
                                 .foregroundStyle(TreeholeTheme.textLight)
                         }
+                        if post.isOwn {
+                            Text(L10n.t("(You)", "(你)"))
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.softPurple)
+                        }
                         Spacer()
-                        Text(appState.preferredLanguage == "zh-Hans" ? post.moodTag.labelZH : post.moodTag.labelEN)
+                        Text(appState.preferredLanguage == "zh-Hans" ? post.mood.labelZH : post.mood.labelEN)
                             .font(.caption)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -72,18 +76,22 @@ struct CloudPostDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .destructiveAction) {
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Image(systemName: "trash")
+            if post.isOwn {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
                 }
             }
         }
         .confirmationDialog(L10n.t("Delete this cloud?", "删除这朵云？"), isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button(L10n.t("Delete", "删除"), role: .destructive) {
-                modelContext.delete(post)
-                dismiss()
+                Task {
+                    await viewModel.deletePost(id: post.id)
+                    dismiss()
+                }
             }
         }
     }

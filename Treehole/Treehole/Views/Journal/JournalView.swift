@@ -20,23 +20,27 @@ struct JournalView: View {
             ZStack {
                 TreeholeTheme.warmBackground.ignoresSafeArea()
 
-                if entries.isEmpty {
-                    EmptyStateView(
-                        icon: "book.closed",
-                        title: L10n.t("Start Your Journal", "开始写日记"),
-                        message: L10n.t("Write your first entry to begin reflecting on your feelings.", "写下你的第一篇日记吧..."),
-                        actionLabel: L10n.t("Write Entry", "写日记"),
-                        action: { showNewEntry = true }
-                    )
-                } else {
-                    ScrollView {
-                        VStack(spacing: TreeholeTheme.spacingMedium) {
+                ScrollView {
+                    VStack(spacing: TreeholeTheme.spacingMedium) {
 
-                            // MARK: - Mood Week Strip
-                            MoodWeekStrip(entries: entries)
-                                .padding(.horizontal, TreeholeTheme.spacingMedium)
-                                .padding(.top, TreeholeTheme.spacingSmall)
+                        // MARK: - Mood Week Strip (always visible)
+                        MoodWeekStrip(entries: entries)
+                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+                            .padding(.top, TreeholeTheme.spacingSmall)
 
+                        if entries.isEmpty {
+                            // Empty state below week strip
+                            VStack(spacing: TreeholeTheme.spacingMedium) {
+                                Spacer().frame(height: 40)
+                                EmptyStateView(
+                                    icon: "book.closed",
+                                    title: L10n.t("Start Your Journal", "开始写日记"),
+                                    message: L10n.t("Write your first entry to begin reflecting on your feelings.", "写下你的第一篇日记吧..."),
+                                    actionLabel: L10n.t("Write Entry", "写日记"),
+                                    action: { showNewEntry = true }
+                                )
+                            }
+                        } else {
                             // MARK: - Compact Stats Row
                             HStack(spacing: TreeholeTheme.spacingMedium) {
                                 MiniStat(

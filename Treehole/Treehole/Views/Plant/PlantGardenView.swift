@@ -5,7 +5,10 @@ import SwiftData
 
 struct PlantGardenView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
+    @Query private var economies: [Economy]
+    @Query private var dailyTasks: [DailyTask]
 
     @State private var selectedPlantID: String?
     @State private var showAddSheet = false
@@ -13,6 +16,7 @@ struct PlantGardenView: View {
     @State private var feedbackText: String?
     @State private var plantToDelete: Plant?
     @State private var showDeleteConfirm = false
+    @State private var economyVM = EconomyViewModel()
 
     private let maxPlants = 5
 
@@ -42,7 +46,7 @@ struct PlantGardenView: View {
                     }
                 }
             }
-            .navigationTitle("Garden")
+            .navigationTitle(L10n.t("Garden", "花园"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -66,23 +70,28 @@ struct PlantGardenView: View {
                 }
             }
             .confirmationDialog(
-                "Remove Plant",
+                L10n.t("Remove Plant", "移除植物"),
                 isPresented: $showDeleteConfirm,
                 titleVisibility: .visible
             ) {
-                Button("Delete", role: .destructive) {
+                Button(L10n.t("Delete", "删除"), role: .destructive) {
                     if let plant = plantToDelete {
                         deletePlant(plant)
                     }
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(L10n.t("Cancel", "取消"), role: .cancel) {}
             } message: {
                 if let plant = plantToDelete {
-                    Text("Are you sure you want to remove \"\(plant.name)\"? This cannot be undone.")
+                    Text(L10n.t(
+                        "Are you sure you want to remove \"\(plant.name)\"? This cannot be undone.",
+                        "确定要移除「\(plant.name)」吗？此操作无法撤销。"
+                    ))
                 }
             }
             .onAppear {
                 plants.forEach { $0.updateHydration() }
+                _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+                try? modelContext.save()
             }
         }
     }
@@ -94,9 +103,9 @@ struct PlantGardenView: View {
             Spacer()
             EmptyStateView(
                 icon: "leaf.fill",
-                title: "No Plants Yet",
-                message: "Plant your first seed and watch it grow!",
-                actionLabel: "Plant a Seed"
+                title: L10n.t("No Plants Yet", "还没有植物"),
+                message: L10n.t("Plant your first seed and watch it grow!", "种下你的第一颗种子吧！"),
+                actionLabel: L10n.t("Plant a Seed", "播种")
             ) {
                 showAddSheet = true
             }
@@ -136,7 +145,7 @@ struct PlantGardenView: View {
                                     .font(.title2)
                                     .foregroundStyle(TreeholeTheme.textSecondary)
                             }
-                            Text("Add")
+                            Text(L10n.t("Add", "添加"))
                                 .font(.caption2)
                                 .foregroundStyle(TreeholeTheme.textSecondary)
                         }
@@ -153,6 +162,8 @@ struct PlantGardenView: View {
 
     @ViewBuilder
     private func plantDetailSection(plant: Plant) -> some View {
+        let lang = appState.preferredLanguage
+
         // Plant visual
         PlantVisualView(
             growthStage: plant.growthStage,
@@ -178,7 +189,7 @@ struct PlantGardenView: View {
             Text("\(plant.species.emoji) \(plant.name)")
                 .font(.title2.bold())
                 .foregroundStyle(TreeholeTheme.textPrimary)
-            Text("Growing Stage: \(plant.growthStage.labelEN)")
+            Text("\(L10n.t("Growing Stage:", "生长阶段：")) \(lang == "zh-Hans" ? plant.growthStage.labelZH : plant.growthStage.labelEN)")
                 .font(.subheadline)
                 .foregroundStyle(TreeholeTheme.textSecondary)
         }
@@ -186,8 +197,8 @@ struct PlantGardenView: View {
         // Growth progress card
         VStack(spacing: TreeholeTheme.spacingSmall) {
             StatBadge(
-                label: "Growth Stage",
-                value: "\(plant.growthStage.icon) \(plant.growthStage.labelEN) (\(plant.experience)/100 XP)",
+                label: L10n.t("Growth Stage", "生长阶段"),
+                value: "\(plant.growthStage.icon) \(lang == "zh-Hans" ? plant.growthStage.labelZH : plant.growthStage.labelEN) (\(plant.experience)/100 XP)",
                 icon: "chart.bar.fill",
                 color: TreeholeTheme.mintCream
             )
@@ -208,8 +219,8 @@ struct PlantGardenView: View {
         // Hydration card
         VStack(spacing: TreeholeTheme.spacingSmall) {
             StatBadge(
-                label: "Hydration",
-                value: "\(plant.hydrationLevel)% - \(plant.hydrationDescription)",
+                label: L10n.t("Hydration", "水分"),
+                value: "\(plant.hydrationLevel)% - \(hydrationDescription(plant: plant, lang: lang))",
                 icon: "drop.fill",
                 color: TreeholeTheme.skyBlue
             )
@@ -221,9 +232,15 @@ struct PlantGardenView: View {
         // Water button
         Button {
             plant.water()
-            showFeedback("+40 Hydration, +5 XP")
+            let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+            economy.addFood(3)
+            if let task = dailyTasks.first(where: { $0.type == .waterPlant && !$0.isCompleted }) {
+                economyVM.completeTask(task, economy: economy)
+            }
+            try? modelContext.save()
+            showFeedback(L10n.t("+40 Hydration, +5 XP, +3 🍖", "+40 水分, +5 经验, +3 🍖"))
         } label: {
-            Label("Water Plant", systemImage: "drop.fill")
+            Label(L10n.t("Water Plant", "浇水"), systemImage: "drop.fill")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, TreeholeTheme.spacingSmall)
@@ -235,6 +252,19 @@ struct PlantGardenView: View {
     }
 
     // MARK: - Helpers
+
+    private func hydrationDescription(plant: Plant, lang: String) -> String {
+        if lang == "zh-Hans" {
+            switch plant.hydrationLevel {
+            case 75...100: return "充足"
+            case 50..<75: return "适中"
+            case 25..<50: return "干燥"
+            default: return "极度干旱"
+            }
+        } else {
+            return plant.hydrationDescription
+        }
+    }
 
     private func deletePlant(_ plant: Plant) {
         let wasSelected = plant.id == selectedPlantID
@@ -295,7 +325,7 @@ private struct PlantThumbnailButton: View {
             Button(role: .destructive) {
                 onDelete()
             } label: {
-                Label("Remove Plant", systemImage: "trash")
+                Label(L10n.t("Remove Plant", "移除植物"), systemImage: "trash")
             }
         }
     }
@@ -305,12 +335,15 @@ private struct PlantThumbnailButton: View {
 
 private struct AddPlantSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     var onAdd: (String, PlantSpecies) -> Void
 
     @State private var selectedSpecies: PlantSpecies = .sunflower
     @State private var plantName: String = PlantSpecies.sunflower.labelEN
 
     var body: some View {
+        let lang = appState.preferredLanguage
+
         NavigationStack {
             ZStack {
                 TreeholeTheme.gardenBackground.ignoresSafeArea()
@@ -319,7 +352,7 @@ private struct AddPlantSheet: View {
                     VStack(spacing: TreeholeTheme.spacingLarge) {
                         // Species picker
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                            Text("Choose a Species")
+                            Text(L10n.t("Choose a Species", "选择品种"))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
                                 .padding(.horizontal)
@@ -329,8 +362,9 @@ private struct AddPlantSheet: View {
                                     ForEach(PlantSpecies.allCases) { species in
                                         Button {
                                             selectedSpecies = species
-                                            if plantName.isEmpty || PlantSpecies.allCases.map(\.labelEN).contains(plantName) {
-                                                plantName = species.labelEN
+                                            let allLabels = PlantSpecies.allCases.flatMap { [$0.labelEN, $0.labelZH] }
+                                            if plantName.isEmpty || allLabels.contains(plantName) {
+                                                plantName = lang == "zh-Hans" ? species.labelZH : species.labelEN
                                             }
                                         } label: {
                                             VStack(spacing: 8) {
@@ -352,7 +386,7 @@ private struct AddPlantSheet: View {
                                                     Text(species.emoji)
                                                         .font(.largeTitle)
                                                 }
-                                                Text(species.labelEN)
+                                                Text(lang == "zh-Hans" ? species.labelZH : species.labelEN)
                                                     .font(.caption)
                                                     .foregroundStyle(selectedSpecies == species
                                                         ? TreeholeTheme.textPrimary
@@ -368,10 +402,10 @@ private struct AddPlantSheet: View {
 
                         // Name field
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                            Text("Plant Name")
+                            Text(L10n.t("Plant Name", "植物名称"))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
-                            TextField("Enter a name", text: $plantName)
+                            TextField(L10n.t("Enter a name", "输入名称"), text: $plantName)
                                 .textFieldStyle(.roundedBorder)
                                 .padding(.vertical, 4)
                         }
@@ -381,10 +415,10 @@ private struct AddPlantSheet: View {
                         VStack(spacing: 8) {
                             Text(selectedSpecies.emoji)
                                 .font(.system(size: 64))
-                            Text(plantName.isEmpty ? selectedSpecies.labelEN : plantName)
+                            Text(plantName.isEmpty ? (lang == "zh-Hans" ? selectedSpecies.labelZH : selectedSpecies.labelEN) : plantName)
                                 .font(.title3.bold())
                                 .foregroundStyle(TreeholeTheme.textPrimary)
-                            Text("Starting as a Seed")
+                            Text(L10n.t("Starting as a Seed", "从种子开始"))
                                 .font(.caption)
                                 .foregroundStyle(TreeholeTheme.textSecondary)
                         }
@@ -396,10 +430,10 @@ private struct AddPlantSheet: View {
                         // Plant button
                         Button {
                             let finalName = plantName.trimmingCharacters(in: .whitespaces)
-                            onAdd(finalName.isEmpty ? selectedSpecies.labelEN : finalName, selectedSpecies)
+                            onAdd(finalName.isEmpty ? (lang == "zh-Hans" ? selectedSpecies.labelZH : selectedSpecies.labelEN) : finalName, selectedSpecies)
                             dismiss()
                         } label: {
-                            Label("Plant Seed", systemImage: "leaf.fill")
+                            Label(L10n.t("Plant Seed", "播种"), systemImage: "leaf.fill")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, TreeholeTheme.spacingSmall)
@@ -411,11 +445,11 @@ private struct AddPlantSheet: View {
                     .padding(.vertical, TreeholeTheme.spacingLarge)
                 }
             }
-            .navigationTitle("New Plant")
+            .navigationTitle(L10n.t("New Plant", "新植物"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.t("Cancel", "取消")) { dismiss() }
                 }
             }
         }

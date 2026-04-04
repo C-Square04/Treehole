@@ -16,7 +16,7 @@ struct CloudPostCreationView: View {
                     VStack(spacing: TreeholeTheme.spacingLarge) {
                         // Mood picker
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                            Text("How are you feeling?")
+                            Text(L10n.t("How are you feeling?", "你现在感觉怎么样？"))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
                             MoodPicker(selectedMood: $viewModel.draftMood)
@@ -24,7 +24,7 @@ struct CloudPostCreationView: View {
 
                         // Text editor
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                            Text("Share your thoughts...")
+                            Text(L10n.t("Share your thoughts...", "分享你的想法..."))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
 
@@ -50,7 +50,7 @@ struct CloudPostCreationView: View {
                         HStack(spacing: TreeholeTheme.spacingTight) {
                             Image(systemName: "theatermasks")
                                 .foregroundStyle(TreeholeTheme.softPurple)
-                            Text("Posting as \(appState.currentAlias)")
+                            Text("\(L10n.t("Posting as", "发布身份")) \(appState.currentAlias)")
                                 .font(.caption)
                                 .foregroundStyle(TreeholeTheme.textSecondary)
                         }
@@ -59,17 +59,17 @@ struct CloudPostCreationView: View {
                     .padding()
                 }
             }
-            .navigationTitle("New Cloud")
+            .navigationTitle(L10n.t("New Cloud", "新云朵"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(L10n.t("Cancel", "取消")) {
                         viewModel.resetDraft()
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") {
+                    Button(L10n.t("Post", "发布")) {
                         viewModel.createPost(
                             context: modelContext,
                             authorAlias: appState.currentAlias,

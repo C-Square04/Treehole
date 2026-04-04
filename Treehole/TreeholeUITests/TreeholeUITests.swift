@@ -33,7 +33,7 @@ final class TreeholeUITests: XCTestCase {
         // Check all 5 tabs exist and are tappable
         let tabBar = app.tabBars.firstMatch
 
-        let tabs = ["Clouds", "Pet", "Garden", "Journal", "Settings"]
+        let tabs = ["Clouds", "Pet", "Garden", "Journal", "Shop"]
         for tabName in tabs {
             let tab = tabBar.buttons[tabName]
             XCTAssertTrue(tab.waitForExistence(timeout: 3), "Tab '\(tabName)' should exist")
@@ -218,10 +218,18 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testSettingsDarkModeToggle() throws {
-        app.tabBars.buttons["Settings"].tap()
-        Thread.sleep(forTimeInterval: 0.5)
+        // Navigate to Shop tab
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 1)
 
-        let darkToggle = app.switches["Dark Mode"]
+        // Tap the settings gear in toolbar
+        let gearButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'gear' OR label CONTAINS[c] 'settings' OR label CONTAINS[c] 'Settings'")).firstMatch
+        if gearButton.waitForExistence(timeout: 3) {
+            gearButton.tap()
+            Thread.sleep(forTimeInterval: 1)
+        }
+
+        let darkToggle = app.switches.matching(NSPredicate(format: "label CONTAINS[c] 'Dark'")).firstMatch
         if darkToggle.waitForExistence(timeout: 3) {
             darkToggle.tap()
             Thread.sleep(forTimeInterval: 0.5)
@@ -232,8 +240,25 @@ final class TreeholeUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             add(attachment)
 
-            // Toggle back
             darkToggle.tap()
         }
+    }
+
+    // MARK: - Shop & Tasks
+
+    @MainActor
+    func testShopTabShowsTasksAndCurrency() throws {
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        // Should see currency display (food icon)
+        let shopContent = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '🍖'")).firstMatch
+        XCTAssertTrue(shopContent.waitForExistence(timeout: 5), "Currency display should show food count")
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Shop Tab"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

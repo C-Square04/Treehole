@@ -10,7 +10,10 @@ final class AppState {
     var aliasExpiryDate: Date = Date()
     var showLoginPrompt: Bool = false
     var preferredLanguage: String = "en" {
-        didSet { saveState() }
+        didSet {
+            L10n.lang = preferredLanguage
+            saveState()
+        }
     }
     var isDarkMode: Bool = false {
         didSet { saveState() }
@@ -31,6 +34,7 @@ final class AppState {
 
     init() {
         loadState()
+        L10n.lang = preferredLanguage
         checkAliasExpiry()
     }
 

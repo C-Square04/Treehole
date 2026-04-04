@@ -32,8 +32,8 @@ struct MainTabView: View {
             Tab("Journal", systemImage: "book.fill", value: 3) {
                 JournalView()
             }
-            Tab("Settings", systemImage: "gearshape.fill", value: 4) {
-                SettingsView()
+            Tab("Shop", systemImage: "bag.fill", value: 4) {
+                ShopView()
             }
         }
         .tint(TreeholeTheme.softPurple)

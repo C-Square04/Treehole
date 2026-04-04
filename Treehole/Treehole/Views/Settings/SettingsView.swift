@@ -9,7 +9,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 // Account section
-                Section("Account") {
+                Section(L10n.t("Account", "账户")) {
                     HStack(spacing: TreeholeTheme.spacingSmall) {
                         Image(systemName: "person.circle.fill")
                             .font(.title2)
@@ -17,7 +17,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(appState.currentAlias)
                                 .font(.headline)
-                            Text(appState.isGuest ? "Guest" : "Signed In")
+                            Text(appState.isGuest ? L10n.t("Guest", "访客") : L10n.t("Signed In", "已登录"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -33,7 +33,7 @@ struct SettingsView: View {
                         Button {
                             appState.showLoginPrompt = true
                         } label: {
-                            Label("Sign In", systemImage: "person.badge.plus")
+                            Label(L10n.t("Sign In", "登录"), systemImage: "person.badge.plus")
                         }
                     }
                 }
@@ -43,26 +43,29 @@ struct SettingsView: View {
                     NavigationLink {
                         AliasExplanationView()
                     } label: {
-                        Label("About Aliases", systemImage: "theatermasks")
+                        Label(L10n.t("About Aliases", "关于别名"), systemImage: "theatermasks")
                     }
                 } footer: {
-                    Text("Your alias changes every 7 days to protect your privacy. No one can see your real identity.")
+                    Text(L10n.t(
+                        "Your alias changes every 7 days to protect your privacy. No one can see your real identity.",
+                        "你的别名每7天更换一次以保护你的隐私。没有人能看到你的真实身份。"
+                    ))
                 }
 
                 // Appearance
-                Section("Appearance") {
-                    Picker("Language", selection: $state.preferredLanguage) {
+                Section(L10n.t("Appearance", "外观")) {
+                    Picker(L10n.t("Language", "语言"), selection: $state.preferredLanguage) {
                         Text("English").tag("en")
                         Text("中文").tag("zh-Hans")
                     }
 
-                    Toggle("Dark Mode", isOn: $state.isDarkMode)
+                    Toggle(L10n.t("Dark Mode", "深色模式"), isOn: $state.isDarkMode)
                 }
 
                 // About
-                Section("About") {
+                Section(L10n.t("About", "关于")) {
                     HStack {
-                        Text("Version")
+                        Text(L10n.t("Version", "版本"))
                         Spacer()
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                             .foregroundStyle(.secondary)
@@ -70,7 +73,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Treehole")
                         Spacer()
-                        Text("A safe space for your thoughts")
+                        Text(L10n.t("A safe space for your thoughts", "倾诉心声的安全空间"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -79,13 +82,13 @@ struct SettingsView: View {
                 // Logout
                 if !appState.isGuest {
                     Section {
-                        Button("Sign Out", role: .destructive) {
+                        Button(L10n.t("Sign Out", "退出登录"), role: .destructive) {
                             appState.logout()
                         }
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(L10n.t("Settings", "设置"))
             .sheet(isPresented: $state.showLoginPrompt) {
                 LoginPromptView()
             }
@@ -107,7 +110,7 @@ struct AliasExplanationView: View {
                         .font(.system(size: 48))
                         .foregroundStyle(TreeholeTheme.softPurple)
 
-                    Text("Your Current Alias")
+                    Text(L10n.t("Your Current Alias", "你的当前别名"))
                         .font(.headline)
                         .foregroundStyle(TreeholeTheme.textSecondary)
 
@@ -117,7 +120,7 @@ struct AliasExplanationView: View {
 
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
-                        Text("Changes in \(appState.daysUntilAliasExpiry) days")
+                        Text(L10n.t("Changes in \(appState.daysUntilAliasExpiry) days", "\(appState.daysUntilAliasExpiry) 天后更换"))
                     }
                     .font(.caption)
                     .foregroundStyle(TreeholeTheme.textLight)
@@ -130,36 +133,48 @@ struct AliasExplanationView: View {
                     ExplanationRow(
                         icon: "theatermasks",
                         color: TreeholeTheme.softPurple,
-                        title: "What are aliases?",
-                        text: "Everyone on Treehole gets a random display name. This keeps you completely anonymous when sharing your thoughts."
+                        title: L10n.t("What are aliases?", "什么是别名？"),
+                        text: L10n.t(
+                            "Everyone on Treehole gets a random display name. This keeps you completely anonymous when sharing your thoughts.",
+                            "树洞上的每个人都会获得一个随机显示名。这让你在分享想法时保持完全匿名。"
+                        )
                     )
                     Divider()
                     ExplanationRow(
                         icon: "arrow.triangle.2.circlepath",
                         color: TreeholeTheme.skyBlue,
-                        title: "Automatic rotation",
-                        text: "Your alias changes every 7 days automatically. You'll receive a notification when it changes so you know your new name."
+                        title: L10n.t("Automatic rotation", "自动轮换"),
+                        text: L10n.t(
+                            "Your alias changes every 7 days automatically. You'll receive a notification when it changes so you know your new name.",
+                            "你的别名每7天自动更换。更换时你会收到通知，以便知道你的新名字。"
+                        )
                     )
                     Divider()
                     ExplanationRow(
                         icon: "lock.shield",
                         color: TreeholeTheme.mintCream,
-                        title: "Your privacy matters",
-                        text: "No one — not even other users — can see your real name or connect your posts to your identity. Your real name stays on your device only."
+                        title: L10n.t("Your privacy matters", "你的隐私很重要"),
+                        text: L10n.t(
+                            "No one — not even other users — can see your real name or connect your posts to your identity. Your real name stays on your device only.",
+                            "没有人——包括其他用户——可以看到你的真实姓名或将你的帖子与你的身份联系起来。你的真实姓名仅保存在你的设备上。"
+                        )
                     )
                     Divider()
                     ExplanationRow(
                         icon: "link.badge.plus",
                         color: TreeholeTheme.coral,
-                        title: "Posts are disconnected",
-                        text: "When your alias changes, your old posts still show the old alias. This makes it even harder for anyone to track your activity."
+                        title: L10n.t("Posts are disconnected", "帖子相互独立"),
+                        text: L10n.t(
+                            "When your alias changes, your old posts still show the old alias. This makes it even harder for anyone to track your activity.",
+                            "当你的别名更改时，你的旧帖子仍显示旧别名。这让任何人都更难追踪你的活动。"
+                        )
                     )
                 }
                 .glassCard()
             }
             .padding()
         }
-        .navigationTitle("About Aliases")
+        .navigationTitle(L10n.t("About Aliases", "关于别名"))
         .treeholeBackground()
     }
 }

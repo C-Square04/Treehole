@@ -5,7 +5,11 @@ struct CloudPostListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
     @Query(sort: \CloudPost.createdAt, order: .reverse) private var posts: [CloudPost]
+    @Query private var economies: [Economy]
+    @Query private var dailyTasks: [DailyTask]
     @State private var viewModel = CloudPostViewModel()
+    @State private var economyVM = EconomyViewModel()
+    @State private var previousPostCount: Int = 0
 
     var body: some View {
         NavigationStack {
@@ -15,9 +19,9 @@ struct CloudPostListView: View {
                 if posts.isEmpty {
                     EmptyStateView(
                         icon: "cloud",
-                        title: "No Clouds Yet",
-                        message: "Share your first thought — it floats away anonymously.",
-                        actionLabel: "Write a Cloud",
+                        title: L10n.t("No Clouds Yet", "还没有云朵"),
+                        message: L10n.t("Share your first thought — it floats away anonymously.", "分享你的第一个想法吧..."),
+                        actionLabel: L10n.t("Write a Cloud", "写一朵云"),
                         action: { viewModel.showCreation = true }
                     )
                 } else {
@@ -37,7 +41,7 @@ struct CloudPostListView: View {
                         LazyVStack(spacing: TreeholeTheme.spacingMedium) {
                             ForEach(posts) { post in
                                 NavigationLink(value: post.id) {
-                                    CloudPostCard(post: post)
+                                    CloudPostCard(post: post, lang: appState.preferredLanguage)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -47,7 +51,7 @@ struct CloudPostListView: View {
                     }
                 }
             }
-            .navigationTitle("Clouds")
+            .navigationTitle(L10n.t("Clouds", "云朵"))
             .navigationDestination(for: String.self) { postId in
                 if let post = posts.first(where: { $0.id == postId }) {
                     CloudPostDetailView(post: post)
@@ -64,8 +68,22 @@ struct CloudPostListView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showCreation) {
+            .sheet(isPresented: $viewModel.showCreation, onDismiss: {
+                if posts.count > previousPostCount {
+                    let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+                    if let task = dailyTasks.first(where: { $0.type == .post && !$0.isCompleted }) {
+                        economyVM.completeTask(task, economy: economy)
+                    }
+                    try? modelContext.save()
+                }
+                previousPostCount = posts.count
+            }) {
                 CloudPostCreationView(viewModel: viewModel)
+            }
+            .onAppear {
+                _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+                previousPostCount = posts.count
+                try? modelContext.save()
             }
         }
     }
@@ -75,6 +93,7 @@ struct CloudPostListView: View {
 
 private struct CloudPostCard: View {
     let post: CloudPost
+    let lang: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
@@ -100,7 +119,7 @@ private struct CloudPostCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.left.fill")
                         .font(.caption2)
-                    Text("NPC replied")
+                    Text(L10n.t("NPC replied", "NPC 已回复"))
                         .font(.caption2)
                 }
                 .foregroundStyle(TreeholeTheme.softPurple)

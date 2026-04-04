@@ -16,6 +16,15 @@ enum HomeTheme: String, Codable, CaseIterable {
         }
     }
 
+    var labelZH: String {
+        switch self {
+        case .daylight: "白天"
+        case .night: "夜晚"
+        case .sunset: "日落"
+        case .garden: "花园"
+        }
+    }
+
     var gradient: (Color, Color) {
         switch self {
         case .daylight:

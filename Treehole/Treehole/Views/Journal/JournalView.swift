@@ -5,6 +5,9 @@ struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
     @Query(sort: \JournalEntry.createdAt, order: .reverse) private var entries: [JournalEntry]
+    @Query private var economies: [Economy]
+    @Query private var dailyTasks: [DailyTask]
+    @State private var economyVM = EconomyViewModel()
     @State private var showNewEntry = false
     @State private var draftText = ""
     @State private var draftMood: MoodTag = .calm
@@ -29,9 +32,9 @@ struct JournalView: View {
                 if entries.isEmpty {
                     EmptyStateView(
                         icon: "book.closed",
-                        title: "Start Your Journal",
-                        message: "Write your first entry to begin reflecting on your feelings.",
-                        actionLabel: "Write Entry",
+                        title: L10n.t("Start Your Journal", "开始写日记"),
+                        message: L10n.t("Write your first entry to begin reflecting on your feelings.", "写下你的第一篇日记吧..."),
+                        actionLabel: L10n.t("Write Entry", "写日记"),
                         action: { showNewEntry = true }
                     )
                 } else {
@@ -42,7 +45,7 @@ struct JournalView: View {
                                 HStack {
                                     Image(systemName: "lightbulb.fill")
                                         .foregroundStyle(TreeholeTheme.warmGold)
-                                    Text("Today's Prompt")
+                                    Text(L10n.t("Today's Prompt", "今日提示"))
                                         .font(.headline)
                                         .foregroundStyle(TreeholeTheme.textPrimary)
                                 }
@@ -57,15 +60,15 @@ struct JournalView: View {
                         // Stats
                         Section {
                             HStack(spacing: TreeholeTheme.spacingMedium) {
-                                MiniStat(label: "Total", value: "\(entries.count)", icon: "book.fill", color: TreeholeTheme.softPurple)
-                                MiniStat(label: "This Week", value: "\(thisWeekCount)", icon: "calendar", color: TreeholeTheme.skyBlue)
-                                MiniStat(label: "This Month", value: "\(thisMonthCount)", icon: "calendar.badge.clock", color: TreeholeTheme.coral)
+                                MiniStat(label: L10n.t("Total", "总计"), value: "\(entries.count)", icon: "book.fill", color: TreeholeTheme.softPurple)
+                                MiniStat(label: L10n.t("This Week", "本周"), value: "\(thisWeekCount)", icon: "calendar", color: TreeholeTheme.skyBlue)
+                                MiniStat(label: L10n.t("This Month", "本月"), value: "\(thisMonthCount)", icon: "calendar.badge.clock", color: TreeholeTheme.coral)
                             }
                             .listRowBackground(Color.clear)
                         }
 
                         // Entries
-                        Section("Entries") {
+                        Section(L10n.t("Entries", "日记列表")) {
                             ForEach(entries) { entry in
                                 JournalEntryRow(entry: entry)
                             }
@@ -79,7 +82,7 @@ struct JournalView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .navigationTitle("Journal")
+            .navigationTitle(L10n.t("Journal", "日记"))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showNewEntry = true } label: {
@@ -96,6 +99,10 @@ struct JournalView: View {
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
                         modelContext.insert(entry)
+                        let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+                        if let task = dailyTasks.first(where: { $0.type == .writeJournal && !$0.isCompleted }) {
+                            economyVM.completeTask(task, economy: economy)
+                        }
                         try? modelContext.save()
                         draftText = ""
                         draftMood = .calm
@@ -103,7 +110,11 @@ struct JournalView: View {
                     }
                 )
             }
-            .onAppear { selectRandomPrompt() }
+            .onAppear {
+                selectRandomPrompt()
+                _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+                try? modelContext.save()
+            }
         }
     }
 
@@ -167,7 +178,7 @@ private struct JournalEntryEditor: View {
                             HStack {
                                 Image(systemName: "lightbulb.fill")
                                     .foregroundStyle(TreeholeTheme.warmGold)
-                                Text("Prompt")
+                                Text(L10n.t("Prompt", "写作提示"))
                                     .font(.headline)
                             }
                             Text(prompt)
@@ -179,7 +190,7 @@ private struct JournalEntryEditor: View {
 
                         // Mood picker
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                            Text("How are you feeling?")
+                            Text(L10n.t("How are you feeling?", "你现在感觉怎么样？"))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
                             MoodPicker(selectedMood: $draftMood)
@@ -195,14 +206,14 @@ private struct JournalEntryEditor: View {
                     .padding()
                 }
             }
-            .navigationTitle("New Entry")
+            .navigationTitle(L10n.t("New Entry", "新日记"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.t("Cancel", "取消")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { onSave() }
+                    Button(L10n.t("Save", "保存")) { onSave() }
                         .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .tint(TreeholeTheme.coral)
                 }

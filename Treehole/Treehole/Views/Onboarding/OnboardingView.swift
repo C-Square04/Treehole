@@ -47,17 +47,17 @@ private struct WelcomePage: View {
                 .symbolEffect(.breathe)
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
-                Text("Welcome to Treehole")
+                Text(L10n.t("Welcome to Treehole", "欢迎来到树洞"))
                     .font(.largeTitle.bold())
                     .foregroundStyle(TreeholeTheme.textPrimary)
 
-                Text("A safe space for your thoughts and feelings")
+                Text(L10n.t("A safe space for your thoughts and feelings", "一个安全的空间，倾诉你的心声"))
                     .font(.title3)
                     .foregroundStyle(TreeholeTheme.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
-            Text("Swipe to learn more")
+            Text(L10n.t("Swipe to learn more", "左滑了解更多"))
                 .font(.caption)
                 .foregroundStyle(TreeholeTheme.textLight)
                 .padding(.top, TreeholeTheme.spacingLarge)
@@ -76,7 +76,7 @@ private struct FeaturesPage: View {
         VStack(spacing: TreeholeTheme.spacingXL) {
             Spacer()
 
-            Text("Your Sanctuary")
+            Text(L10n.t("Your Sanctuary", "你的避风港"))
                 .font(.title.bold())
                 .foregroundStyle(TreeholeTheme.textPrimary)
 
@@ -84,26 +84,26 @@ private struct FeaturesPage: View {
                 FeatureRow(
                     icon: "cloud.fill",
                     color: TreeholeTheme.skyBlue,
-                    title: "Floating Clouds",
-                    description: "Share your thoughts anonymously"
+                    title: L10n.t("Floating Clouds", "漂浮云朵"),
+                    description: L10n.t("Share your thoughts anonymously", "匿名分享你的想法")
                 )
                 FeatureRow(
                     icon: "cat.fill",
                     color: TreeholeTheme.coral,
-                    title: "Pet Companion",
-                    description: "A caring friend who listens"
+                    title: L10n.t("Pet Companion", "宠物伙伴"),
+                    description: L10n.t("A caring friend who listens", "一个关心你的倾听者")
                 )
                 FeatureRow(
                     icon: "leaf.fill",
                     color: TreeholeTheme.mintCream,
-                    title: "Plant Garden",
-                    description: "Grow something beautiful together"
+                    title: L10n.t("Plant Garden", "植物花园"),
+                    description: L10n.t("Grow something beautiful together", "一起种植美好")
                 )
                 FeatureRow(
                     icon: "book.fill",
                     color: TreeholeTheme.warmGold,
-                    title: "Journal",
-                    description: "Reflect on your feelings"
+                    title: L10n.t("Journal", "日记"),
+                    description: L10n.t("Reflect on your feelings", "记录你的感受")
                 )
             }
             .glassCard()
@@ -152,20 +152,23 @@ private struct PrivacyPage: View {
                 .foregroundStyle(TreeholeTheme.softPurple)
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
-                Text("You're Completely Anonymous")
+                Text(L10n.t("You're Completely Anonymous", "完全匿名"))
                     .font(.title2.bold())
                     .foregroundStyle(TreeholeTheme.textPrimary)
 
-                Text("Every user gets a random alias that changes every 7 days. No one can see your real identity.")
-                    .font(.body)
-                    .foregroundStyle(TreeholeTheme.textSecondary)
-                    .multilineTextAlignment(.center)
+                Text(L10n.t(
+                    "Every user gets a random alias that changes every 7 days. No one can see your real identity.",
+                    "每位用户都会获得一个随机别名，每7天更换一次。没有人能看到你的真实身份。"
+                ))
+                .font(.body)
+                .foregroundStyle(TreeholeTheme.textSecondary)
+                .multilineTextAlignment(.center)
             }
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
-                PrivacyBullet(icon: "person.fill.questionmark", text: "Random alias, refreshed weekly")
-                PrivacyBullet(icon: "lock.shield.fill", text: "Your real name stays private")
-                PrivacyBullet(icon: "eye.slash.fill", text: "Posts cannot be traced to you")
+                PrivacyBullet(icon: "person.fill.questionmark", text: L10n.t("Random alias, refreshed weekly", "随机别名，每周刷新"))
+                PrivacyBullet(icon: "lock.shield.fill", text: L10n.t("Your real name stays private", "你的真实姓名保持私密"))
+                PrivacyBullet(icon: "eye.slash.fill", text: L10n.t("Posts cannot be traced to you", "帖子无法追溯到你"))
             }
             .glassCard()
 
@@ -206,21 +209,24 @@ private struct GetStartedPage: View {
                 .font(.system(size: 64))
                 .foregroundStyle(TreeholeTheme.warmGold)
 
-            Text("Ready to Begin?")
+            Text(L10n.t("Ready to Begin?", "准备好了吗？"))
                 .font(.title.bold())
                 .foregroundStyle(TreeholeTheme.textPrimary)
 
-            Text("Start your journey of self-care and emotional expression.")
-                .font(.body)
-                .foregroundStyle(TreeholeTheme.textSecondary)
-                .multilineTextAlignment(.center)
+            Text(L10n.t(
+                "Start your journey of self-care and emotional expression.",
+                "开始你的自我关怀与情感表达之旅。"
+            ))
+            .font(.body)
+            .foregroundStyle(TreeholeTheme.textSecondary)
+            .multilineTextAlignment(.center)
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
                 // Guest
                 Button {
                     appState.loginAsGuest()
                 } label: {
-                    Label("Continue as Guest", systemImage: "person.fill")
+                    Label(L10n.t("Continue as Guest", "以访客身份继续"), systemImage: "person.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, TreeholeTheme.spacingSmall)
@@ -232,7 +238,7 @@ private struct GetStartedPage: View {
                 Button {
                     appState.loginWithApple()
                 } label: {
-                    Label("Sign in with Apple", systemImage: "apple.logo")
+                    Label(L10n.t("Sign in with Apple", "通过 Apple 登录"), systemImage: "apple.logo")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, TreeholeTheme.spacingSmall)

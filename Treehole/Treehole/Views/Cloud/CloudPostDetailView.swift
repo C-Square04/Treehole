@@ -4,6 +4,7 @@ import SwiftData
 struct CloudPostDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     let post: CloudPost
     @State private var showDeleteConfirmation = false
 
@@ -26,7 +27,7 @@ struct CloudPostDetailView: View {
                                 .foregroundStyle(TreeholeTheme.textLight)
                         }
                         Spacer()
-                        Text(post.moodTag.labelEN)
+                        Text(appState.preferredLanguage == "zh-Hans" ? post.moodTag.labelZH : post.moodTag.labelEN)
                             .font(.caption)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -47,7 +48,7 @@ struct CloudPostDetailView: View {
                             HStack {
                                 Image(systemName: "bubble.left.fill")
                                     .foregroundStyle(TreeholeTheme.warmGold)
-                                Text("Treehole Spirit")
+                                Text(L10n.t("Treehole Spirit", "树洞精灵"))
                                     .font(.headline)
                                     .foregroundStyle(TreeholeTheme.textPrimary)
                             }
@@ -60,9 +61,9 @@ struct CloudPostDetailView: View {
 
                     // Gentle interactions
                     HStack(spacing: TreeholeTheme.spacingMedium) {
-                        GentleInteractionButton(icon: "wind", label: "Breeze")
-                        GentleInteractionButton(icon: "heart.fill", label: "Hug")
-                        GentleInteractionButton(icon: "sparkles", label: "Starlight")
+                        GentleInteractionButton(icon: "wind", label: L10n.t("Breeze", "微风"))
+                        GentleInteractionButton(icon: "heart.fill", label: L10n.t("Hug", "拥抱"))
+                        GentleInteractionButton(icon: "sparkles", label: L10n.t("Starlight", "星光"))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -79,8 +80,8 @@ struct CloudPostDetailView: View {
                 }
             }
         }
-        .confirmationDialog("Delete this cloud?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
+        .confirmationDialog(L10n.t("Delete this cloud?", "删除这朵云？"), isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button(L10n.t("Delete", "删除"), role: .destructive) {
                 modelContext.delete(post)
                 dismiss()
             }

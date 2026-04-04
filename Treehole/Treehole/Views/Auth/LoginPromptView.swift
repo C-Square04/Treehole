@@ -20,10 +20,10 @@ struct LoginPromptView: View {
 
                     // Title
                     VStack(spacing: TreeholeTheme.spacingTight) {
-                        Text("Welcome to Treehole")
+                        Text(L10n.t("Welcome to Treehole", "欢迎来到树洞"))
                             .font(.title2.bold())
                             .foregroundStyle(TreeholeTheme.textPrimary)
-                        Text("Sign in to save your progress and sync across devices.")
+                        Text(L10n.t("Sign in to save your progress and sync across devices.", "登录以保存你的进度..."))
                             .font(.subheadline)
                             .foregroundStyle(TreeholeTheme.textSecondary)
                             .multilineTextAlignment(.center)
@@ -31,10 +31,10 @@ struct LoginPromptView: View {
 
                     // Benefits comparison
                     VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                        BenefitRow(icon: "checkmark.circle.fill", color: .green, text: "Save your posts and journal entries")
-                        BenefitRow(icon: "checkmark.circle.fill", color: .green, text: "Sync your pet and plant progress")
-                        BenefitRow(icon: "checkmark.circle.fill", color: .green, text: "Keep your data safe")
-                        BenefitRow(icon: "xmark.circle.fill", color: .red, text: "Guests can lose data if the app is deleted")
+                        BenefitRow(icon: "checkmark.circle.fill", color: .green, text: L10n.t("Save your posts and journal entries", "保存你的帖子和日记"))
+                        BenefitRow(icon: "checkmark.circle.fill", color: .green, text: L10n.t("Sync your pet and plant progress", "同步你的宠物和植物进度"))
+                        BenefitRow(icon: "checkmark.circle.fill", color: .green, text: L10n.t("Keep your data safe", "保护你的数据安全"))
+                        BenefitRow(icon: "xmark.circle.fill", color: .red, text: L10n.t("Guests can lose data if the app is deleted", "访客在删除应用后可能丢失数据"))
                     }
                     .glassCard()
 
@@ -61,7 +61,7 @@ struct LoginPromptView: View {
                             appState.loginAsGuest()
                             dismiss()
                         } label: {
-                            Text("Continue as Guest")
+                            Text(L10n.t("Continue as Guest", "以访客身份继续"))
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, TreeholeTheme.spacingSmall)
@@ -77,7 +77,7 @@ struct LoginPromptView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.t("Cancel", "取消")) { dismiss() }
                 }
             }
         }

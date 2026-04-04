@@ -64,6 +64,16 @@ enum GrowthStage: String, Codable, CaseIterable {
         }
     }
 
+    var labelZH: String {
+        switch self {
+        case .seed: "种子"
+        case .sprout: "幼苗"
+        case .growing: "生长"
+        case .blooming: "开花"
+        case .mature: "成熟"
+        }
+    }
+
     var stageIndex: Int {
         switch self {
         case .seed: 0

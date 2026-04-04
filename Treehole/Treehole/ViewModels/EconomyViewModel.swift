@@ -63,4 +63,63 @@ final class EconomyViewModel {
     func completedTaskCount(tasks: [DailyTask]) -> Int {
         tasks.filter { $0.isCompleted }.count
     }
+
+    // MARK: - Weekly Challenges
+
+    func createWeeklyChallenges(context: ModelContext, existing: [WeeklyChallenge]) {
+        let weekStart = Calendar.current.startOfWeek(for: Date())
+
+        // Check if challenges already exist for this week
+        let thisWeekChallenges = existing.filter {
+            Calendar.current.isDate($0.weekStartDate, inSameDayAs: weekStart)
+        }
+        guard thisWeekChallenges.isEmpty else { return }
+
+        for challengeType in ChallengeType.allCases {
+            let challenge = WeeklyChallenge(type: challengeType, weekStartDate: weekStart)
+            context.insert(challenge)
+        }
+    }
+
+    func incrementChallenge(type: ChallengeType, economy: Economy, challenges: [WeeklyChallenge]) {
+        let weekStart = Calendar.current.startOfWeek(for: Date())
+
+        guard let challenge = challenges.first(where: {
+            $0.type == type &&
+            Calendar.current.isDate($0.weekStartDate, inSameDayAs: weekStart) &&
+            !$0.isCompleted
+        }) else { return }
+
+        challenge.currentCount += 1
+
+        if challenge.currentCount >= type.targetCount {
+            challenge.isCompleted = true
+            economy.addFood(type.foodReward)
+            if type.tokenReward > 0 {
+                economy.addTokens(type.tokenReward)
+            }
+        }
+    }
+
+    func resetWeeklyChallengesIfNeeded(challenges: [WeeklyChallenge], context: ModelContext) {
+        guard !challenges.isEmpty else { return }
+        let weekStart = Calendar.current.startOfWeek(for: Date())
+
+        // Delete challenges that are from a previous week
+        let oldChallenges = challenges.filter {
+            !Calendar.current.isDate($0.weekStartDate, inSameDayAs: weekStart)
+        }
+        for challenge in oldChallenges {
+            context.delete(challenge)
+        }
+    }
+}
+
+// MARK: - Calendar extension
+
+private extension Calendar {
+    func startOfWeek(for date: Date) -> Date {
+        let components = dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return self.date(from: components) ?? startOfDay(for: date)
+    }
 }

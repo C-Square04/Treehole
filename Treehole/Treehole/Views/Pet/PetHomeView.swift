@@ -7,6 +7,7 @@ struct PetHomeView: View {
     @Query private var pets: [Pet]
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
+    @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var viewModel = PetViewModel()
     @State private var economyVM = EconomyViewModel()
     @State private var feedbackText: String?
@@ -86,7 +87,9 @@ struct PetHomeView: View {
                                 if let task = dailyTasks.first(where: { $0.type == .feedPet && !$0.isCompleted }) {
                                     economyVM.completeTask(task, economy: economy)
                                 }
+                                economyVM.incrementChallenge(type: .feedStreak, economy: economy, challenges: weeklyChallenges)
                                 try? modelContext.save()
+                                NotificationService.scheduleFeedingReminder()
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                     viewModel.showFeedingAnimation = false
                                 }

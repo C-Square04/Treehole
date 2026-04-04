@@ -8,7 +8,8 @@ struct TreeholeApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             CloudPost.self, Pet.self, Plant.self,
-            JournalEntry.self, Economy.self, DailyTask.self
+            JournalEntry.self, Economy.self, DailyTask.self,
+            WeeklyChallenge.self
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
@@ -39,6 +40,7 @@ struct TreeholeApp: App {
                 .preferredColorScheme(appState.isDarkMode ? .dark : .light)
                 .onAppear {
                     appState.requestNotificationPermission()
+                    NotificationService.scheduleDailyCheckIn()
                 }
         }
         .modelContainer(sharedModelContainer)

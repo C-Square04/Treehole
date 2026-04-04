@@ -7,6 +7,7 @@ struct JournalView: View {
     @Query(sort: \JournalEntry.createdAt, order: .reverse) private var entries: [JournalEntry]
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
+    @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var economyVM = EconomyViewModel()
     @State private var showNewEntry = false
     @State private var draftText = ""
@@ -103,6 +104,7 @@ struct JournalView: View {
                         if let task = dailyTasks.first(where: { $0.type == .writeJournal && !$0.isCompleted }) {
                             economyVM.completeTask(task, economy: economy)
                         }
+                        economyVM.incrementChallenge(type: .journalStreak, economy: economy, challenges: weeklyChallenges)
                         try? modelContext.save()
                         draftText = ""
                         draftMood = .calm

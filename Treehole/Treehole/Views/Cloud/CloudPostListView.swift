@@ -7,6 +7,7 @@ struct CloudPostListView: View {
     @Query(sort: \CloudPost.createdAt, order: .reverse) private var posts: [CloudPost]
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
+    @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var viewModel = CloudPostViewModel()
     @State private var economyVM = EconomyViewModel()
     @State private var previousPostCount: Int = 0
@@ -74,6 +75,7 @@ struct CloudPostListView: View {
                     if let task = dailyTasks.first(where: { $0.type == .post && !$0.isCompleted }) {
                         economyVM.completeTask(task, economy: economy)
                     }
+                    economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
                     try? modelContext.save()
                 }
                 previousPostCount = posts.count

@@ -7,6 +7,7 @@ struct ShopView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
+    @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var viewModel = EconomyViewModel()
     @State private var selectedTab: ShopTab = .tasks
 
@@ -47,7 +48,7 @@ struct ShopView: View {
                     ScrollView {
                         switch selectedTab {
                         case .tasks:
-                            TasksPanel(economy: economy, tasks: dailyTasks, viewModel: viewModel)
+                            TasksPanel(economy: economy, tasks: dailyTasks, challenges: weeklyChallenges, viewModel: viewModel)
                                 .padding(.horizontal, TreeholeTheme.spacingMedium)
                                 .padding(.bottom, TreeholeTheme.spacingXL)
                         case .shop:
@@ -76,6 +77,8 @@ struct ShopView: View {
             eco.checkLoginStreak()
             viewModel.resetDailyTasksIfNeeded(tasks: dailyTasks, context: modelContext)
             viewModel.createDailyTasks(context: modelContext, existingTasks: dailyTasks)
+            viewModel.resetWeeklyChallengesIfNeeded(challenges: weeklyChallenges, context: modelContext)
+            viewModel.createWeeklyChallenges(context: modelContext, existing: weeklyChallenges)
             try? modelContext.save()
         }
     }
@@ -124,6 +127,7 @@ private struct TasksPanel: View {
     @Environment(\.modelContext) private var modelContext
     let economy: Economy?
     let tasks: [DailyTask]
+    let challenges: [WeeklyChallenge]
     let viewModel: EconomyViewModel
 
     @State private var loginBonusClaimed = false
@@ -133,6 +137,14 @@ private struct TasksPanel: View {
         let today = calendar.startOfDay(for: Date())
         return tasks.filter {
             calendar.isDate(calendar.startOfDay(for: $0.createdAt), inSameDayAs: today)
+        }
+    }
+
+    private var thisWeekChallenges: [WeeklyChallenge] {
+        let calendar = Calendar.current
+        let weekStart = calendar.startOfWeek(for: Date())
+        return challenges.filter {
+            calendar.isDate($0.weekStartDate, inSameDayAs: weekStart)
         }
     }
 
@@ -153,7 +165,7 @@ private struct TasksPanel: View {
                 )
             }
 
-            // Task cards
+            // Daily task cards
             VStack(spacing: TreeholeTheme.spacingSmall) {
                 ForEach(todayTasks) { task in
                     TaskCard(task: task)
@@ -170,13 +182,152 @@ private struct TasksPanel: View {
             }
 
             // Reset caption
-            Text("Tasks reset daily")
+            Text(L10n.t("Tasks reset daily", "每日任务每天重置"))
+                .font(.caption)
+                .foregroundStyle(TreeholeTheme.textLight)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, TreeholeTheme.spacingTight)
+
+            // Weekly challenges section
+            WeeklyChallengesSection(challenges: thisWeekChallenges)
+        }
+        .padding(.top, TreeholeTheme.spacingSmall)
+    }
+}
+
+// MARK: - Calendar extension (view-side)
+
+private extension Calendar {
+    func startOfWeek(for date: Date) -> Date {
+        let components = dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return self.date(from: components) ?? startOfDay(for: date)
+    }
+}
+
+// MARK: - Weekly Challenges Section
+
+private struct WeeklyChallengesSection: View {
+    let challenges: [WeeklyChallenge]
+
+    private var completedCount: Int { challenges.filter { $0.isCompleted }.count }
+
+    var body: some View {
+        VStack(spacing: TreeholeTheme.spacingSmall) {
+            // Section header
+            HStack {
+                Image(systemName: "trophy.fill")
+                    .foregroundStyle(TreeholeTheme.warmGold)
+                Text(L10n.t("Weekly Challenges", "每周挑战"))
+                    .font(.headline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Spacer()
+                Text("\(completedCount)/\(challenges.count)")
+                    .font(.caption.bold())
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+            }
+            .padding(.top, TreeholeTheme.spacingSmall)
+
+            if challenges.isEmpty {
+                HStack(spacing: TreeholeTheme.spacingMedium) {
+                    Image(systemName: "hourglass")
+                        .font(.title2)
+                        .foregroundStyle(TreeholeTheme.softPurple.opacity(0.6))
+                    Text(L10n.t("Weekly challenges loading…", "每周挑战加载中…"))
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textSecondary)
+                }
+                .glassCard()
+            } else {
+                ForEach(challenges) { challenge in
+                    WeeklyChallengeCard(challenge: challenge)
+                }
+            }
+
+            Text(L10n.t("Challenges reset each Monday", "挑战每周一重置"))
                 .font(.caption)
                 .foregroundStyle(TreeholeTheme.textLight)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top, TreeholeTheme.spacingTight)
         }
-        .padding(.top, TreeholeTheme.spacingSmall)
+    }
+}
+
+// MARK: - Weekly Challenge Card
+
+private struct WeeklyChallengeCard: View {
+    let challenge: WeeklyChallenge
+
+    private var iconColor: Color {
+        switch challenge.type {
+        case .postStreak:   return TreeholeTheme.skyBlue
+        case .waterStreak:  return TreeholeTheme.mintCream
+        case .journalStreak: return TreeholeTheme.gentleLavender
+        case .feedStreak:   return TreeholeTheme.warmPeach
+        }
+    }
+
+    private var title: String {
+        L10n.lang == "zh-Hans" ? challenge.type.titleZH : challenge.type.title
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            HStack(spacing: TreeholeTheme.spacingMedium) {
+                // Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall)
+                        .fill(iconColor.opacity(0.25))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: challenge.type.icon)
+                        .font(.title3)
+                        .foregroundStyle(iconColor)
+                }
+
+                // Title and progress text
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(challenge.isCompleted ? TreeholeTheme.textLight : TreeholeTheme.textPrimary)
+
+                    Text("\(challenge.currentCount)/\(challenge.type.targetCount)")
+                        .font(.caption)
+                        .foregroundStyle(TreeholeTheme.textSecondary)
+                }
+
+                Spacer()
+
+                // Reward or completed badge
+                if challenge.isCompleted {
+                    VStack(spacing: 2) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(Color.green.opacity(0.8))
+                        Text(L10n.t("Done", "完成"))
+                            .font(.caption2)
+                            .foregroundStyle(TreeholeTheme.textLight)
+                    }
+                } else {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("+\(challenge.type.foodReward) 🍖")
+                            .font(.caption.bold())
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                        Text("+\(challenge.type.tokenReward) 🎫")
+                            .font(.caption.bold())
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                    }
+                }
+            }
+
+            // Progress bar
+            ProgressBar(
+                value: challenge.currentCount,
+                maxValue: challenge.type.targetCount,
+                color: challenge.isCompleted ? Color.green.opacity(0.6) : iconColor
+            )
+        }
+        .padding(TreeholeTheme.spacingMedium)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
+        .opacity(challenge.isCompleted ? 0.75 : 1.0)
     }
 }
 

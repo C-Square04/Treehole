@@ -7,6 +7,7 @@ struct CartoonCatView: View {
     @State private var tailPosition: Double = 0
     @State private var bounceOffset: CGFloat = 0
     @State private var breatheScale: CGFloat = 1.0
+    @State private var blinkTimer: Timer?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -82,6 +83,7 @@ struct CartoonCatView: View {
         }
         .scaleEffect(showFeedingAnimation ? 1.1 : breatheScale)
         .onAppear { if !reduceMotion { startAnimations() } }
+        .onDisappear { blinkTimer?.invalidate(); blinkTimer = nil }
         .accessibilityLabel("Your pet companion, feeling \(mood.labelEN)")
     }
 
@@ -94,7 +96,7 @@ struct CartoonCatView: View {
     }
 
     private func startAnimations() {
-        Timer.scheduledTimer(withTimeInterval: 3.5, repeats: true) { _ in
+        blinkTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 0.15)) { isBlinking = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 withAnimation(.easeInOut(duration: 0.15)) { isBlinking = false }

@@ -3,6 +3,7 @@ import SwiftData
 
 struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
     @Query(sort: \JournalEntry.createdAt, order: .reverse) private var entries: [JournalEntry]
     @State private var showNewEntry = false
     @State private var draftText = ""
@@ -117,7 +118,7 @@ struct JournalView: View {
 
     private func selectRandomPrompt() {
         let prompt = Self.prompts.randomElement() ?? Self.prompts[0]
-        currentPrompt = prompt.en // TODO: use appState.preferredLanguage
+        currentPrompt = appState.preferredLanguage == "zh-Hans" ? prompt.zh : prompt.en
     }
 }
 

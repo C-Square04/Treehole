@@ -60,21 +60,23 @@ final class Economy {
     }
 
     func addFood(_ amount: Int) {
-        food = min(9999, max(0, food + amount))
+        guard amount > 0 else { return }
+        food = min(9999, food + amount)
     }
 
     func spendFood(_ amount: Int) -> Bool {
-        guard food >= amount else { return false }
+        guard amount > 0, food >= amount else { return false }
         food -= amount
         return true
     }
 
     func addTokens(_ amount: Int) {
-        decorationTokens += amount
+        guard amount > 0 else { return }
+        decorationTokens = min(9999, decorationTokens + amount)
     }
 
     func spendTokens(_ amount: Int) -> Bool {
-        guard decorationTokens >= amount else { return false }
+        guard amount > 0, decorationTokens >= amount else { return false }
         decorationTokens -= amount
         return true
     }

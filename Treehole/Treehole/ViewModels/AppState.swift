@@ -41,7 +41,8 @@ final class AppState {
     }
 
     var daysUntilAliasExpiry: Int {
-        max(0, Calendar.current.dateComponents([.day], from: Date(), to: aliasExpiryDate).day ?? 0)
+        guard aliasExpiryDate > Date() else { return 0 }
+        return Calendar.current.dateComponents([.day], from: Date(), to: aliasExpiryDate).day ?? 0
     }
 
     func rotateAlias() {
@@ -118,7 +119,9 @@ final class AppState {
             : "Your new alias is \"\(currentAlias)\". It will change again in 7 days."
         content.sound = .default
 
-        // Schedule for when current alias expires
+        // Remove old alias notification before scheduling new one
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["aliasRotation"])
+
         let trigger = UNTimeIntervalNotificationTrigger(
             timeInterval: max(1, aliasExpiryDate.timeIntervalSinceNow),
             repeats: false

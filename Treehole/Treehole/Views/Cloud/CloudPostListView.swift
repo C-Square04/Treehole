@@ -51,6 +51,8 @@ struct CloudPostListView: View {
             .navigationDestination(for: String.self) { postId in
                 if let post = posts.first(where: { $0.id == postId }) {
                     CloudPostDetailView(post: post)
+                } else {
+                    ContentUnavailableView("Cloud Not Found", systemImage: "cloud.slash")
                 }
             }
             .toolbar {

@@ -40,18 +40,3 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - View Stubs (replaced incrementally)
-
-// OnboardingView is defined in Views/Onboarding/OnboardingView.swift
-
-// CloudPostListView is defined in Views/Cloud/
-
-// PetHomeView is defined in Views/Pet/
-
-// PlantGardenView is defined in Views/Plant/
-
-// JournalView is defined in Views/Journal/
-
-// SettingsView is defined in Views/Settings/
-
-// LoginPromptView is defined in Views/Auth/

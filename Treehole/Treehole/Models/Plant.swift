@@ -125,7 +125,7 @@ final class Plant {
 
         // Stage advancement at 100 XP
         if experience >= 100 {
-            experience = 0
+            experience = experience - 100
             switch growthStage {
             case .seed: growthStage = .sprout
             case .sprout: growthStage = .growing

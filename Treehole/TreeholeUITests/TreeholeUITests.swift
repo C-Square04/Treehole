@@ -26,6 +26,28 @@ final class TreeholeUITests: XCTestCase {
         }
     }
 
+    // MARK: - Navigation Helpers
+
+    private func navigateToMe() {
+        let meTab = app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Me' OR label CONTAINS[c] '我'")).firstMatch
+        if meTab.waitForExistence(timeout: 3) { meTab.tap() }
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    private func navigateToShop() {
+        navigateToMe()
+        let shopLink = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Shop' OR label CONTAINS[c] '商店'")).firstMatch
+        if shopLink.waitForExistence(timeout: 3) { shopLink.tap() }
+        Thread.sleep(forTimeInterval: 1)
+    }
+
+    private func navigateToSettings() {
+        navigateToMe()
+        let settingsLink = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Settings' OR label CONTAINS[c] '设置'")).firstMatch
+        if settingsLink.waitForExistence(timeout: 3) { settingsLink.tap() }
+        Thread.sleep(forTimeInterval: 1)
+    }
+
     // MARK: - Tab Navigation
 
     @MainActor
@@ -33,7 +55,7 @@ final class TreeholeUITests: XCTestCase {
         // Check all 5 tabs exist and are tappable
         let tabBar = app.tabBars.firstMatch
 
-        let tabs = ["Clouds", "Pet", "Garden", "Journal", "Shop"]
+        let tabs = ["Clouds", "Pet", "Garden", "Journal", "Me"]
         for tabName in tabs {
             let tab = tabBar.buttons[tabName]
             XCTAssertTrue(tab.waitForExistence(timeout: 3), "Tab '\(tabName)' should exist")
@@ -218,16 +240,7 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testSettingsDarkModeToggle() throws {
-        // Navigate to Shop tab
-        app.tabBars.buttons["Shop"].tap()
-        Thread.sleep(forTimeInterval: 1)
-
-        // Tap the settings gear in toolbar
-        let gearButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'gear' OR label CONTAINS[c] 'settings' OR label CONTAINS[c] 'Settings'")).firstMatch
-        if gearButton.waitForExistence(timeout: 3) {
-            gearButton.tap()
-            Thread.sleep(forTimeInterval: 1)
-        }
+        navigateToSettings()
 
         let darkToggle = app.switches.matching(NSPredicate(format: "label CONTAINS[c] 'Dark'")).firstMatch
         if darkToggle.waitForExistence(timeout: 3) {
@@ -248,7 +261,7 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testShopTabShowsTasksAndCurrency() throws {
-        app.tabBars.buttons["Shop"].tap()
+        navigateToShop()
         Thread.sleep(forTimeInterval: 2)
 
         // Should see currency display (food icon)
@@ -266,7 +279,7 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testShopShowsDailyTasks() throws {
-        app.tabBars.buttons["Shop"].tap()
+        navigateToShop()
         Thread.sleep(forTimeInterval: 2)
 
         let screenshot = app.screenshot()
@@ -289,7 +302,7 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testShopBuyFood() throws {
-        app.tabBars.buttons["Shop"].tap()
+        navigateToShop()
         Thread.sleep(forTimeInterval: 2)
 
         // Switch to "Shop" segment in the segmented picker.
@@ -330,7 +343,7 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testShopLoginStreak() throws {
-        app.tabBars.buttons["Shop"].tap()
+        navigateToShop()
         Thread.sleep(forTimeInterval: 2)
 
         let screenshot = app.screenshot()
@@ -558,16 +571,8 @@ final class TreeholeUITests: XCTestCase {
     // MARK: - Language Toggle
 
     @MainActor
-    func testLanguageSwitchToChinese() throws {
-        // Navigate to Settings via Shop toolbar gear button
-        app.tabBars.buttons["Shop"].tap()
-        Thread.sleep(forTimeInterval: 1)
-
-        let gearButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'gear' OR label CONTAINS[c] 'Settings'")).firstMatch
-        if gearButton.waitForExistence(timeout: 3) {
-            gearButton.tap()
-            Thread.sleep(forTimeInterval: 1)
-        }
+    func testZZ_LanguageSwitchToChinese() throws {
+        navigateToSettings()
 
         let screenshot1 = app.screenshot()
         let attachment1 = XCTAttachment(screenshot: screenshot1)
@@ -611,7 +616,7 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testWeeklyChallengesVisible() throws {
-        app.tabBars.buttons["Shop"].tap()
+        navigateToShop()
         Thread.sleep(forTimeInterval: 2)
 
         let screenshot = app.screenshot()

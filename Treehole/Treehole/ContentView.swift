@@ -20,23 +20,48 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            Tab("Clouds", systemImage: "cloud.fill", value: 0) {
+            Tab(L10n.t("Clouds", "云朵"), systemImage: "cloud.fill", value: 0) {
                 CloudPostListView()
             }
-            Tab("Pet", systemImage: "cat.fill", value: 1) {
+            Tab(L10n.t("Pet", "宠物"), systemImage: "cat.fill", value: 1) {
                 PetHomeView()
             }
-            Tab("Garden", systemImage: "leaf.fill", value: 2) {
+            Tab(L10n.t("Garden", "花园"), systemImage: "leaf.fill", value: 2) {
                 PlantGardenView()
             }
-            Tab("Journal", systemImage: "book.fill", value: 3) {
+            Tab(L10n.t("Journal", "日记"), systemImage: "book.fill", value: 3) {
                 JournalView()
             }
-            Tab("Shop", systemImage: "bag.fill", value: 4) {
-                ShopView()
+            Tab(L10n.t("Me", "我"), systemImage: "person.fill", value: 4) {
+                MeView()
             }
         }
         .tint(TreeholeTheme.softPurple)
     }
 }
 
+// MARK: - Me Tab (Shop + Settings combined)
+
+struct MeView: View {
+    var body: some View {
+        NavigationStack {
+            List {
+                // Quick links
+                Section {
+                    NavigationLink {
+                        ShopView()
+                    } label: {
+                        Label(L10n.t("Shop & Tasks", "商店 & 任务"), systemImage: "bag.fill")
+                    }
+
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Label(L10n.t("Settings", "设置"), systemImage: "gearshape.fill")
+                    }
+                }
+            }
+            .navigationTitle(L10n.t("Me", "我"))
+        }
+    }
+}

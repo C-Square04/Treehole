@@ -59,18 +59,8 @@ struct ShopView: View {
                     }
                 }
             }
-            .navigationTitle("Shop & Tasks")
+            .navigationTitle(L10n.t("Shop & Tasks", "商店 & 任务"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundStyle(TreeholeTheme.softPurple)
-                    }
-                }
-            }
         }
         .onAppear {
             let eco = viewModel.ensureEconomyExists(context: modelContext, economies: economies)

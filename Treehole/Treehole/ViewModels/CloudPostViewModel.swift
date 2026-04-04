@@ -36,6 +36,13 @@ final class CloudPostViewModel {
         let text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
+        // Client-side moderation pre-check
+        let moderationResult = ContentModerator.check(text)
+        guard moderationResult.isAllowed else {
+            errorMessage = moderationResult.reason
+            return
+        }
+
         do {
             // Get NPC reply from server
             let npcReply = try await SupabaseService.fetchNPCReply(mood: draftMood.rawValue, language: language)

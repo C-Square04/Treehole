@@ -662,3 +662,69 @@ struct AppStateTests {
         #expect(state.isAliasExpired == false)
     }
 }
+
+// MARK: - Content Moderation Tests
+
+@Suite("ContentModeratorTests")
+struct ContentModeratorTests {
+
+    @Test func testNormalTextAllowed() {
+        let result = ContentModerator.check("I had a really tough day today")
+        #expect(result.isAllowed == true)
+    }
+
+    @Test func testEmotionalVentingAllowed() {
+        let result = ContentModerator.check("I feel like I want to die sometimes")
+        #expect(result.isAllowed == true, "Emotional venting about self should be allowed")
+    }
+
+    @Test func testAngerAllowed() {
+        let result = ContentModerator.check("I'm so fucking angry at everything")
+        #expect(result.isAllowed == true, "Profanity for venting should be allowed")
+    }
+
+    @Test func testSadnessAllowed() {
+        let result = ContentModerator.check("我好想哭，活着好累")
+        #expect(result.isAllowed == true, "Chinese emotional expression should be allowed")
+    }
+
+    @Test func testThreatToOthersBlocked() {
+        let result = ContentModerator.check("I will kill you for this")
+        #expect(result.isAllowed == false, "Threats toward others should be blocked")
+    }
+
+    @Test func testChineseThreatBlocked() {
+        let result = ContentModerator.check("我要杀了你")
+        #expect(result.isAllowed == false, "Chinese threats should be blocked")
+    }
+
+    @Test func testHateSpeechBlocked() {
+        let result = ContentModerator.check("All those faggots should go away")
+        #expect(result.isAllowed == false, "Hate speech should be blocked")
+    }
+
+    @Test func testLinksBlocked() {
+        let result = ContentModerator.check("Check out https://spam.com for free stuff")
+        #expect(result.isAllowed == false, "Links should be blocked")
+    }
+
+    @Test func testChineseSpamBlocked() {
+        let result = ContentModerator.check("加微信领取免费礼品")
+        #expect(result.isAllowed == false, "Chinese spam should be blocked")
+    }
+
+    @Test func testPhoneNumberBlocked() {
+        let result = ContentModerator.check("Call me at 138-1234-5678")
+        #expect(result.isAllowed == false, "Phone numbers should be blocked")
+    }
+
+    @Test func testSelfHarmExpressionAllowed() {
+        let result = ContentModerator.check("I've been cutting myself and I don't know how to stop")
+        #expect(result.isAllowed == true, "Self-harm expression should be allowed as emotional outlet")
+    }
+
+    @Test func testDepressionAllowed() {
+        let result = ContentModerator.check("我觉得活着没有意义，每天都很痛苦")
+        #expect(result.isAllowed == true, "Depression expression should be allowed")
+    }
+}

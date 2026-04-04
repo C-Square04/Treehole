@@ -178,18 +178,81 @@ enum SupabaseService {
     }
 }
 
+// MARK: - Content Moderation (Client-side pre-check)
+
+enum ContentModerator {
+    struct Result {
+        let isAllowed: Bool
+        let reason: String?
+    }
+
+    static func check(_ text: String) -> Result {
+        let lower = text.lowercased()
+
+        // 1. Threats toward others
+        let threatPatterns = [
+            "i will kill.*you", "i'm going to kill.*you", "gonna kill.*him",
+            "gonna kill.*her", "gonna kill.*them",
+            "我要杀了.*你", "我要杀了.*他", "我要杀了.*她", "要杀死.*你",
+            "砍死.*你", "弄死.*你"
+        ]
+        for pattern in threatPatterns {
+            if lower.range(of: pattern, options: .regularExpression) != nil {
+                return Result(isAllowed: false, reason: L10n.t(
+                    "Threats toward others are not allowed. If you're in distress, please reach out for help.",
+                    "不允许威胁他人。如果你感到痛苦，请寻求帮助。"
+                ))
+            }
+        }
+
+        // 2. Hate speech / slurs
+        let hateWords = ["nigger", "chink", "faggot", "kike", "wetback"]
+        for word in hateWords {
+            if lower.contains(word) {
+                return Result(isAllowed: false, reason: L10n.t(
+                    "Hate speech is not allowed in this safe space.",
+                    "这个安全空间不允许仇恨言论。"
+                ))
+            }
+        }
+
+        // 3. Spam / links
+        let spamPatterns = ["https?://", "www\\.", "\\.com/", "加微信", "加我qq", "免费领取", "click here", "buy now", "赚钱", "兼职招聘"]
+        for pattern in spamPatterns {
+            if lower.range(of: pattern, options: .regularExpression) != nil {
+                return Result(isAllowed: false, reason: L10n.t(
+                    "Links and advertising are not allowed.",
+                    "不允许发送链接和广告。"
+                ))
+            }
+        }
+
+        // 4. Phone number patterns
+        if lower.range(of: "\\d{3}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}", options: .regularExpression) != nil {
+            return Result(isAllowed: false, reason: L10n.t(
+                "Please don't share personal contact information.",
+                "请不要分享个人联系方式。"
+            ))
+        }
+
+        return Result(isAllowed: true, reason: nil)
+    }
+}
+
 // MARK: - Errors
 
 enum SupabaseError: Error, LocalizedError {
     case invalidURL
     case serverError
     case noData
+    case moderation(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL: "Invalid URL"
         case .serverError: "Server error"
         case .noData: "No data returned"
+        case .moderation(let reason): reason
         }
     }
 }

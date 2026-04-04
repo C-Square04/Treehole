@@ -1,0 +1,520 @@
+import SwiftUI
+import SwiftData
+
+// MARK: - Time Period
+
+private enum TimePeriod: String, CaseIterable {
+    case week, month, year
+
+    var localizedLabel: String {
+        switch self {
+        case .week:  L10n.t("Week", "周")
+        case .month: L10n.t("Month", "月")
+        case .year:  L10n.t("Year", "年")
+        }
+    }
+}
+
+// MARK: - Calendar Day Model
+
+private struct CalendarDay: Identifiable {
+    let id: Int
+    let date: Date?
+    let mood: MoodTag?
+    let isToday: Bool
+    let isInPeriod: Bool
+}
+
+// MARK: - Sub-Period Item
+
+private struct SubPeriodItem: Identifiable {
+    let id: Int   // offset value
+    let label: String
+}
+
+// MARK: - Mood Stats View
+
+struct MoodStatsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \JournalEntry.createdAt, order: .reverse) private var allEntries: [JournalEntry]
+
+    @State private var selectedPeriod: TimePeriod = .month
+    @State private var selectedMonthOffset: Int = 0
+    @State private var selectedWeekOffset: Int = 0
+
+    private let cal = Calendar.current
+
+    var body: some View {
+        ZStack {
+            TreeholeTheme.warmBackground.ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: TreeholeTheme.spacingLarge) {
+                    periodPickerSection
+                    subPeriodScroller
+                    calendarSection
+                    distributionSection
+                    streakSection
+                }
+                .padding(.horizontal, TreeholeTheme.spacingMedium)
+                .padding(.vertical, TreeholeTheme.spacingSmall)
+            }
+        }
+        .navigationTitle(L10n.t("Mood Stats", "情绪统计"))
+        .navigationBarTitleDisplayMode(.large)
+    }
+
+    // MARK: - Period Picker
+
+    private var periodPickerSection: some View {
+        Picker(L10n.t("Period", "周期"), selection: $selectedPeriod) {
+            ForEach(TimePeriod.allCases, id: \.self) { period in
+                Text(period.localizedLabel).tag(period)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.top, TreeholeTheme.spacingSmall)
+    }
+
+    // MARK: - Sub-Period Scroller
+
+    private var subPeriodScroller: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: TreeholeTheme.spacingSmall) {
+                    ForEach(subPeriodItems) { item in
+                        Button {
+                            withAnimation(.spring(response: 0.3)) {
+                                if selectedPeriod == .week {
+                                    selectedWeekOffset = item.id
+                                } else {
+                                    selectedMonthOffset = item.id
+                                }
+                            }
+                        } label: {
+                            Text(item.label)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(isSelected(item.id) ? Color.white : TreeholeTheme.textPrimary)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                                .padding(.vertical, 8)
+                                .background(
+                                    isSelected(item.id) ? TreeholeTheme.softPurple : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium)
+                                )
+                        }
+                        .id(item.id)
+                    }
+                }
+                .padding(.horizontal, TreeholeTheme.spacingMedium)
+            }
+            .onAppear { proxy.scrollTo(0, anchor: .center) }
+            .onChange(of: selectedPeriod) { proxy.scrollTo(0, anchor: .center) }
+        }
+    }
+
+    private var subPeriodItems: [SubPeriodItem] {
+        switch selectedPeriod {
+        case .month, .year:
+            return (-11...0).map { offset in
+                let date = cal.date(byAdding: .month, value: offset, to: Date()) ?? Date()
+                let label = date.formatted(.dateTime.month(.abbreviated).year(.twoDigits))
+                return SubPeriodItem(id: offset, label: label)
+            }
+        case .week:
+            return (-7...0).map { offset in
+                let start = weekStart(offset: offset)
+                let end = cal.date(byAdding: .day, value: 6, to: start) ?? start
+                let s = start.formatted(.dateTime.month(.abbreviated).day())
+                let e = end.formatted(.dateTime.month(.abbreviated).day())
+                return SubPeriodItem(id: offset, label: "\(s)–\(e)")
+            }
+        }
+    }
+
+    private func isSelected(_ offset: Int) -> Bool {
+        selectedPeriod == .week ? selectedWeekOffset == offset : selectedMonthOffset == offset
+    }
+
+    // MARK: - Calendar Section
+
+    private var calendarSection: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            Text(L10n.t("Average Mood", "情绪概览"))
+                .font(.headline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+            calendarGrid
+        }
+        .glassCard()
+    }
+
+    private var calendarGrid: some View {
+        VStack(spacing: 6) {
+            // Weekday headers Mon–Sun
+            HStack(spacing: 6) {
+                ForEach(weekdayHeaders, id: \.self) { label in
+                    Text(label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(TreeholeTheme.textLight)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            let days = buildCalendarDays()
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(days) { day in
+                    dayCellView(day)
+                }
+            }
+        }
+    }
+
+    private var weekdayHeaders: [String] {
+        var symbols = cal.shortWeekdaySymbols   // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
+        let sun = symbols.removeFirst()
+        symbols.append(sun)                     // [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+        return symbols.map { String($0.prefix(1)) }
+    }
+
+    @ViewBuilder
+    private func dayCellView(_ day: CalendarDay) -> some View {
+        ZStack {
+            if day.isInPeriod {
+                if let mood = day.mood {
+                    if day.isToday {
+                        Circle()
+                            .strokeBorder(TreeholeTheme.softPurple, lineWidth: 2)
+                            .frame(width: 36, height: 36)
+                    }
+                    Text(mood.emoji)
+                        .font(.system(size: 22))
+                        .frame(width: 36, height: 36)
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 36, height: 36)
+                        if day.isToday {
+                            Circle()
+                                .strokeBorder(TreeholeTheme.softPurple, lineWidth: 2)
+                                .frame(width: 36, height: 36)
+                        }
+                    }
+                }
+            } else {
+                Color.clear
+                    .frame(width: 36, height: 36)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Calendar Day Building
+
+    private func buildCalendarDays() -> [CalendarDay] {
+        switch selectedPeriod {
+        case .week:
+            return buildWeekDays()
+        case .month, .year:
+            return buildMonthDays()
+        }
+    }
+
+    private func buildMonthDays() -> [CalendarDay] {
+        let target = cal.date(byAdding: .month, value: selectedMonthOffset, to: Date()) ?? Date()
+        guard
+            let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: target)),
+            let monthRange = cal.range(of: .day, in: .month, for: monthStart)
+        else { return [] }
+
+        let today = cal.startOfDay(for: Date())
+        let moodMap = moodMapForPeriod
+
+        let leading = isoWeekday(monthStart) - 1
+        var days: [CalendarDay] = []
+
+        for i in 0..<leading {
+            days.append(CalendarDay(id: -(leading - i), date: nil, mood: nil, isToday: false, isInPeriod: false))
+        }
+
+        for dayNum in monthRange {
+            guard let date = cal.date(byAdding: .day, value: dayNum - 1, to: monthStart) else { continue }
+            let dayStart = cal.startOfDay(for: date)
+            days.append(CalendarDay(
+                id: dayNum,
+                date: date,
+                mood: moodMap[dayStart],
+                isToday: dayStart == today,
+                isInPeriod: true
+            ))
+        }
+
+        let trailing = (7 - (days.count % 7)) % 7
+        for i in 0..<trailing {
+            days.append(CalendarDay(id: 1000 + i, date: nil, mood: nil, isToday: false, isInPeriod: false))
+        }
+
+        return days
+    }
+
+    private func buildWeekDays() -> [CalendarDay] {
+        let start = weekStart(offset: selectedWeekOffset)
+        let today = cal.startOfDay(for: Date())
+        let moodMap = moodMapForPeriod
+
+        return (0..<7).map { offset in
+            guard let date = cal.date(byAdding: .day, value: offset, to: start) else {
+                return CalendarDay(id: offset, date: nil, mood: nil, isToday: false, isInPeriod: false)
+            }
+            let dayStart = cal.startOfDay(for: date)
+            return CalendarDay(
+                id: offset,
+                date: date,
+                mood: moodMap[dayStart],
+                isToday: dayStart == today,
+                isInPeriod: true
+            )
+        }
+    }
+
+    // MARK: - Distribution Section
+
+    private var distributionSection: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            Text(L10n.t("Mood Distribution", "情绪分布"))
+                .font(.headline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            let counts = moodCounts
+            let maxCount = counts.values.max() ?? 1
+            let sorted = MoodTag.allCases
+                .filter { (counts[$0] ?? 0) > 0 }
+                .sorted { (counts[$0] ?? 0) > (counts[$1] ?? 0) }
+
+            if sorted.isEmpty {
+                Text(L10n.t("No entries in this period.", "此时间段内没有日记。"))
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textLight)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, TreeholeTheme.spacingSmall)
+            } else {
+                VStack(spacing: TreeholeTheme.spacingSmall) {
+                    ForEach(sorted) { mood in
+                        MoodBarRow(
+                            mood: mood,
+                            count: counts[mood] ?? 0,
+                            maxCount: maxCount,
+                            barColor: moodColor(mood)
+                        )
+                    }
+                }
+            }
+        }
+        .glassCard()
+    }
+
+    // MARK: - Streak Section
+
+    private var streakSection: some View {
+        let streaks = calculateStreaks()
+        return VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            Text(L10n.t("Writing Streaks", "写作连续天数"))
+                .font(.headline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            HStack(spacing: TreeholeTheme.spacingMedium) {
+                StreakCard(
+                    value: streaks.current,
+                    label: L10n.t("Current Streak", "当前连续"),
+                    icon: "flame.fill",
+                    color: TreeholeTheme.coral
+                )
+                StreakCard(
+                    value: streaks.longest,
+                    label: L10n.t("Longest Streak", "最长连续"),
+                    icon: "trophy.fill",
+                    color: TreeholeTheme.warmGold
+                )
+            }
+        }
+        .glassCard()
+        .padding(.bottom, TreeholeTheme.spacingLarge)
+    }
+
+    // MARK: - Data Helpers
+
+    private var filteredEntries: [JournalEntry] {
+        let range = currentDateRange
+        return allEntries.filter { $0.createdAt >= range.start && $0.createdAt < range.end }
+    }
+
+    private var currentDateRange: (start: Date, end: Date) {
+        switch selectedPeriod {
+        case .week:
+            let start = weekStart(offset: selectedWeekOffset)
+            let end = cal.date(byAdding: .day, value: 7, to: start) ?? start
+            return (start, end)
+        case .month, .year:
+            let target = cal.date(byAdding: .month, value: selectedMonthOffset, to: Date()) ?? Date()
+            let comps = cal.dateComponents([.year, .month], from: target)
+            let start = cal.date(from: comps) ?? target
+            let end = cal.date(byAdding: .month, value: 1, to: start) ?? start
+            return (start, end)
+        }
+    }
+
+    /// Map: start-of-day -> dominant MoodTag for the current filtered period
+    private var moodMapForPeriod: [Date: MoodTag] {
+        var dict: [Date: [MoodTag]] = [:]
+        for entry in filteredEntries {
+            let day = cal.startOfDay(for: entry.createdAt)
+            dict[day, default: []].append(entry.moodTag)
+        }
+        return dict.mapValues { moods in
+            let freq = moods.reduce(into: [MoodTag: Int]()) { $0[$1, default: 0] += 1 }
+            return freq.max(by: { $0.value < $1.value })?.key ?? moods[0]
+        }
+    }
+
+    private var moodCounts: [MoodTag: Int] {
+        filteredEntries.reduce(into: [MoodTag: Int]()) { $0[$1.moodTag, default: 0] += 1 }
+    }
+
+    private func weekStart(offset: Int) -> Date {
+        // Find Monday of current week then apply offset
+        let now = Date()
+        let dow = isoWeekday(now)  // Mon=1..Sun=7
+        let monday = cal.date(byAdding: .day, value: -(dow - 1), to: cal.startOfDay(for: now)) ?? now
+        return cal.date(byAdding: .weekOfYear, value: offset, to: monday) ?? monday
+    }
+
+    /// ISO weekday: Mon=1 ... Sun=7
+    private func isoWeekday(_ date: Date) -> Int {
+        let raw = cal.component(.weekday, from: date)  // Sun=1...Sat=7
+        return raw == 1 ? 7 : raw - 1
+    }
+
+    private func calculateStreaks() -> (current: Int, longest: Int) {
+        let today = cal.startOfDay(for: Date())
+        let days = Set(allEntries.map { cal.startOfDay(for: $0.createdAt) }).sorted()
+
+        guard !days.isEmpty else { return (0, 0) }
+
+        // Longest streak
+        var longest = 0
+        var streak = 0
+        var prev: Date? = nil
+        for day in days {
+            if let p = prev, cal.date(byAdding: .day, value: 1, to: p) == day {
+                streak += 1
+            } else {
+                streak = 1
+            }
+            longest = max(longest, streak)
+            prev = day
+        }
+
+        // Current streak (counting backwards from today or yesterday)
+        var current = 0
+        var check = today
+        // if today has no entry, start from yesterday
+        if !days.contains(today) {
+            check = cal.date(byAdding: .day, value: -1, to: today) ?? today
+        }
+        while days.contains(check) {
+            current += 1
+            check = cal.date(byAdding: .day, value: -1, to: check) ?? check
+        }
+
+        return (current, longest)
+    }
+
+    private func moodColor(_ mood: MoodTag) -> Color {
+        switch mood {
+        case .happy:    TreeholeTheme.warmGold
+        case .sad:      TreeholeTheme.skyBlue
+        case .angry:    TreeholeTheme.coral
+        case .anxious:  TreeholeTheme.softRose
+        case .tired:    TreeholeTheme.gentleLavender
+        case .confused: TreeholeTheme.softPurple
+        case .hopeful:  TreeholeTheme.mintCream
+        case .calm:     TreeholeTheme.warmPeach
+        }
+    }
+}
+
+// MARK: - Mood Bar Row
+
+private struct MoodBarRow: View {
+    let mood: MoodTag
+    let count: Int
+    let maxCount: Int
+    let barColor: Color
+
+    var body: some View {
+        HStack(spacing: TreeholeTheme.spacingSmall) {
+            Text(mood.emoji)
+                .font(.title3)
+                .frame(width: 28)
+
+            Text(L10n.t(mood.labelEN, mood.labelZH))
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+                .frame(width: 65, alignment: .leading)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.12))
+                        .frame(height: 14)
+
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(barColor)
+                        .frame(
+                            width: maxCount > 0
+                                ? geo.size.width * CGFloat(count) / CGFloat(maxCount)
+                                : 0,
+                            height: 14
+                        )
+                }
+            }
+            .frame(height: 14)
+
+            Text("\(count)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(TreeholeTheme.textSecondary)
+                .frame(width: 24, alignment: .trailing)
+        }
+    }
+}
+
+// MARK: - Streak Card
+
+private struct StreakCard: View {
+    let value: Int
+    let label: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .foregroundStyle(color)
+                Text("\(value)")
+                    .font(.title2.bold())
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Text(L10n.t("days", "天"))
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+            }
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(TreeholeTheme.textLight)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(TreeholeTheme.spacingSmall)
+        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+    }
+}

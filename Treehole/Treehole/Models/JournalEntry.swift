@@ -7,12 +7,18 @@ final class JournalEntry {
     var createdAt: Date
     var moodTagRaw: String
     var text: String
+    var photoData: [Data]?
 
     init(moodTag: MoodTag, text: String) {
         self.id = UUID().uuidString
         self.createdAt = Date()
         self.moodTagRaw = moodTag.rawValue
         self.text = text
+        self.photoData = nil
+    }
+
+    var photoCount: Int {
+        photoData?.count ?? 0
     }
 
     var moodTag: MoodTag {

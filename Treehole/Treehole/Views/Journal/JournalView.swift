@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
@@ -12,6 +13,7 @@ struct JournalView: View {
     @State private var showNewEntry = false
     @State private var draftText = ""
     @State private var draftMood: MoodTag = .calm
+    @State private var draftPhotoData: [Data] = []
     @State private var currentPrompt: String = ""
 
     private static let prompts: [(en: String, zh: String)] = [
@@ -71,7 +73,9 @@ struct JournalView: View {
                         // Entries
                         Section(L10n.t("Entries", "日记列表")) {
                             ForEach(entries) { entry in
-                                JournalEntryRow(entry: entry)
+                                NavigationLink(destination: JournalDetailView(entry: entry)) {
+                                    JournalEntryRow(entry: entry)
+                                }
                             }
                             .onDelete { indexSet in
                                 for index in indexSet {
@@ -85,6 +89,14 @@ struct JournalView: View {
             }
             .navigationTitle(L10n.t("Journal", "日记"))
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    NavigationLink {
+                        MoodStatsView()
+                    } label: {
+                        Image(systemName: "chart.bar.fill")
+                            .foregroundStyle(TreeholeTheme.softPurple)
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showNewEntry = true } label: {
                         Image(systemName: "square.and.pencil")
@@ -96,9 +108,13 @@ struct JournalView: View {
                 JournalEntryEditor(
                     draftText: $draftText,
                     draftMood: $draftMood,
+                    draftPhotoData: $draftPhotoData,
                     prompt: currentPrompt,
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
+                        if !draftPhotoData.isEmpty {
+                            entry.photoData = draftPhotoData
+                        }
                         modelContext.insert(entry)
                         let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                         if let task = dailyTasks.first(where: { $0.type == .writeJournal && !$0.isCompleted }) {
@@ -108,6 +124,7 @@ struct JournalView: View {
                         try? modelContext.save()
                         draftText = ""
                         draftMood = .calm
+                        draftPhotoData = []
                         showNewEntry = false
                     }
                 )
@@ -150,9 +167,16 @@ private struct JournalEntryRow: View {
                     .font(.body)
                     .foregroundStyle(TreeholeTheme.textPrimary)
                     .lineLimit(2)
-                Text(entry.formattedDate)
-                    .font(.caption)
-                    .foregroundStyle(TreeholeTheme.textLight)
+                HStack(spacing: TreeholeTheme.spacingTight) {
+                    Text(entry.formattedDate)
+                        .font(.caption)
+                        .foregroundStyle(TreeholeTheme.textLight)
+                    if entry.photoCount > 0 {
+                        Label("\(entry.photoCount)", systemImage: "photo.fill")
+                            .font(.caption)
+                            .foregroundStyle(TreeholeTheme.skyBlue)
+                    }
+                }
             }
             Spacer()
         }
@@ -165,8 +189,14 @@ private struct JournalEntryEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var draftText: String
     @Binding var draftMood: MoodTag
+    @Binding var draftPhotoData: [Data]
     let prompt: String
     let onSave: () -> Void
+
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var isLoadingPhotos = false
+
+    private let maxPhotos = 3
 
     var body: some View {
         NavigationStack {
@@ -204,6 +234,73 @@ private struct JournalEntryEditor: View {
                             .padding(TreeholeTheme.spacingSmall)
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
                             .scrollContentBackground(.hidden)
+
+                        // MARK: - Photo Section
+                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+                            HStack {
+                                Text(L10n.t("Photos", "照片"))
+                                    .font(.headline)
+                                    .foregroundStyle(TreeholeTheme.textPrimary)
+                                Spacer()
+                                Text(L10n.t("\(draftPhotoData.count)/\(maxPhotos)", "\(draftPhotoData.count)/\(maxPhotos)"))
+                                    .font(.caption)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+
+                            // Photo thumbnails
+                            if !draftPhotoData.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: TreeholeTheme.spacingSmall) {
+                                        ForEach(Array(draftPhotoData.enumerated()), id: \.offset) { index, data in
+                                            ZStack(alignment: .topTrailing) {
+                                                if let uiImage = UIImage(data: data) {
+                                                    Image(uiImage: uiImage)
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 80, height: 80)
+                                                        .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                                                }
+                                                Button {
+                                                    draftPhotoData.remove(at: index)
+                                                } label: {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .font(.system(size: 18))
+                                                        .foregroundStyle(.white)
+                                                        .background(Circle().fill(Color.black.opacity(0.5)))
+                                                }
+                                                .offset(x: 6, y: -6)
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+
+                            // Photos picker button
+                            if draftPhotoData.count < maxPhotos {
+                                PhotosPicker(
+                                    selection: $selectedItems,
+                                    maxSelectionCount: maxPhotos - draftPhotoData.count,
+                                    matching: .images
+                                ) {
+                                    HStack(spacing: TreeholeTheme.spacingTight) {
+                                        if isLoadingPhotos {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        } else {
+                                            Image(systemName: "photo.badge.plus")
+                                        }
+                                        Text(L10n.t("Add Photos", "添加照片"))
+                                            .font(.subheadline)
+                                    }
+                                    .foregroundStyle(TreeholeTheme.skyBlue)
+                                    .padding(.vertical, TreeholeTheme.spacingTight)
+                                    .padding(.horizontal, TreeholeTheme.spacingSmall)
+                                    .background(TreeholeTheme.skyBlue.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 2)
                     }
                     .padding()
                 }
@@ -220,7 +317,28 @@ private struct JournalEntryEditor: View {
                         .tint(TreeholeTheme.coral)
                 }
             }
+            .onChange(of: selectedItems) { _, newItems in
+                Task {
+                    await loadPhotos(from: newItems)
+                }
+            }
         }
+    }
+
+    @MainActor
+    private func loadPhotos(from items: [PhotosPickerItem]) async {
+        isLoadingPhotos = true
+        defer { isLoadingPhotos = false }
+
+        for item in items {
+            guard draftPhotoData.count < maxPhotos else { break }
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let uiImage = UIImage(data: data),
+               let jpegData = uiImage.jpegData(compressionQuality: 0.7) {
+                draftPhotoData.append(jpegData)
+            }
+        }
+        selectedItems = []
     }
 }
 

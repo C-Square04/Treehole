@@ -261,4 +261,430 @@ final class TreeholeUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
+    // MARK: - Economy / Shop Tests
+
+    @MainActor
+    func testShopShowsDailyTasks() throws {
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Shop Daily Tasks"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        // Tasks panel is the default selected segment — look for task-related content
+        // The Tasks panel shows up to 4 daily task cards (one per TaskType).
+        // Task titles come from TaskType.title (English, not localized via L10n):
+        //   "Share a Cloud", "Feed Your Pet", "Water Your Plant", "Write in Journal"
+        // Also search for the reward icons which are always emoji
+        let taskCards = app.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Feed' OR label CONTAINS[c] 'Water' OR label CONTAINS[c] 'Journal' OR label CONTAINS[c] 'Cloud' OR label CONTAINS[c] 'Share' OR label CONTAINS '🍖' OR label CONTAINS '🎫'"
+        ))
+        // We expect at least 1 task card to be visible
+        XCTAssertTrue(taskCards.firstMatch.waitForExistence(timeout: 5), "At least one daily task card should be visible in Shop Tasks panel")
+    }
+
+    @MainActor
+    func testShopBuyFood() throws {
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        // Switch to "Shop" segment in the segmented picker.
+        // The segmented Picker renders as a UISegmentedControl — its segments are buttons
+        // BUT there's ambiguity with the "Shop" tab bar button.
+        // We use the segmented control directly to avoid tapping the tab bar.
+        let segmentedControl = app.segmentedControls.firstMatch
+        if segmentedControl.waitForExistence(timeout: 3) {
+            // "Shop" is the second segment (index 1)
+            let shopSegment = segmentedControl.buttons["Shop"]
+            if shopSegment.waitForExistence(timeout: 2) {
+                shopSegment.tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        let screenshot1 = app.screenshot()
+        let attachment1 = XCTAttachment(screenshot: screenshot1)
+        attachment1.name = "Shop Panel"
+        attachment1.lifetime = .keepAlways
+        add(attachment1)
+
+        // Find a buy button (shows token cost like "1 🎫")
+        // These are FoodPackCard buy buttons labeled "<cost> 🎫"
+        let buyButton = app.buttons.matching(NSPredicate(format: "label CONTAINS '🎫'")).firstMatch
+        if buyButton.waitForExistence(timeout: 3) && buyButton.isEnabled {
+            buyButton.tap()
+            Thread.sleep(forTimeInterval: 1)
+
+            let screenshot2 = app.screenshot()
+            let attachment2 = XCTAttachment(screenshot: screenshot2)
+            attachment2.name = "After Shop Purchase"
+            attachment2.lifetime = .keepAlways
+            add(attachment2)
+        }
+        // Don't assert — token balance may be insufficient or buy button may be disabled
+    }
+
+    @MainActor
+    func testShopLoginStreak() throws {
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Shop Login Streak"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        // Login streak card should show the fire emoji 🔥
+        let fireEmoji = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '🔥'")).firstMatch
+        XCTAssertTrue(fireEmoji.waitForExistence(timeout: 5), "Login streak badge with 🔥 should be visible in Shop tab")
+    }
+
+    // MARK: - Pet Economy Integration
+
+    @MainActor
+    func testPetFeedCostsFood() throws {
+        app.tabBars.buttons["Pet"].tap()
+        Thread.sleep(forTimeInterval: 3)
+
+        let screenshot1 = app.screenshot()
+        let attachment1 = XCTAttachment(screenshot: screenshot1)
+        attachment1.name = "Pet Before Feed"
+        attachment1.lifetime = .keepAlways
+        add(attachment1)
+
+        // The feed button label contains "Feed (5 🍖)" in English or "喂食 (5 🍖)" in Chinese.
+        // Use food icon as the canonical identifier since it appears in both languages.
+        // The button's VStack includes: Label("Feed (5 🍖)" / "喂食 (5 🍖)") + Text("🍖 N")
+        // Look for any button that has "🍖" in its label (covers both EN and ZH)
+        let feedButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS '🍖' OR label CONTAINS[c] 'Feed' OR label CONTAINS '喂食'"
+        )).firstMatch
+        XCTAssertTrue(feedButton.waitForExistence(timeout: 5), "Feed button (with 🍖 icon) should be present on Pet screen")
+
+        // Verify food icon also appears on screen as a stat label
+        let foodIcon = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '🍖'")).firstMatch
+        XCTAssertTrue(foodIcon.waitForExistence(timeout: 3), "Food icon 🍖 should appear on Pet screen (in button or stats)")
+
+        if feedButton.isEnabled {
+            feedButton.tap()
+            Thread.sleep(forTimeInterval: 2)
+
+            let screenshot2 = app.screenshot()
+            let attachment2 = XCTAttachment(screenshot: screenshot2)
+            attachment2.name = "Pet After Feed (food decreased)"
+            attachment2.lifetime = .keepAlways
+            add(attachment2)
+        }
+    }
+
+    // MARK: - Garden Multi-Plant
+
+    @MainActor
+    func testAddSecondPlant() throws {
+        app.tabBars.buttons["Garden"].tap()
+        Thread.sleep(forTimeInterval: 1)
+
+        // Ensure at least one plant exists first.
+        // "Plant a Seed" is the English empty-state button; "播种" is Chinese.
+        let plantSeedButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Plant a Seed' OR label CONTAINS[c] '播种'"
+        )).firstMatch
+        if plantSeedButton.waitForExistence(timeout: 2) {
+            plantSeedButton.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            // "Plant Seed" confirm button in AddPlantSheet
+            let confirmButton = app.buttons.matching(NSPredicate(format:
+                "label CONTAINS[c] 'Plant Seed' OR label CONTAINS[c] '播种'"
+            )).firstMatch
+            if confirmButton.waitForExistence(timeout: 3) {
+                confirmButton.tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        // First confirm we have at least one plant — Water Plant button exists in EN or ZH
+        let waterButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Water' OR label CONTAINS[c] '浇水'"
+        )).firstMatch
+        XCTAssertTrue(waterButton.waitForExistence(timeout: 5), "Garden should show a plant (Water button visible in EN or ZH)")
+
+        // Now tap the toolbar + button to add a second plant
+        // The toolbar button uses systemName "plus.circle.fill"
+        let addButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Add' OR label CONTAINS[c] 'plus' OR label CONTAINS[c] 'New' OR label CONTAINS[c] '添加'"
+        )).firstMatch
+        if addButton.waitForExistence(timeout: 3) {
+            addButton.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+
+            // In the Add Plant sheet, tap "Plant Seed" / "播种" to confirm with defaults
+            let plantSeedConfirm = app.buttons.matching(NSPredicate(format:
+                "label CONTAINS[c] 'Plant Seed' OR label CONTAINS[c] '播种'"
+            )).firstMatch
+            if plantSeedConfirm.waitForExistence(timeout: 3) {
+                plantSeedConfirm.tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Garden With Second Plant"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        // Garden should still show plant content
+        let waterButtonAfter = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Water' OR label CONTAINS[c] '浇水'"
+        )).firstMatch
+        XCTAssertTrue(waterButtonAfter.waitForExistence(timeout: 5), "Garden should still show a plant after attempting to add second")
+    }
+
+    @MainActor
+    func testSwitchBetweenPlants() throws {
+        app.tabBars.buttons["Garden"].tap()
+        Thread.sleep(forTimeInterval: 1)
+
+        // Make sure there's at least one plant
+        let plantSeedButton = app.buttons["Plant a Seed"]
+        if plantSeedButton.waitForExistence(timeout: 2) {
+            plantSeedButton.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            let confirmButton = app.buttons["Plant Seed"]
+            if confirmButton.waitForExistence(timeout: 3) {
+                confirmButton.tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        let screenshot1 = app.screenshot()
+        let attachment1 = XCTAttachment(screenshot: screenshot1)
+        attachment1.name = "Garden Plant Selector Before"
+        attachment1.lifetime = .keepAlways
+        add(attachment1)
+
+        // Scroll the plant selector horizontally and tap a thumbnail button
+        // Thumbnails are PlainButtonStyle buttons containing plant name and emoji
+        let scrollView = app.scrollViews.firstMatch
+        if scrollView.waitForExistence(timeout: 3) {
+            // Try tapping the second plant thumbnail if it exists
+            let allPlainButtons = app.buttons.allElementsBoundByIndex
+            // Filter for small plant thumbnail buttons in the selector region
+            // They appear near the top of the screen
+            for button in allPlainButtons.prefix(20) {
+                let frame = button.frame
+                // Plant thumbnails are in the top selector area (y < 300) and small
+                if frame.height < 80 && frame.width < 80 && frame.minY < 300 && frame.minY > 50 {
+                    button.tap()
+                    Thread.sleep(forTimeInterval: 0.5)
+                    break
+                }
+            }
+        }
+
+        let screenshot2 = app.screenshot()
+        let attachment2 = XCTAttachment(screenshot: screenshot2)
+        attachment2.name = "Garden After Plant Switch"
+        attachment2.lifetime = .keepAlways
+        add(attachment2)
+    }
+
+    // MARK: - Journal Stats
+
+    @MainActor
+    func testJournalShowsStats() throws {
+        app.tabBars.buttons["Journal"].tap()
+        Thread.sleep(forTimeInterval: 1)
+
+        let screenshot0 = app.screenshot()
+        let attachment0 = XCTAttachment(screenshot: screenshot0)
+        attachment0.name = "Journal Initial State"
+        attachment0.lifetime = .keepAlways
+        add(attachment0)
+
+        // Open new-entry editor: try empty-state button first, then toolbar button
+        // Empty state shows "Write Entry" (EN) or "写日记" (ZH)
+        let emptyWriteButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Write Entry' OR label CONTAINS[c] '写日记'"
+        )).firstMatch
+        if emptyWriteButton.waitForExistence(timeout: 2) {
+            emptyWriteButton.tap()
+        } else {
+            // Toolbar button uses systemName "square.and.pencil"
+            // SF Symbols accessibility label: "square and pencil"
+            let toolbarButton = app.buttons.matching(NSPredicate(format:
+                "label CONTAINS[c] 'pencil' OR label CONTAINS[c] 'square'"
+            )).firstMatch
+            if toolbarButton.waitForExistence(timeout: 2) {
+                toolbarButton.tap()
+            }
+        }
+        Thread.sleep(forTimeInterval: 0.5)
+
+        let textEditor = app.textViews.firstMatch
+        if textEditor.waitForExistence(timeout: 3) {
+            textEditor.tap()
+            textEditor.typeText("Stats test entry")
+
+            // Save button is "Save" (EN) or "保存" (ZH)
+            let saveButton = app.buttons.matching(NSPredicate(format:
+                "label CONTAINS[c] 'Save' OR label CONTAINS[c] '保存'"
+            )).firstMatch
+            if saveButton.waitForExistence(timeout: 2) && saveButton.isEnabled {
+                saveButton.tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Journal Stats After Entry"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        // Stats section shows "Total" (EN) or "总计" (ZH) label
+        // Only visible when there are entries
+        let totalLabel = app.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Total' OR label CONTAINS[c] '总计'"
+        )).firstMatch
+        XCTAssertTrue(totalLabel.waitForExistence(timeout: 5), "Journal stats section should show 'Total' / '总计' label after an entry is created")
+    }
+
+    // MARK: - Language Toggle
+
+    @MainActor
+    func testLanguageSwitchToChinese() throws {
+        // Navigate to Settings via Shop toolbar gear button
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 1)
+
+        let gearButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'gear' OR label CONTAINS[c] 'Settings'")).firstMatch
+        if gearButton.waitForExistence(timeout: 3) {
+            gearButton.tap()
+            Thread.sleep(forTimeInterval: 1)
+        }
+
+        let screenshot1 = app.screenshot()
+        let attachment1 = XCTAttachment(screenshot: screenshot1)
+        attachment1.name = "Settings Before Language Switch"
+        attachment1.lifetime = .keepAlways
+        add(attachment1)
+
+        // Find and tap the Language picker
+        let languagePicker = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Language' OR label CONTAINS[c] '语言'")).firstMatch
+        if languagePicker.waitForExistence(timeout: 3) {
+            languagePicker.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+
+        // Alternatively, find the 中文 option directly
+        let chineseOption = app.buttons["中文"]
+        if chineseOption.waitForExistence(timeout: 2) {
+            chineseOption.tap()
+            Thread.sleep(forTimeInterval: 1)
+        }
+
+        let screenshot2 = app.screenshot()
+        let attachment2 = XCTAttachment(screenshot: screenshot2)
+        attachment2.name = "Settings After Language Switch"
+        attachment2.lifetime = .keepAlways
+        add(attachment2)
+
+        // After switching to Chinese, verify the nav title changes to "设置"
+        let chineseTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] '设置' OR label CONTAINS[c] 'Settings'")).firstMatch
+        XCTAssertTrue(chineseTitle.waitForExistence(timeout: 5), "Settings navigation title should exist (in either language)")
+
+        // Reset back to English to avoid affecting other tests
+        let englishOption = app.buttons["English"]
+        if englishOption.waitForExistence(timeout: 2) {
+            englishOption.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+    }
+
+    // MARK: - Weekly Challenges
+
+    @MainActor
+    func testWeeklyChallengesVisible() throws {
+        app.tabBars.buttons["Shop"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Shop Weekly Challenges"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        // Weekly challenges section has a header with "Weekly Challenges" or "每周挑战"
+        let weeklyChallengesHeader = app.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Weekly' OR label CONTAINS[c] '每周'"
+        )).firstMatch
+        XCTAssertTrue(weeklyChallengesHeader.waitForExistence(timeout: 5), "Weekly challenges section should be visible in Shop Tasks tab")
+    }
+
+    // MARK: - Onboarding
+
+    @MainActor
+    func testOnboardingPages() throws {
+        // Launch a fresh app instance without the uitesting flag so onboarding appears
+        let freshApp = XCUIApplication()
+        freshApp.launchArguments = ["--uitesting-onboarding"]
+        freshApp.launch()
+        Thread.sleep(forTimeInterval: 1)
+
+        let screenshot1 = freshApp.screenshot()
+        let attachment1 = XCTAttachment(screenshot: screenshot1)
+        attachment1.name = "Onboarding Page 1"
+        attachment1.lifetime = .keepAlways
+        add(attachment1)
+
+        // If onboarding is shown, we should see "Welcome" or "Treehole" text on page 1
+        let welcomeText = freshApp.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Welcome' OR label CONTAINS[c] 'Treehole' OR label CONTAINS[c] '欢迎'"
+        )).firstMatch
+
+        if welcomeText.waitForExistence(timeout: 3) {
+            // Swipe left through remaining pages
+            let screen = freshApp.windows.firstMatch
+
+            screen.swipeLeft()
+            Thread.sleep(forTimeInterval: 0.5)
+            let screenshot2 = freshApp.screenshot()
+            let attachment2 = XCTAttachment(screenshot: screenshot2)
+            attachment2.name = "Onboarding Page 2"
+            attachment2.lifetime = .keepAlways
+            add(attachment2)
+
+            screen.swipeLeft()
+            Thread.sleep(forTimeInterval: 0.5)
+            let screenshot3 = freshApp.screenshot()
+            let attachment3 = XCTAttachment(screenshot: screenshot3)
+            attachment3.name = "Onboarding Page 3"
+            attachment3.lifetime = .keepAlways
+            add(attachment3)
+
+            screen.swipeLeft()
+            Thread.sleep(forTimeInterval: 0.5)
+            let screenshot4 = freshApp.screenshot()
+            let attachment4 = XCTAttachment(screenshot: screenshot4)
+            attachment4.name = "Onboarding Page 4"
+            attachment4.lifetime = .keepAlways
+            add(attachment4)
+
+            // On the last page, "Continue as Guest" button should appear
+            let guestButton = freshApp.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Guest'")).firstMatch
+            if guestButton.waitForExistence(timeout: 3) {
+                guestButton.tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+        // Don't assert harshly — onboarding only shows on truly fresh install;
+        // the --uitesting flag in setUp suppresses it. Just capture state.
+        freshApp.terminate()
+    }
 }

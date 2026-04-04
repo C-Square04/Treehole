@@ -22,6 +22,7 @@ struct PetHomeView: View {
         guard pets.isEmpty else { return }
         let newPet = Pet(name: "Companion")
         modelContext.insert(newPet)
+        try? modelContext.save()
     }
 
     @ViewBuilder

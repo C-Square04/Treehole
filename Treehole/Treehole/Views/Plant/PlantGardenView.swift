@@ -61,6 +61,7 @@ struct PlantGardenView: View {
                 AddPlantSheet { name, species in
                     let newPlant = Plant(name: name, species: species)
                     modelContext.insert(newPlant)
+                    try? modelContext.save()
                     selectedPlantID = newPlant.id
                 }
             }

@@ -96,6 +96,7 @@ struct JournalView: View {
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
                         modelContext.insert(entry)
+                        try? modelContext.save()
                         draftText = ""
                         draftMood = .calm
                         showNewEntry = false

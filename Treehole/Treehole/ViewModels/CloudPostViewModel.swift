@@ -21,6 +21,7 @@ final class CloudPostViewModel {
             sourceLanguage: language
         )
         context.insert(post)
+        try? context.save()
         draftText = ""
         draftMood = .calm
         showCreation = false

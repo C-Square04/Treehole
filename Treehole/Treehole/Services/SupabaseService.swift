@@ -149,9 +149,59 @@ enum SupabaseService {
         }
     }
 
-    // MARK: - Fetch NPC reply template
+    // MARK: - AI Content Moderation (MiniMax via Edge Function)
 
-    static func fetchNPCReply(mood: String, language: String) async throws -> String {
+    static func moderateWithAI(text: String, language: String) async throws -> (allowed: Bool, reason: String?) {
+        let urlString = "\(SupabaseConfig.projectURL)/functions/v1/moderate-post"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+
+        struct ModerationRequest: Codable { let text: String; let language: String }
+        request.httpBody = try JSONEncoder().encode(ModerationRequest(text: text, language: language))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            // AI unavailable → allow (fail open, DB trigger is backup)
+            return (true, nil)
+        }
+
+        struct ModerationResponse: Codable { let allowed: Bool; let reason: String? }
+        let result = try JSONDecoder().decode(ModerationResponse.self, from: data)
+        return (result.allowed, result.reason)
+    }
+
+    // MARK: - AI NPC Reply (MiniMax via Edge Function)
+
+    static func generateAINPCReply(text: String, mood: String, language: String) async throws -> String {
+        let urlString = "\(SupabaseConfig.projectURL)/functions/v1/generate-npc-reply"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+
+        struct NPCRequest: Codable { let text: String; let mood: String; let language: String }
+        request.httpBody = try JSONEncoder().encode(NPCRequest(text: text, mood: mood, language: language))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            // Fallback to template
+            return try await fetchNPCReplyTemplate(mood: mood, language: language)
+        }
+
+        struct NPCResponse: Codable { let reply: String }
+        let result = try JSONDecoder().decode(NPCResponse.self, from: data)
+        return result.reply
+    }
+
+    // MARK: - Fetch NPC reply template (fallback)
+
+    static func fetchNPCReplyTemplate(mood: String, language: String) async throws -> String {
         let urlString = "\(SupabaseConfig.restURL)/npc_reply_templates?mood_tag=eq.\(mood)&limit=1"
         guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
 

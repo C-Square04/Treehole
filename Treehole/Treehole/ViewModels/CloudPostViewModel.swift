@@ -36,16 +36,23 @@ final class CloudPostViewModel {
         let text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        // Client-side moderation pre-check
-        let moderationResult = ContentModerator.check(text)
-        guard moderationResult.isAllowed else {
-            errorMessage = moderationResult.reason
+        // Layer 1: Client-side keyword pre-check (instant)
+        let keywordResult = ContentModerator.check(text)
+        guard keywordResult.isAllowed else {
+            errorMessage = keywordResult.reason
             return
         }
 
         do {
-            // Get NPC reply from server
-            let npcReply = try await SupabaseService.fetchNPCReply(mood: draftMood.rawValue, language: language)
+            // Layer 2: AI moderation via MiniMax (server-side)
+            let aiModeration = try await SupabaseService.moderateWithAI(text: text, language: language)
+            guard aiModeration.allowed else {
+                errorMessage = aiModeration.reason
+                return
+            }
+
+            // Generate AI NPC reply via MiniMax
+            let npcReply = try await SupabaseService.generateAINPCReply(text: text, mood: draftMood.rawValue, language: language)
 
             // Create post on Supabase
             let newPost = try await SupabaseService.createPost(

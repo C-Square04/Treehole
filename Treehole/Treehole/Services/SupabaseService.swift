@@ -149,6 +149,30 @@ enum SupabaseService {
         }
     }
 
+    // MARK: - Update post NPC reply (background)
+
+    static func updatePostNPCReply(id: String, npcReply: String) async throws {
+        let urlString = "\(SupabaseConfig.restURL)/cloud_posts?id=eq.\(id)"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct UpdateBody: Codable {
+            let npcReplyText: String
+            enum CodingKeys: String, CodingKey { case npcReplyText = "npc_reply_text" }
+        }
+        request.httpBody = try JSONEncoder().encode(UpdateBody(npcReplyText: npcReply))
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+    }
+
     // MARK: - AI Content Moderation (MiniMax via Edge Function)
 
     static func moderateWithAI(text: String, language: String) async throws -> (allowed: Bool, reason: String?) {

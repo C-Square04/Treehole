@@ -14,18 +14,6 @@ struct JournalView: View {
     @State private var draftText = ""
     @State private var draftMood: MoodTag = .calm
     @State private var draftPhotoData: [Data] = []
-    @State private var currentPrompt: String = ""
-
-    private static let prompts: [(en: String, zh: String)] = [
-        ("What was your proudest moment today?", "今天最自豪的时刻是什么？"),
-        ("What are you grateful for right now?", "你现在最感恩的是什么？"),
-        ("Describe how you're feeling in three words.", "用三个词描述你现在的感受。"),
-        ("What challenged you today, and how did you handle it?", "今天有什么挑战？你是怎么应对的？"),
-        ("Write about something that made you smile.", "写一件让你微笑的事。"),
-        ("What would you tell your future self?", "你想对未来的自己说什么？"),
-        ("What's one thing you'd like to let go of?", "有什么事你想放下？"),
-        ("Describe your ideal peaceful moment.", "描述你理想中的平静时刻。"),
-    ]
 
     var body: some View {
         NavigationStack {
@@ -41,50 +29,60 @@ struct JournalView: View {
                         action: { showNewEntry = true }
                     )
                 } else {
-                    List {
-                        // Prompt card
-                        Section {
-                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                                HStack {
-                                    Image(systemName: "lightbulb.fill")
-                                        .foregroundStyle(TreeholeTheme.warmGold)
-                                    Text(L10n.t("Today's Prompt", "今日提示"))
+                    ScrollView {
+                        VStack(spacing: TreeholeTheme.spacingMedium) {
+
+                            // MARK: - Mood Week Strip
+                            MoodWeekStrip(entries: entries)
+                                .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                .padding(.top, TreeholeTheme.spacingSmall)
+
+                            // MARK: - Compact Stats Row
+                            HStack(spacing: TreeholeTheme.spacingMedium) {
+                                MiniStat(
+                                    label: L10n.t("Total", "总计"),
+                                    value: "\(entries.count)",
+                                    icon: "book.fill",
+                                    color: TreeholeTheme.softPurple
+                                )
+                                MiniStat(
+                                    label: L10n.t("This Week", "本周"),
+                                    value: "\(thisWeekCount)",
+                                    icon: "calendar",
+                                    color: TreeholeTheme.skyBlue
+                                )
+                                MiniStat(
+                                    label: L10n.t("This Month", "本月"),
+                                    value: "\(thisMonthCount)",
+                                    icon: "calendar.badge.clock",
+                                    color: TreeholeTheme.coral
+                                )
+                            }
+                            .glassCard()
+                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+
+                            // MARK: - Entries Section
+                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+                                HStack(spacing: TreeholeTheme.spacingTight) {
+                                    Image(systemName: "book.pages")
+                                        .foregroundStyle(TreeholeTheme.softPurple)
+                                    Text(L10n.t("Entries", "日记列表"))
                                         .font(.headline)
                                         .foregroundStyle(TreeholeTheme.textPrimary)
                                 }
-                                Text(currentPrompt)
-                                    .font(.subheadline)
-                                    .foregroundStyle(TreeholeTheme.textSecondary)
-                                    .italic()
-                            }
-                            .listRowBackground(TreeholeTheme.warmGold.opacity(0.1))
-                        }
+                                .padding(.horizontal, TreeholeTheme.spacingMedium)
 
-                        // Stats
-                        Section {
-                            HStack(spacing: TreeholeTheme.spacingMedium) {
-                                MiniStat(label: L10n.t("Total", "总计"), value: "\(entries.count)", icon: "book.fill", color: TreeholeTheme.softPurple)
-                                MiniStat(label: L10n.t("This Week", "本周"), value: "\(thisWeekCount)", icon: "calendar", color: TreeholeTheme.skyBlue)
-                                MiniStat(label: L10n.t("This Month", "本月"), value: "\(thisMonthCount)", icon: "calendar.badge.clock", color: TreeholeTheme.coral)
-                            }
-                            .listRowBackground(Color.clear)
-                        }
-
-                        // Entries
-                        Section(L10n.t("Entries", "日记列表")) {
-                            ForEach(entries) { entry in
-                                NavigationLink(destination: JournalDetailView(entry: entry)) {
-                                    JournalEntryRow(entry: entry)
+                                ForEach(entries) { entry in
+                                    NavigationLink(destination: JournalDetailView(entry: entry)) {
+                                        JournalEntryCard(entry: entry, appState: appState)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, TreeholeTheme.spacingMedium)
                                 }
                             }
-                            .onDelete { indexSet in
-                                for index in indexSet {
-                                    modelContext.delete(entries[index])
-                                }
-                            }
+                            .padding(.bottom, TreeholeTheme.spacingLarge)
                         }
                     }
-                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle(L10n.t("Journal", "日记"))
@@ -109,7 +107,6 @@ struct JournalView: View {
                     draftText: $draftText,
                     draftMood: $draftMood,
                     draftPhotoData: $draftPhotoData,
-                    prompt: currentPrompt,
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
                         if !draftPhotoData.isEmpty {
@@ -130,7 +127,6 @@ struct JournalView: View {
                 )
             }
             .onAppear {
-                selectRandomPrompt()
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                 try? modelContext.save()
             }
@@ -146,40 +142,159 @@ struct JournalView: View {
         let monthAgo = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
         return entries.filter { $0.createdAt > monthAgo }.count
     }
+}
 
-    private func selectRandomPrompt() {
-        let prompt = Self.prompts.randomElement() ?? Self.prompts[0]
-        currentPrompt = appState.preferredLanguage == "zh-Hans" ? prompt.zh : prompt.en
+// MARK: - Mood Week Strip
+
+private struct MoodWeekStrip: View {
+    let entries: [JournalEntry]
+
+    private var today: Date { Date() }
+    private var calendar: Calendar { Calendar.current }
+
+    /// Returns the Monday of the current week
+    private var weekStart: Date {
+        let weekday = calendar.component(.weekday, from: today)
+        // weekday: 1=Sun,2=Mon,...,7=Sat. We want Mon=0
+        let daysFromMonday = (weekday + 5) % 7
+        return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -daysFromMonday, to: today) ?? today)
+    }
+
+    /// 7 days starting from Monday
+    private var weekDays: [Date] {
+        (0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset, to: weekStart)
+        }
+    }
+
+    /// Formatted date header: "Today, 4 April"
+    private var headerText: String {
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "d MMMM"
+        return L10n.t("Today, \(dayFormatter.string(from: today))", "今天，\(chineseDateString(today))")
+    }
+
+    private func chineseDateString(_ date: Date) -> String {
+        let month = calendar.component(.month, from: date)
+        let day = calendar.component(.day, from: date)
+        return "\(month)月\(day)日"
+    }
+
+    /// Short weekday label (Mon, Tue, ...)
+    private func shortWeekdayLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = L10n.t("EEE", "EEE")
+        formatter.locale = Locale(identifier: L10n.lang == "zh-Hans" ? "zh_Hans" : "en_US")
+        return formatter.string(from: date)
+    }
+
+    /// First entry's mood for a given calendar day, if any
+    private func mood(for date: Date) -> MoodTag? {
+        entries.first { calendar.isDate($0.createdAt, inSameDayAs: date) }?.moodTag
+    }
+
+    private func isToday(_ date: Date) -> Bool {
+        calendar.isDateInToday(date)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            Text(headerText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            HStack(spacing: 0) {
+                ForEach(weekDays, id: \.self) { day in
+                    VStack(spacing: 6) {
+                        Text(shortWeekdayLabel(day))
+                            .font(.caption2)
+                            .foregroundStyle(isToday(day) ? TreeholeTheme.softPurple : TreeholeTheme.textLight)
+                            .fontWeight(isToday(day) ? .semibold : .regular)
+
+                        ZStack {
+                            if isToday(day) {
+                                Circle()
+                                    .strokeBorder(TreeholeTheme.softPurple, lineWidth: 2)
+                                    .frame(width: 36, height: 36)
+                            }
+
+                            if let moodTag = mood(for: day) {
+                                Text(moodTag.emoji)
+                                    .font(.title3)
+                            } else {
+                                Circle()
+                                    .fill(TreeholeTheme.textLight.opacity(0.3))
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
+                        .frame(width: 36, height: 36)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .glassCard()
     }
 }
 
-// MARK: - Journal Entry Row
+// MARK: - Journal Entry Card
 
-private struct JournalEntryRow: View {
+private struct JournalEntryCard: View {
     let entry: JournalEntry
+    let appState: AppState
+
+    private var moodLabel: String {
+        appState.preferredLanguage == "zh-Hans" ? entry.moodTag.labelZH : entry.moodTag.labelEN
+    }
+
+    private var relativeDate: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: entry.createdAt, relativeTo: Date())
+    }
+
+    private var shortDate: String {
+        entry.createdAt.formatted(.dateTime.month(.abbreviated).day())
+    }
 
     var body: some View {
-        HStack(spacing: TreeholeTheme.spacingSmall) {
-            Text(entry.moodTag.emoji)
-                .font(.title2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.text)
-                    .font(.body)
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+            // Header row: mood emoji + label + date
+            HStack(alignment: .center, spacing: TreeholeTheme.spacingTight) {
+                Text(entry.moodTag.emoji)
+                    .font(.title2)
+
+                Text(moodLabel)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(TreeholeTheme.textPrimary)
-                    .lineLimit(2)
-                HStack(spacing: TreeholeTheme.spacingTight) {
-                    Text(entry.formattedDate)
+
+                Text("•")
+                    .foregroundStyle(TreeholeTheme.textLight)
+
+                Text(shortDate)
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+
+                Spacer()
+
+                if entry.photoCount > 0 {
+                    Label("\(entry.photoCount)", systemImage: "photo.fill")
                         .font(.caption)
-                        .foregroundStyle(TreeholeTheme.textLight)
-                    if entry.photoCount > 0 {
-                        Label("\(entry.photoCount)", systemImage: "photo.fill")
-                            .font(.caption)
-                            .foregroundStyle(TreeholeTheme.skyBlue)
-                    }
+                        .foregroundStyle(TreeholeTheme.skyBlue)
                 }
             }
-            Spacer()
+
+            // Text preview
+            if !entry.text.isEmpty {
+                Text(entry.text)
+                    .font(.body)
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
     }
 }
 
@@ -190,7 +305,6 @@ private struct JournalEntryEditor: View {
     @Binding var draftText: String
     @Binding var draftMood: MoodTag
     @Binding var draftPhotoData: [Data]
-    let prompt: String
     let onSave: () -> Void
 
     @State private var selectedItems: [PhotosPickerItem] = []
@@ -205,21 +319,6 @@ private struct JournalEntryEditor: View {
 
                 ScrollView {
                     VStack(spacing: TreeholeTheme.spacingLarge) {
-                        // Prompt
-                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                            HStack {
-                                Image(systemName: "lightbulb.fill")
-                                    .foregroundStyle(TreeholeTheme.warmGold)
-                                Text(L10n.t("Prompt", "写作提示"))
-                                    .font(.headline)
-                            }
-                            Text(prompt)
-                                .font(.subheadline)
-                                .foregroundStyle(TreeholeTheme.textSecondary)
-                                .italic()
-                        }
-                        .accentCard(TreeholeTheme.warmGold)
-
                         // Mood picker
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
                             Text(L10n.t("How are you feeling?", "你现在感觉怎么样？"))

@@ -9,8 +9,12 @@ final class AppState {
     var currentAlias: String = "Anonymous"
     var aliasExpiryDate: Date = Date()
     var showLoginPrompt: Bool = false
-    var preferredLanguage: String = "en"
-    var isDarkMode: Bool = false
+    var preferredLanguage: String = "en" {
+        didSet { saveState() }
+    }
+    var isDarkMode: Bool = false {
+        didSet { saveState() }
+    }
 
     // MARK: - Alias Name Pool
 

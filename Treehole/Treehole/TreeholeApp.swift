@@ -9,6 +9,7 @@ struct TreeholeApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .preferredColorScheme(appState.isDarkMode ? .dark : .light)
                 .onAppear {
                     appState.requestNotificationPermission()
                 }

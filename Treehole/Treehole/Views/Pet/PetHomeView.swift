@@ -11,10 +11,19 @@ struct PetHomeView: View {
         viewModel.ensurePetExists(context: modelContext, pets: pets)
     }
 
+    private var themeGradient: LinearGradient {
+        let (top, bottom) = pet.homeTheme.gradient
+        return LinearGradient(
+            colors: [top, bottom],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                TreeholeTheme.softSunset.ignoresSafeArea()
+                themeGradient.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: TreeholeTheme.spacingLarge) {
@@ -43,6 +52,7 @@ struct PetHomeView: View {
 
                         // Status card
                         VStack(spacing: TreeholeTheme.spacingSmall) {
+                            // Hunger
                             StatBadge(
                                 label: "Hunger",
                                 value: "\(pet.hungerLevel)/100 - \(pet.hungerDescription)",
@@ -50,23 +60,111 @@ struct PetHomeView: View {
                                 color: TreeholeTheme.coral
                             )
                             ProgressBar(value: pet.hungerLevel, maxValue: 100, color: TreeholeTheme.coral)
+
+                            // Energy
+                            StatBadge(
+                                label: "Energy",
+                                value: "\(pet.energy)/100",
+                                icon: "bolt.fill",
+                                color: TreeholeTheme.skyBlue
+                            )
+                            ProgressBar(value: pet.energy, maxValue: 100, color: TreeholeTheme.skyBlue)
+
+                            // Level & XP
+                            StatBadge(
+                                label: "Level",
+                                value: "Level \(pet.level) • \(pet.experience)/\(pet.nextLevelExp) XP",
+                                icon: "star.fill",
+                                color: TreeholeTheme.warmGold
+                            )
+                            ProgressBar(value: pet.experience, maxValue: pet.nextLevelExp, color: TreeholeTheme.warmGold)
                         }
                         .glassCard()
 
-                        // Feed button
-                        Button {
-                            viewModel.feed(pet: pet)
-                            showFeedback("+30 Hunger")
-                        } label: {
-                            Label("Feed", systemImage: "cup.and.saucer.fill")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, TreeholeTheme.spacingSmall)
+                        // Action buttons
+                        HStack(spacing: TreeholeTheme.spacingSmall) {
+                            // Feed
+                            Button {
+                                viewModel.feed(pet: pet)
+                                showFeedback("+30 Hunger")
+                            } label: {
+                                Label("Feed", systemImage: "cup.and.saucer.fill")
+                                    .font(.subheadline.bold())
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, TreeholeTheme.spacingSmall)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(TreeholeTheme.coral)
+                            .disabled(pet.hungerLevel >= 100)
+
+                            // Pet
+                            Button {
+                                viewModel.pet(pet: pet)
+                                showFeedback("+10 Energy")
+                            } label: {
+                                Label("Pet", systemImage: "hand.raised.fill")
+                                    .font(.subheadline.bold())
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, TreeholeTheme.spacingSmall)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(TreeholeTheme.softPurple)
+                            .disabled(pet.energy >= 100)
+
+                            // Rest
+                            Button {
+                                viewModel.rest(pet: pet)
+                                showFeedback("+40 Energy")
+                            } label: {
+                                Label("Rest", systemImage: "moon.fill")
+                                    .font(.subheadline.bold())
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, TreeholeTheme.spacingSmall)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(TreeholeTheme.skyBlue)
+                            .disabled(pet.energy >= 100)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(TreeholeTheme.coral)
-                        .disabled(pet.hungerLevel >= 100)
                         .padding(.horizontal)
+
+                        // Theme picker
+                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+                            Text("Home Theme")
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.textSecondary)
+                                .padding(.horizontal, 4)
+
+                            HStack(spacing: TreeholeTheme.spacingSmall) {
+                                ForEach(HomeTheme.allCases, id: \.rawValue) { theme in
+                                    Button {
+                                        viewModel.changeTheme(pet: pet, theme: theme)
+                                    } label: {
+                                        let (topColor, _) = theme.gradient
+                                        VStack(spacing: 4) {
+                                            Circle()
+                                                .fill(topColor)
+                                                .frame(width: 28, height: 28)
+                                                .overlay {
+                                                    if pet.homeTheme == theme {
+                                                        Circle()
+                                                            .strokeBorder(TreeholeTheme.textPrimary, lineWidth: 2)
+                                                    }
+                                                }
+                                            Text(theme.labelEN)
+                                                .font(.caption2)
+                                                .foregroundStyle(
+                                                    pet.homeTheme == theme
+                                                        ? TreeholeTheme.textPrimary
+                                                        : TreeholeTheme.textSecondary
+                                                )
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .glassCard()
                     }
                     .padding()
                 }

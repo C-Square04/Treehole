@@ -25,4 +25,20 @@ final class PetViewModel {
         context.insert(newPet)
         return newPet
     }
+
+    func pet(pet: Pet) {
+        pet.pet()
+        showFeedingAnimation = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.showFeedingAnimation = false
+        }
+    }
+
+    func rest(pet: Pet) {
+        pet.rest()
+    }
+
+    func changeTheme(pet: Pet, theme: HomeTheme) {
+        pet.homeTheme = theme
+    }
 }

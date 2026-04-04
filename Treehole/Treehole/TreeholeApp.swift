@@ -14,6 +14,6 @@ struct TreeholeApp: App {
                     appState.requestNotificationPermission()
                 }
         }
-        .modelContainer(for: [CloudPost.self, Pet.self, Plant.self, JournalEntry.self])
+        .modelContainer(for: [CloudPost.self, Pet.self, Plant.self, JournalEntry.self, Economy.self, DailyTask.self])
     }
 }

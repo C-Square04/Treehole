@@ -1,173 +1,133 @@
-//
-//  AppState.swift
-//  Treehole
-//
-//  Created by Kayli Cheung & Jimmy Chen on 2025-11-06.
-//
-
 import Foundation
-import Combine
+import Observation
+import UserNotifications
 
-class AppState: ObservableObject {
-    @Published var isAuthenticated: Bool = false
-    @Published var currentUser: User?
-    @Published var isGuest: Bool = true
-    @Published var currentAlias: AliasSession?
-    @Published var showLoginSheet: Bool = false
-    @Published var authError: String?
+@Observable
+final class AppState {
+    var isGuest: Bool = true
+    var hasCompletedOnboarding: Bool = false
+    var currentAlias: String = "Anonymous"
+    var aliasExpiryDate: Date = Date()
+    var showLoginPrompt: Bool = false
+    var preferredLanguage: String = "en"
+    var isDarkMode: Bool = false
 
-    private var cancellables = Set<AnyCancellable>()
+    // MARK: - Alias Name Pool
+
+    static let aliasNames = [
+        "Wandering Cloud", "Quiet Moon", "Starry Breeze", "Gentle Rain",
+        "Hidden River", "Silent Leaf", "Dreamy Fox", "Little Sparrow",
+        "Night Owl", "Morning Dew", "Paper Crane", "Warm Stone",
+        "Blue Whale", "Snow Rabbit", "Firefly", "Sleepy Cat",
+        "风中云", "静月", "星风", "柔雨",
+        "隐河", "落叶", "梦狐", "小雀",
+        "夜鸮", "晨露", "纸鹤", "暖石",
+        "蓝鲸", "雪兔", "萤火", "睡猫"
+    ]
 
     init() {
-        loadUserFromKeychain()
+        loadState()
+        checkAliasExpiry()
     }
 
-    // MARK: - Authentication Methods
+    // MARK: - Alias System
+
+    var isAliasExpired: Bool {
+        Date() > aliasExpiryDate
+    }
+
+    var daysUntilAliasExpiry: Int {
+        max(0, Calendar.current.dateComponents([.day], from: Date(), to: aliasExpiryDate).day ?? 0)
+    }
+
+    func rotateAlias() {
+        let newAlias = Self.aliasNames.randomElement() ?? "Anonymous"
+        currentAlias = newAlias
+        aliasExpiryDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        saveState()
+        scheduleAliasRotationReminder()
+    }
+
+    func checkAliasExpiry() {
+        if currentAlias == "Anonymous" || isAliasExpired {
+            rotateAlias()
+        }
+    }
+
+    // MARK: - Auth
 
     func loginAsGuest() {
-        let guestUser = User(
-            id: UUID().uuidString,
-            privateName: "Guest",
-            authProvider: .guest,
-            isGuest: true,
-            subscriptionStatus: .free,
-            themePrefs: ThemePreferences(),
-            createdAt: Date()
-        )
-        currentUser = guestUser
         isGuest = true
-        isAuthenticated = false
-        generateNewAlias()
+        hasCompletedOnboarding = true
+        if currentAlias == "Anonymous" { rotateAlias() }
+        saveState()
     }
 
-    func loginWithAppleID(userId: String, email: String?) {
-        let user = User(
-            id: userId,
-            privateName: email ?? "Apple User",
-            authProvider: .appleid,
-            isGuest: false,
-            subscriptionStatus: .free,
-            themePrefs: ThemePreferences(),
-            createdAt: Date()
-        )
-        currentUser = user
+    func loginWithApple() {
+        // Placeholder — real Apple Sign-In integration in Phase 2+
         isGuest = false
-        isAuthenticated = true
-        saveUserToKeychain(user)
-        generateNewAlias()
+        hasCompletedOnboarding = true
+        saveState()
     }
 
-    func loginWithEmail(email: String, password: String) {
-        // In a real app, this would validate against a backend
-        let user = User(
-            id: UUID().uuidString,
-            privateName: email,
-            authProvider: .email,
-            isGuest: false,
-            subscriptionStatus: .free,
-            themePrefs: ThemePreferences(),
-            createdAt: Date()
-        )
-        currentUser = user
-        isGuest = false
-        isAuthenticated = true
-        saveUserToKeychain(user)
-        generateNewAlias()
-    }
-
-    func loginWithGoogle(userId: String, email: String?, displayName: String?) {
-        let user = User(
-            id: userId,
-            privateName: email ?? displayName ?? "Google User",
-            authProvider: .google,
-            isGuest: false,
-            subscriptionStatus: .free,
-            themePrefs: ThemePreferences(),
-            createdAt: Date()
-        )
-        currentUser = user
-        isGuest = false
-        isAuthenticated = true
-        saveUserToKeychain(user)
-        generateNewAlias()
+    func completeOnboarding() {
+        hasCompletedOnboarding = true
+        saveState()
     }
 
     func logout() {
-        currentUser = nil
-        isAuthenticated = false
         isGuest = true
-        currentAlias = nil
-        removeUserFromKeychain()
-        loginAsGuest()
+        saveState()
     }
 
-    // MARK: - Alias Management
+    // MARK: - Persistence (UserDefaults for preferences)
 
-    func generateNewAlias() {
-        let aliases = [
-            "CloudWhisperer", "DreamWeaver", "SilentMoon", "NightOwl",
-            "QuietSoul", "WhisperingWind", "MoonLight", "StarDust",
-            "SoftCloud", "EchoHeart", "TranquilMind", "GentleSpirit",
-            "云语者", "梦织者", "月影", "夜猫子",
-            "静心", "低语风", "月光", "星尘"
-        ]
+    private func saveState() {
+        let defaults = UserDefaults.standard
+        defaults.set(isGuest, forKey: "isGuest")
+        defaults.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding")
+        defaults.set(currentAlias, forKey: "currentAlias")
+        defaults.set(aliasExpiryDate, forKey: "aliasExpiryDate")
+        defaults.set(preferredLanguage, forKey: "preferredLanguage")
+        defaults.set(isDarkMode, forKey: "isDarkMode")
+    }
 
-        let randomAlias = aliases.randomElement() ?? "Anonymous"
-        let expiryDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    private func loadState() {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: "isGuest") != nil {
+            isGuest = defaults.bool(forKey: "isGuest")
+        }
+        hasCompletedOnboarding = defaults.bool(forKey: "hasCompletedOnboarding")
+        currentAlias = defaults.string(forKey: "currentAlias") ?? "Anonymous"
+        aliasExpiryDate = defaults.object(forKey: "aliasExpiryDate") as? Date ?? Date()
+        preferredLanguage = defaults.string(forKey: "preferredLanguage") ?? "en"
+        isDarkMode = defaults.bool(forKey: "isDarkMode")
+    }
 
-        currentAlias = AliasSession(
-            id: UUID().uuidString,
-            generatedName: randomAlias,
-            expiryTimestamp: expiryDate
+    // MARK: - Notifications
+
+    private func scheduleAliasRotationReminder() {
+        let content = UNMutableNotificationContent()
+        content.title = preferredLanguage == "zh-Hans" ? "别名已更新" : "Alias Updated"
+        content.body = preferredLanguage == "zh-Hans"
+            ? "你的新别名是「\(currentAlias)」，7天后将再次更换。"
+            : "Your new alias is \"\(currentAlias)\". It will change again in 7 days."
+        content.sound = .default
+
+        // Schedule for when current alias expires
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: max(1, aliasExpiryDate.timeIntervalSinceNow),
+            repeats: false
         )
+        let request = UNNotificationRequest(
+            identifier: "aliasRotation",
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(request)
     }
 
-    // MARK: - Keychain Storage
-
-    private func saveUserToKeychain(_ user: User) {
-        // In a real app, use Security framework to save to keychain
-        do {
-            let encoded = try JSONEncoder().encode(user)
-            UserDefaults.standard.set(encoded, forKey: "savedUser")
-        } catch {
-            print("ERROR: Failed to encode user for keychain: \(error)")
-        }
-    }
-
-    private func loadUserFromKeychain() {
-        if let data = UserDefaults.standard.data(forKey: "savedUser") {
-            do {
-                let user = try JSONDecoder().decode(User.self, from: data)
-                currentUser = user
-                isAuthenticated = !user.isGuest
-                isGuest = user.isGuest
-                generateNewAlias()
-            } catch {
-                print("ERROR: Failed to decode user from keychain: \(error)")
-                loginAsGuest()
-            }
-        } else {
-            loginAsGuest()
-        }
-    }
-
-    private func removeUserFromKeychain() {
-        UserDefaults.standard.removeObject(forKey: "savedUser")
-    }
-
-    // MARK: - Theme Preferences
-
-    func updateThemePreference(_ prefs: ThemePreferences) {
-        if var user = currentUser {
-            user.themePrefs = prefs
-            currentUser = user  // Reassign to trigger @Published
-            saveUserToKeychain(user)
-        }
-    }
-
-    func toggleLanguage() {
-        var newPrefs = currentUser?.themePrefs ?? ThemePreferences()
-        newPrefs.preferredLanguage = newPrefs.preferredLanguage == .simplifiedChinese ? .english : .simplifiedChinese
-        updateThemePreference(newPrefs)
+    func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 }

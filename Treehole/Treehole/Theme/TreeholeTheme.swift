@@ -1,105 +1,75 @@
-//
-//  TreeholeTheme.swift
-//  Treehole
-//
-//  Created by Kayli Cheung & Jimmy Chen on 2025-11-06.
-//
-
 import SwiftUI
 
-struct TreeholeTheme {
-    // MARK: - Color Palette (Warm Macaroon Colors)
+// MARK: - Treehole Design System
+// Warm macaroon color palette with iOS 26 Liquid Glass support
 
-    // Primary warm tones
-    static let warmPeach = Color(red: 1.0, green: 0.85, blue: 0.75)      // Warm peach
-    static let softRose = Color(red: 0.95, green: 0.80, blue: 0.85)      // Soft rose
-    static let gentleLavender = Color(red: 0.92, green: 0.85, blue: 0.95) // Gentle lavender
-    static let skyBlue = Color(red: 0.85, green: 0.92, blue: 0.98)       // Sky blue
-    static let mintCream = Color(red: 0.90, green: 0.96, blue: 0.92)     // Mint cream
+enum TreeholeTheme {
 
-    // Accent colors
-    static let warmGold = Color(red: 1.0, green: 0.88, blue: 0.60)       // Warm gold
-    static let coral = Color(red: 1.0, green: 0.72, blue: 0.68)          // Coral
-    static let softPurple = Color(red: 0.88, green: 0.78, blue: 0.92)    // Soft purple
+    // MARK: - Primary Warm Tones
+    static let warmPeach = Color(red: 1.0, green: 0.85, blue: 0.75)
+    static let softRose = Color(red: 0.95, green: 0.80, blue: 0.85)
+    static let gentleLavender = Color(red: 0.92, green: 0.85, blue: 0.95)
+    static let skyBlue = Color(red: 0.85, green: 0.92, blue: 0.98)
+    static let mintCream = Color(red: 0.90, green: 0.96, blue: 0.92)
 
-    // Neutral/Glass backgrounds
-    static let glassLight = Color.white.opacity(0.85)                    // Liquid glass light
-    static let glassMedium = Color.white.opacity(0.70)                   // Liquid glass medium
-    static let glassDark = Color.white.opacity(0.50)                     // Liquid glass dark
+    // MARK: - Accent Colors
+    static let warmGold = Color(red: 1.0, green: 0.88, blue: 0.60)
+    static let coral = Color(red: 1.0, green: 0.72, blue: 0.68)
+    static let softPurple = Color(red: 0.88, green: 0.78, blue: 0.92)
 
-    // Text colors
-    static let textPrimary = Color(red: 0.25, green: 0.25, blue: 0.30)   // Warm dark gray
-    static let textSecondary = Color(red: 0.55, green: 0.55, blue: 0.60) // Medium gray
-    static let textLight = Color(red: 0.75, green: 0.75, blue: 0.80)     // Light gray
+    // MARK: - Text Colors
+    static let textPrimary = Color(red: 0.25, green: 0.22, blue: 0.20)
+    static let textSecondary = Color(red: 0.50, green: 0.45, blue: 0.42)
+    static let textLight = Color(red: 0.70, green: 0.65, blue: 0.62)
 
     // MARK: - Gradients
-
-    static var warmBackground: LinearGradient {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(red: 0.98, green: 0.95, blue: 0.93), // Warm cream
-                Color(red: 0.96, green: 0.92, blue: 0.92)  // Warm taupe
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    static var cloudyBackground: LinearGradient {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(red: 0.95, green: 0.93, blue: 0.98), // Lavender tint
-                Color(red: 0.98, green: 0.96, blue: 0.94)  // Cream
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    static var softSunset: LinearGradient {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(red: 1.0, green: 0.88, blue: 0.75), // Warm peach
-                Color(red: 0.98, green: 0.92, blue: 0.88)  // Light cream
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
+    static let warmBackground = LinearGradient(
+        colors: [Color(red: 1.0, green: 0.97, blue: 0.93), Color(red: 0.96, green: 0.92, blue: 0.88)],
+        startPoint: .top, endPoint: .bottom
+    )
+    static let cloudyBackground = LinearGradient(
+        colors: [gentleLavender.opacity(0.4), Color(red: 1.0, green: 0.97, blue: 0.93)],
+        startPoint: .top, endPoint: .bottom
+    )
+    static let softSunset = LinearGradient(
+        colors: [warmPeach.opacity(0.5), Color(red: 1.0, green: 0.97, blue: 0.93)],
+        startPoint: .top, endPoint: .bottom
+    )
+    static let gardenBackground = LinearGradient(
+        colors: [mintCream.opacity(0.5), Color(red: 1.0, green: 0.97, blue: 0.93)],
+        startPoint: .top, endPoint: .bottom
+    )
 
     // MARK: - Spacing
-    static let spacing8 = CGFloat(8)
-    static let spacing12 = CGFloat(12)
-    static let spacing16 = CGFloat(16)
-    static let spacing20 = CGFloat(20)
-    static let spacing24 = CGFloat(24)
+    static let spacingTight: CGFloat = 8
+    static let spacingSmall: CGFloat = 12
+    static let spacingMedium: CGFloat = 16
+    static let spacingLarge: CGFloat = 20
+    static let spacingXL: CGFloat = 24
 
     // MARK: - Corner Radius
-    static let cornerSmall = CGFloat(8)
-    static let cornerMedium = CGFloat(12)
-    static let cornerLarge = CGFloat(16)
-    static let cornerXL = CGFloat(24)
-
-    // MARK: - Blur Effects
-    static let blurSmall = CGFloat(4)
-    static let blurMedium = CGFloat(8)
-    static let blurLarge = CGFloat(12)
+    static let cornerSmall: CGFloat = 8
+    static let cornerMedium: CGFloat = 12
+    static let cornerLarge: CGFloat = 16
+    static let cornerXL: CGFloat = 24
 }
 
-// MARK: - View Extension for Easy Theme Access
+// MARK: - View Extensions
+
 extension View {
-    func treeholeBackground() -> some View {
-        self.background(TreeholeTheme.warmBackground)
+    func treeholeBackground(_ gradient: LinearGradient = TreeholeTheme.warmBackground) -> some View {
+        self.background(gradient.ignoresSafeArea())
     }
 
     func glassCard() -> some View {
         self
-            .background(TreeholeTheme.glassLight)
-            .cornerRadius(TreeholeTheme.cornerMedium)
-            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+            .padding(TreeholeTheme.spacingMedium)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
     }
 
-    func textPrimary() -> some View {
-        self.foregroundColor(TreeholeTheme.textPrimary)
+    func accentCard(_ color: Color = TreeholeTheme.warmPeach) -> some View {
+        self
+            .padding(TreeholeTheme.spacingMedium)
+            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
     }
 }

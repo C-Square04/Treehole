@@ -1,21 +1,18 @@
-//
-//  TreeholeApp.swift
-//  Treehole
-//
-//  Created by Kayli Cheung & Jimmy Chen on 2025-11-06.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct TreeholeApp: App {
+    @State private var appState = AppState()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(appState)
                 .onAppear {
-                    // Request notification permissions on app launch
-                    NotificationManager.shared.requestAuthorization()
+                    appState.requestNotificationPermission()
                 }
         }
+        .modelContainer(for: [CloudPost.self, Pet.self, Plant.self, JournalEntry.self])
     }
 }

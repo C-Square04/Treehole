@@ -1,133 +1,144 @@
-//
-//  Plant.swift
-//  Treehole
-//
-//  Created by Kayli Cheung on 2025-11-06.
-//
-
 import Foundation
+import SwiftData
 
-struct PlantState: Codable, Identifiable {
-    let id: String
-    var name: String = "My Plant"
-    var species: PlantSpecies = .sunflower
-    var growthStage: GrowthStage = .seed
-    var hydrationLevel: Int = 100 // 0-100
+// MARK: - Plant Species
+
+enum PlantSpecies: String, Codable, CaseIterable, Identifiable {
+    case sunflower, rose, tulip, cactus, fern
+
+    var id: String { rawValue }
+
+    var emoji: String {
+        switch self {
+        case .sunflower: "🌻"
+        case .rose: "🌹"
+        case .tulip: "🌷"
+        case .cactus: "🌵"
+        case .fern: "🌿"
+        }
+    }
+
+    var labelEN: String {
+        switch self {
+        case .sunflower: "Sunflower"
+        case .rose: "Rose"
+        case .tulip: "Tulip"
+        case .cactus: "Cactus"
+        case .fern: "Fern"
+        }
+    }
+
+    var labelZH: String {
+        switch self {
+        case .sunflower: "向日葵"
+        case .rose: "玫瑰"
+        case .tulip: "郁金香"
+        case .cactus: "仙人掌"
+        case .fern: "蕨类"
+        }
+    }
+}
+
+// MARK: - Growth Stage
+
+enum GrowthStage: String, Codable, CaseIterable {
+    case seed, sprout, growing, blooming, mature
+
+    var icon: String {
+        switch self {
+        case .seed: "🌰"
+        case .sprout: "🌱"
+        case .growing: "🌿"
+        case .blooming: "🌸"
+        case .mature: "🌳"
+        }
+    }
+
+    var labelEN: String {
+        switch self {
+        case .seed: "Seed"
+        case .sprout: "Sprout"
+        case .growing: "Growing"
+        case .blooming: "Blooming"
+        case .mature: "Mature"
+        }
+    }
+
+    var stageIndex: Int {
+        switch self {
+        case .seed: 0
+        case .sprout: 1
+        case .growing: 2
+        case .blooming: 3
+        case .mature: 4
+        }
+    }
+}
+
+// MARK: - Plant Model
+
+@Model
+final class Plant {
+    var id: String
+    var name: String
+    var speciesRaw: String
+    var growthStageRaw: String
+    var hydrationLevel: Int
+    var experience: Int
     var lastWateredAt: Date?
-    var experience: Int = 0
     var createdAt: Date
-    var decorations: [String] = []
 
-    enum PlantSpecies: String, Codable, CaseIterable {
-        case sunflower = "Sunflower"
-        case rose = "Rose"
-        case tulip = "Tulip"
-        case cactus = "Cactus"
-        case fern = "Fern"
-
-        var emoji: String {
-            switch self {
-            case .sunflower:
-                return "🌻"
-            case .rose:
-                return "🌹"
-            case .tulip:
-                return "🌷"
-            case .cactus:
-                return "🌵"
-            case .fern:
-                return "🌿"
-            }
-        }
-
-        var description: String {
-            switch self {
-            case .sunflower:
-                return "Sunflower"
-            case .rose:
-                return "Rose"
-            case .tulip:
-                return "Tulip"
-            case .cactus:
-                return "Cactus"
-            case .fern:
-                return "Fern"
-            }
-        }
+    init(name: String = "My Plant", species: PlantSpecies = .sunflower) {
+        self.id = UUID().uuidString
+        self.name = name
+        self.speciesRaw = species.rawValue
+        self.growthStageRaw = GrowthStage.seed.rawValue
+        self.hydrationLevel = 100
+        self.experience = 0
+        self.lastWateredAt = nil
+        self.createdAt = Date()
     }
 
-    enum GrowthStage: String, Codable {
-        case seed = "Seed"
-        case sprout = "Sprout"
-        case growing = "Growing"
-        case blooming = "Blooming"
-        case mature = "Mature"
-
-        var icon: String {
-            switch self {
-            case .seed:
-                return "🌰"
-            case .sprout:
-                return "🌱"
-            case .growing:
-                return "🌿"
-            case .blooming:
-                return "🌸"
-            case .mature:
-                return "🌳"
-            }
-        }
+    var species: PlantSpecies {
+        get { PlantSpecies(rawValue: speciesRaw) ?? .sunflower }
+        set { speciesRaw = newValue.rawValue }
     }
 
-    var hydrationStatus: HydrationStatus {
+    var growthStage: GrowthStage {
+        get { GrowthStage(rawValue: growthStageRaw) ?? .seed }
+        set { growthStageRaw = newValue.rawValue }
+    }
+
+    var hydrationDescription: String {
         switch hydrationLevel {
-        case 75...100:
-            return .well_watered
-        case 50..<75:
-            return .adequate
-        case 25..<50:
-            return .dry
-        default:
-            return .dying
+        case 75...100: "Well Watered"
+        case 50..<75: "Adequate"
+        case 25..<50: "Dry"
+        default: "Critical"
         }
     }
 
-    enum HydrationStatus: String {
-        case well_watered
-        case adequate
-        case dry
-        case dying
-    }
-
-    mutating func water() {
+    func water() {
         hydrationLevel = min(100, hydrationLevel + 40)
         lastWateredAt = Date()
+        experience += 5
 
-        // Cap experience at 100 per stage
-        let maxExpPerStage = 100
-        experience = min(experience + 5, maxExpPerStage)
-
-        // Update growth stage based on experience
-        if experience >= 100 && growthStage == .seed {
-            growthStage = .sprout
-            experience = 0 // Reset experience for next stage
-        } else if experience >= 100 && growthStage == .sprout {
-            growthStage = .growing
+        // Stage advancement at 100 XP
+        if experience >= 100 {
             experience = 0
-        } else if experience >= 100 && growthStage == .growing {
-            growthStage = .blooming
-            experience = 0
-        } else if experience >= 100 && growthStage == .blooming {
-            growthStage = .mature
-            experience = 0
+            switch growthStage {
+            case .seed: growthStage = .sprout
+            case .sprout: growthStage = .growing
+            case .growing: growthStage = .blooming
+            case .blooming: growthStage = .mature
+            case .mature: break
+            }
         }
     }
 
-    mutating func updateHydration() {
-        // Decrease hydration over time
-        if let lastWatered = lastWateredAt {
-            let daysSinceWatering = Date().timeIntervalSince(lastWatered) / 86400
-            hydrationLevel = max(0, hydrationLevel - Int(daysSinceWatering * 20))
-        }
+    func updateHydration() {
+        guard let lastWatered = lastWateredAt else { return }
+        let daysSinceWatering = Date().timeIntervalSince(lastWatered) / 86400
+        hydrationLevel = max(0, hydrationLevel - Int(daysSinceWatering * 20))
     }
 }

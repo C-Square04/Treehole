@@ -1,100 +1,83 @@
-//
-//  CloudPost.swift
-//  Treehole
-//
-//  Created by Kayli Cheung on 2025-11-06.
-//
-
 import Foundation
+import SwiftData
 
-struct CloudPost: Codable, Identifiable {
-    let id: String
+// MARK: - Shared Mood Tag (used by CloudPost and JournalEntry)
+
+enum MoodTag: String, Codable, CaseIterable, Identifiable {
+    case happy, sad, angry, anxious, tired, confused, hopeful, calm
+
+    var id: String { rawValue }
+
+    var emoji: String {
+        switch self {
+        case .happy: "😊"
+        case .sad: "😢"
+        case .angry: "😠"
+        case .anxious: "😰"
+        case .tired: "😴"
+        case .confused: "😕"
+        case .hopeful: "🌟"
+        case .calm: "😌"
+        }
+    }
+
+    var labelEN: String {
+        switch self {
+        case .happy: "Happy"
+        case .sad: "Sad"
+        case .angry: "Angry"
+        case .anxious: "Anxious"
+        case .tired: "Tired"
+        case .confused: "Confused"
+        case .hopeful: "Hopeful"
+        case .calm: "Calm"
+        }
+    }
+
+    var labelZH: String {
+        switch self {
+        case .happy: "开心"
+        case .sad: "伤心"
+        case .angry: "生气"
+        case .anxious: "焦虑"
+        case .tired: "疲惫"
+        case .confused: "困惑"
+        case .hopeful: "希望"
+        case .calm: "平静"
+        }
+    }
+}
+
+// MARK: - Cloud Post Model
+
+@Model
+final class CloudPost {
+    var id: String
     var authorAlias: String
-    var moodTag: MoodTag
+    var moodTagRaw: String
     var text: String
     var createdAt: Date
-    var npcReplyId: String?
     var npcReplyText: String?
-    var visibilityState: VisibilityState
-    var sourceLanguage: Language
-    var translations: [Language: TranslationData] = [:]
-    var isPublic: Bool = false
+    var sourceLanguage: String
 
-    enum MoodTag: String, Codable, CaseIterable {
-        case happy = "😊"
-        case sad = "😢"
-        case angry = "😠"
-        case anxious = "😰"
-        case tired = "😴"
-        case confused = "😕"
-        case hopeful = "🌟"
-        case calm = "😌"
-
-        var description: String {
-            switch self {
-            case .happy:
-                return "Happy"
-            case .sad:
-                return "Sad"
-            case .angry:
-                return "Angry"
-            case .anxious:
-                return "Anxious"
-            case .tired:
-                return "Tired"
-            case .confused:
-                return "Confused"
-            case .hopeful:
-                return "Hopeful"
-            case .calm:
-                return "Calm"
-            }
-        }
-
-        var localizedDescription: String {
-            switch self {
-            case .happy:
-                return "开心"
-            case .sad:
-                return "伤心"
-            case .angry:
-                return "生气"
-            case .anxious:
-                return "焦虑"
-            case .tired:
-                return "疲惫"
-            case .confused:
-                return "困惑"
-            case .hopeful:
-                return "希望"
-            case .calm:
-                return "平静"
-            }
-        }
+    init(
+        authorAlias: String,
+        moodTag: MoodTag,
+        text: String,
+        npcReplyText: String? = nil,
+        sourceLanguage: String = "en"
+    ) {
+        self.id = UUID().uuidString
+        self.authorAlias = authorAlias
+        self.moodTagRaw = moodTag.rawValue
+        self.text = text
+        self.createdAt = Date()
+        self.npcReplyText = npcReplyText
+        self.sourceLanguage = sourceLanguage
     }
 
-    enum VisibilityState: String, Codable {
-        case onlyMe = "private"
-        case friendsOnly = "friends_only"
-        case visible = "public"
+    var moodTag: MoodTag {
+        get { MoodTag(rawValue: moodTagRaw) ?? .calm }
+        set { moodTagRaw = newValue.rawValue }
     }
-
-    enum Language: String, Codable {
-        case simplifiedChinese = "zh-Hans"
-        case english = "en"
-    }
-}
-
-struct TranslationData: Codable {
-    var text: String
-    var updatedAt: Date
-}
-
-struct NPCReply: Codable, Identifiable {
-    let id: String
-    var moodCategory: String
-    var replyTemplate: String
-    var emotionalMirror: String
-    var suggestion: String
-    var createdAt: Date
 }

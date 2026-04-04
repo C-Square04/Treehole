@@ -77,6 +77,11 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    NavigationLink {
+                        PrivacyPolicyView()
+                    } label: {
+                        Label(L10n.t("Privacy Policy", "隐私政策"), systemImage: "lock.shield")
+                    }
                 }
 
                 // Logout
@@ -178,6 +183,131 @@ struct AliasExplanationView: View {
         .treeholeBackground()
     }
 }
+
+// MARK: - Privacy Policy View
+
+struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: TreeholeTheme.spacingLarge) {
+                // Header card
+                VStack(spacing: TreeholeTheme.spacingSmall) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(TreeholeTheme.softPurple)
+
+                    Text(L10n.t("Privacy Policy", "隐私政策"))
+                        .font(.title2.bold())
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+
+                    Text(L10n.t("Last Updated: April 2026", "最后更新：2026年4月"))
+                        .font(.caption)
+                        .foregroundStyle(TreeholeTheme.textLight)
+                }
+                .frame(maxWidth: .infinity)
+                .glassCard()
+
+                // Policy sections card
+                VStack(alignment: .leading, spacing: TreeholeTheme.spacingMedium) {
+                    PrivacyPolicyRow(
+                        icon: "internaldrive",
+                        color: TreeholeTheme.skyBlue,
+                        title: L10n.t("Data Collection", "数据收集"),
+                        text: L10n.t(
+                            "Treehole stores all your data locally on your device. We do not collect, transmit, or store any personal information on external servers.",
+                            "树洞将你所有的数据存储在你的设备本地。我们不会在外部服务器上收集、传输或存储任何个人信息。"
+                        )
+                    )
+                    Divider()
+                    PrivacyPolicyRow(
+                        icon: "theatermasks",
+                        color: TreeholeTheme.softPurple,
+                        title: L10n.t("Anonymous Identity", "匿名身份"),
+                        text: L10n.t(
+                            "Your alias is randomly generated and changes every 7 days. Your real name is never shared.",
+                            "你的别名是随机生成的，每7天更换一次。你的真实姓名不会被分享。"
+                        )
+                    )
+                    Divider()
+                    PrivacyPolicyRow(
+                        icon: "bell.badge",
+                        color: TreeholeTheme.coral,
+                        title: L10n.t("Notifications", "通知"),
+                        text: L10n.t(
+                            "We send local push notifications to remind you about feeding, watering, and daily check-ins. No data is sent to any server.",
+                            "我们发送本地推送通知，提醒你喂食、浇水和每日签到。不会向任何服务器发送数据。"
+                        )
+                    )
+                    Divider()
+                    PrivacyPolicyRow(
+                        icon: "shield.slash",
+                        color: TreeholeTheme.mintCream,
+                        title: L10n.t("Third-Party Services", "第三方服务"),
+                        text: L10n.t(
+                            "Treehole does not use any third-party analytics, advertising, or tracking services.",
+                            "树洞不使用任何第三方分析、广告或追踪服务。"
+                        )
+                    )
+                    Divider()
+                    PrivacyPolicyRow(
+                        icon: "trash",
+                        color: TreeholeTheme.textLight,
+                        title: L10n.t("Data Deletion", "数据删除"),
+                        text: L10n.t(
+                            "You can delete all your data by removing the app from your device. All data is stored locally and will be permanently deleted.",
+                            "你可以通过从设备中删除应用来删除所有数据。所有数据均存储在本地，将被永久删除。"
+                        )
+                    )
+                    Divider()
+                    PrivacyPolicyRow(
+                        icon: "envelope",
+                        color: TreeholeTheme.skyBlue,
+                        title: L10n.t("Contact", "联系我们"),
+                        text: L10n.t(
+                            "For questions about privacy, contact: toki.studio.app@gmail.com",
+                            "如有隐私问题，请联系：toki.studio.app@gmail.com"
+                        )
+                    )
+                }
+                .glassCard()
+
+                Text(L10n.t("© 2026 Toki Studio. Jimmy Chen & Kayli Cheung.", "© 2026 Toki Studio. 陈韬 & 张凯莉。"))
+                    .font(.caption2)
+                    .foregroundStyle(TreeholeTheme.textLight)
+                    .multilineTextAlignment(.center)
+            }
+            .padding()
+        }
+        .navigationTitle(L10n.t("Privacy Policy", "隐私政策"))
+        .treeholeBackground()
+    }
+}
+
+private struct PrivacyPolicyRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: TreeholeTheme.spacingSmall) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(color)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+            }
+        }
+    }
+}
+
+// MARK: - Explanation Row
 
 private struct ExplanationRow: View {
     let icon: String

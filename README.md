@@ -1,161 +1,201 @@
 # Treehole
 
-<details>
+<details open>
 <summary>English Version</summary>
 
 ## Overview
-- Anonymous emotional support app blending drifting-cloud venting, virtual pet companionship, and mindful plant care.
-- Built for iOS 17+ (optimised for iOS 26 Liquid Glass) with SwiftUI, Combine, Core Data/CloudKit; privacy-first, pressure-free community.
-- Ships with Chinese/English locale and introduces AI features gradually.
 
-## Experience Pillars
-- **Emotion Release** – Floating cloud posts, instant NPC replies, translation toggle.
-- **Comforting Companions** – Virtual pet & plant ecosystems with mood feedback and journaling.
-- **Guided Wellbeing** – Daily rituals, journaling prompts, subtle reminders.
-- **Sustainable Progression** – Multi-currency economy, décor unlocks, missions, seasonal events.
-- **Trust & Safety** – Session aliases, layered moderation, transparent privacy controls.
+Treehole is an iOS 26 app for anonymous emotional expression and gentle self-care. Users can vent via floating cloud posts, raise a virtual pet, tend a multi-plant garden, and keep a private journal — all within a single cozy space. The app ships with full English/Chinese bilingual support and a warm Liquid Glass design.
 
-## Feature Highlights
-| Module | Key Notes |
-| --- | --- |
-| Cloud Venting | Anonymous posts, curated guest feed, NPC reply, EN/ZN translation button |
-| Virtual Pet | Hunger = AI quota, décor customization, idle animation, journal nook |
-| Plant Growth | Daily watering, growth stages, themed variants |
-| Voice Layers | Apple TTS baseline → Backend Piper/F5 fallback → Volcengine TTS for subscribers → MegaTTS3 custom voices (future) |
-| Missions & Rewards | Daily/weekly tasks, streak bonuses, surprise gifts |
-| Identity & Privacy | Device-scoped aliases, local username only, data export/delete |
+- **Bundle ID:** com.Toki.Treehole
+- **Platform:** iOS 26, SwiftUI + SwiftData + @Observable
+- **Creators:** Jimmy Chen & Kayli Cheung
 
-## Monetization
-- **Free Tier**：Cloud venting, check-ins, base pet/plant loops, lightweight voice (Apple TTS or backend Piper/F5).
-- **Pro Plan (Monthly)**：Higher AI chat quota, exclusive décor, monthly food pack, premium Volcengine voice lines, 7-day free trial.
-- **Voice Upgrades**：MegaTTS3-based custom voices planned as advanced add-ons once stable.
-- **Battle Pass & Store**：Tiered rewards, décor bundles, consumables.
-- **One-off Purchases**：Food packs, outfits, themed décor.
+---
 
-## AI & Voice Strategy
-1. **Moderation & NPC**：DeepSeek API primary; OpenAI/GPT-4o-mini or rule-based fallback.
-2. **Voice Layering**：
-   - Apple AVSpeechSynthesizer: instant, offline baseline.
-   - Backend Piper/F5-TTS: guest/free users & outage fallback.
-   - Volcengine (Doubao) TTS: premium voice packs for subscribers with emotion controls.
-   - MegaTTS3: internal pilot → offline packs & custom voice cloning for future paid tiers.
-3. **Safety & Compliance**：Consent prompts, encrypted storage, model monitoring, auto-renew compliance reminders.
+## Features
+
+| Module | What's Implemented |
+|---|---|
+| Clouds | Anonymous posts, NPC template replies, delete; EN/ZH toggle |
+| Pet | Feed / pet / rest interactions; XP, levels, hunger/happiness/energy stats; unlockable themes |
+| Garden | 5 plant species, per-species growth stages, daily watering, multi-plant support |
+| Journal | Mood-tagged entries, daily writing prompts, entry history |
+| Shop | Buy pet food with tokens; economy (food / tokens / gems) |
+| Tasks | 4 daily task types, 4 weekly challenge types |
+| Streaks | Login streak tracking with tiered rewards |
+| Notifications | Push reminders for feeding, watering, and daily check-in |
+| Onboarding | 4-page flow with alias privacy explanation |
+| Localization | Full EN/ZH throughout; system locale detection |
+| Design | iOS 26 Liquid Glass, dark mode, warm macaroon palette |
+
+---
+
+## Screenshots
+
+_Coming soon — TestFlight build in progress._
+
+---
 
 ## Tech Stack
-- **Client**：SwiftUI, Combine, NavigationStack, Lottie/SpriteKit, AVFoundation, Speech Framework, Liquid Glass materials (iOS 26).
-- **Data Layer**：URLSession/Alamofire, Core Data cache, optional CloudKit sync.
-- **Backend**：Serverless (Cloud Functions/Supabase) for posts, economy, AI gateway; MongoDB Atlas / Supabase Postgres options.
-- **DevOps**：Fastlane CI, TestFlight, Xcode Cloud UI tests, App Center/Amplitude analytics.
 
-## Roadmap Snapshot
-| Phase | Focus | Key Deliverables |
-| --- | --- | --- |
-| A · MVP | Core loop | Guest mode, aliasing, rule-based moderation, base pet/plant |
-| B · Experience | Immersion | Animations, décor, journaling rewards, missions, push + localisation |
-| C · AI Elevation | AI/Voice foundations | DeepSeek moderation, AI pet chat, MegaTTS3 prototype validation |
-| D · Monetization | Revenue systems | Subscription, battle pass, voice store, Volcengine rollout |
-| E · Expansion | Advanced ops | MegaTTS3 custom voice beta, voice journaling, ops tooling |
+| Layer | Details |
+|---|---|
+| Language | Swift 6 (strict concurrency, MainActor isolation) |
+| UI | SwiftUI, iOS 26 Liquid Glass materials |
+| State | @Observable (not ObservableObject) |
+| Persistence | SwiftData (@Model classes) |
+| Navigation | TabView (5 tabs) + NavigationStack |
+| Notifications | UserNotifications framework |
+| Testing | XCTest — 65 unit tests + 18 UI tests |
 
-## Repository Guide
-- `DesignDocument.md` – full product & technical spec (Chinese).
-- `README.md` – quick overview (English + Chinese tabs).
-- Planned directories: `docs/` (wireframes, APIs), `client/`, `server/`.
-
-## Liquid Glass Notes
-- Adopt Apple’s iOS 26 Liquid Glass material for navigation bars, cards, modals, and controls.
-- Use layered transparency (100/70/40/20%) and ensure typography contrast under varying wallpapers (support Reduce Transparency).
-- Implement subtle reflections/highlights, with performance fallbacks on older devices.
-- Reference the latest Apple iOS 26 design resources (Sketch/Figma) and extend the component library with reusable Liquid Glass variants.
+---
 
 ## Getting Started
-1. Read `DesignDocument.md` for specs, economy, AI plans.
-2. Produce wireframes & flows per roadmap before implementation.
-3. Establish voice stack: Apple baseline, backend Piper/F5 fallback, Volcengine credentials, MegaTTS3 pilot env.
-4. Build Milestone A, instrument analytics, then unlock AI/voice per roadmap.
 
-## Communication & Support
-- Capture risks/feedback at milestone reviews.
-- Complete legal/privacy reviews before launching voice cloning.
-- Contributions welcome—maintain bilingual resources for the team.
+1. Clone the repo and open `Treehole/Treehole.xcodeproj` in Xcode 26+.
+2. Select an iOS 26 simulator (e.g. iPhone 17 Pro).
+3. Build and run (`Cmd+R`) — no API keys or backend required for the local build.
+4. To run all tests: `Cmd+U` or see the test commands in `DEVELOPMENT_WORKFLOW.md`.
+
+---
+
+## Testing
+
+```bash
+# Build verification
+cd /Users/jimmychen/Treehole/Treehole
+xcodebuild -project Treehole.xcodeproj -scheme Treehole \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  build 2>&1 | grep -E "(error:|BUILD)" | tail -20
+
+# Run all tests
+xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  2>&1 | grep -E "(Test Case|passed|failed|error:)" | tail -30
+```
+
+**Current test count:** 83 total (65 unit + 18 UI)
+
+---
+
+## Roadmap
+
+| Phase | Focus | Status |
+|---|---|---|
+| Phase 1 | Core loop: onboarding, cloud, pet, plant, journal | Complete |
+| Phase 2 | Economy, shop, tasks, streaks, bilingual, notifications | Complete |
+| Phase 3 | UI polish to Figma designs, animation refinement | Next up |
+| Phase 4 | Backend: real posts, social features, moderation | Planned |
+| Phase 5 | App Store submission, TestFlight beta, analytics | Planned |
+
+---
+
+## Credits
+
+Built by **Jimmy Chen** & **Kayli Cheung**.
+
+Contributions welcome — please keep bilingual resources (EN/ZH) in sync.
 
 </details>
+
+---
 
 <details>
 <summary>中文版本</summary>
 
 ## 项目概览
-- 面向匿名情绪宣泄与陪伴的 iOS 应用，融合漂浮云吐槽、虚拟宠物、植物养成等自愈机制。
-- 基于 iOS 17+（SwiftUI/Combine/Core Data/CloudKit），强调隐私、安全与无压力社区。
-- 默认中英双语，AI 能力分阶段灰度上线。
 
-## 核心体验支柱
-- **情绪释放**：漂浮云发帖、NPC 秒回、翻译按钮。
-- **温柔陪伴**：虚拟宠物/植物生态，情绪反馈与日记角。
-- **引导仪式**：每日签到、写作提示、柔和提醒。
-- **长期动力**：多货币系统、装饰解锁、任务与节日活动。
-- **信任安全**：会话别名、分层审核、透明隐私说明。
+Treehole 是一款 iOS 26 自愈类应用，融合匿名漂浮云发帖、虚拟宠物陪伴、多植物花园养成与私密日记功能，界面采用温暖马卡龙配色与 Liquid Glass 设计语言，全程支持中英双语。
 
-## 核心功能模块
-| 模块 | 要点 |
-| --- | --- |
-| 漂浮云倾诉 | 匿名发帖、精选游客流、NPC 回复、翻译切换 |
-| 虚拟宠物 | 饥饿=AI 配额、家园装饰、闲置动画、日记入口 |
-| 植物养成 | 每日浇水、成长阶段、主题变种 |
-| 语音体系 | Apple TTS 基线 → 后端 Piper/F5 fallback → 豆包 TTS 订阅层 → MegaTTS3 自定义声线（后期） |
-| 任务奖励 | 日/周任务、连续签到、惊喜礼盒 |
-| 身份隐私 | 设备级别名、本地存真实用户名、数据导出/删除 |
+- **Bundle ID：** com.Toki.Treehole
+- **平台：** iOS 26，SwiftUI + SwiftData + @Observable
+- **开发者：** Jimmy Chen & Kayli Cheung
 
-## 变现策略
-- **免费层**：漂浮云、签到、基础宠物/植物、轻量语音（Apple TTS 或后端 Piper/F5）。
-- **订阅（月卡/Pro）**：更高 AI 对话额度、专属装饰、月度食物包、豆包高级声线、7 天试用。
-- **声线升级**：MegaTTS3 定制声线作为后期高级增值服务。
-- **战令与商店**：阶梯奖励、装饰礼包、消耗品。
-- **单次充值**：食物包、服饰、主题套装。
+---
 
-## AI 与语音策略
-1. **审核与 NPC**：DeepSeek 为主，OpenAI/GPT-4o-mini 或规则引擎兜底。
-2. **语音分层**：  
-   - Apple AVSpeechSynthesizer：离线即时基线。  
-   - 后端 Piper/F5-TTS：游客/免费用户与故障 fallback。  
-   - 火山引擎豆包 TTS：订阅声线，支持情绪参数。  
-   - MegaTTS3：内部试点 → 离线语音包 + 声线克隆增值。  
-3. **安全合规**：语音采集授权提示、加密存储、模型切换监控、试用自动续费合规提醒。
+## 功能一览
+
+| 模块 | 已实现内容 |
+|---|---|
+| 漂浮云 | 匿名发帖、NPC 模板回复、删除帖子；中英切换 |
+| 虚拟宠物 | 喂食 / 抚摸 / 休息互动；经验值、等级、饥饿/快乐/精力属性；可解锁主题 |
+| 花园 | 5 种植物、各自成长阶段、每日浇水、多植物并行养成 |
+| 日记 | 心情标签记录、每日写作提示、历史条目浏览 |
+| 商店 | 用 Token 购买宠物食物；三种货币体系（食物 / Token / 宝石） |
+| 任务 | 4 类每日任务、4 类每周挑战 |
+| 签到连续奖励 | 登录连续天数追踪与阶梯奖励 |
+| 推送通知 | 喂食、浇水、每日签到提醒 |
+| 引导流程 | 4 页新手引导，含别名隐私说明 |
+| 本地化 | 全界面中英双语，自动跟随系统语言 |
+| 设计 | iOS 26 Liquid Glass、深色模式、马卡龙暖色调 |
+
+---
+
+## 截图
+
+_即将上线 — TestFlight 构建中。_
+
+---
 
 ## 技术栈
-- **客户端**：SwiftUI、Combine、NavigationStack、Lottie/SpriteKit、AVFoundation、Speech Framework、Liquid Glass 材质（iOS 26）。
-- **数据层**：URLSession/Alamofire、Core Data 缓存，可选 CloudKit 同步。
-- **后端**：Serverless（Cloud Functions/Supabase）负责帖子、经济、AI 网关；数据库可选 MongoDB Atlas/Supabase Postgres。
-- **工程运维**：Fastlane 自动化、TestFlight 发布、Xcode Cloud UI 测试、App Center/Amplitude 分析。
+
+| 层级 | 详情 |
+|---|---|
+| 语言 | Swift 6（严格并发，MainActor 隔离） |
+| UI | SwiftUI + iOS 26 Liquid Glass 材质 |
+| 状态管理 | @Observable（非 ObservableObject） |
+| 持久化 | SwiftData（@Model 类） |
+| 导航 | TabView（5 标签）+ NavigationStack |
+| 通知 | UserNotifications 框架 |
+| 测试 | XCTest — 65 个单元测试 + 18 个 UI 测试 |
+
+---
+
+## 快速开始
+
+1. 克隆仓库，用 Xcode 26+ 打开 `Treehole/Treehole.xcodeproj`。
+2. 选择 iOS 26 模拟器（如 iPhone 17 Pro）。
+3. 按 `Cmd+R` 编译运行 — 本地版本无需 API Key 或后端服务。
+4. 运行全部测试：`Cmd+U`，或参考 `DEVELOPMENT_WORKFLOW.md` 中的命令行方式。
+
+---
+
+## 测试
+
+```bash
+# 编译验证
+cd /Users/jimmychen/Treehole/Treehole
+xcodebuild -project Treehole.xcodeproj -scheme Treehole \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  build 2>&1 | grep -E "(error:|BUILD)" | tail -20
+
+# 运行全部测试
+xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  2>&1 | grep -E "(Test Case|passed|failed|error:)" | tail -30
+```
+
+**当前测试总数：** 83（65 单元测试 + 18 UI 测试）
+
+---
 
 ## 迭代路线图
-| 阶段 | 目标 | 关键交付 |
-| --- | --- | --- |
-| A · MVP | 核心闭环 | 游客模式、别名、规则审核、基础宠物/植物 |
-| B · 体验强化 | 沉浸打磨 | 动效、装饰、日记奖励、任务、推送+本地化 |
-| C · AI 提升 | AI/语音基础 | DeepSeek 审核、AI 宠物聊天、MegaTTS3 原型验证 |
-| D · 商业化 | 收益体系 | 订阅、战令、声线商店、豆包声线上线 |
-| E · 拓展运营 | 高阶体验 | MegaTTS3 自定义声线内测、语音日记、运营工具 |
 
-## 仓库说明
-- `DesignDocument.md`：详细产品与技术设计（中文）。  
-- `README.md`：中英简介（折叠版）。  
-- TODO：`docs/` 原型与 API、`client/` 客户端、`server/` 后端等。
+| 阶段 | 目标 | 状态 |
+|---|---|---|
+| Phase 1 | 核心闭环：引导、云帖、宠物、植物、日记 | 已完成 |
+| Phase 2 | 经济系统、商店、任务、签到、双语、通知 | 已完成 |
+| Phase 3 | UI 精修（对齐 Figma 设计稿）、动效优化 | 下一阶段 |
+| Phase 4 | 后端：真实帖子、社交功能、内容审核 | 规划中 |
+| Phase 5 | App Store 上架、TestFlight 公测、数据分析 | 规划中 |
 
-## Liquid Glass 设计提示
-- 导航栏、卡片、模态层统一采用 iOS 26 Liquid Glass 半透明模糊材质，并通过透明度分级（100/70/40/20%）管理层级。
-- 复杂背景下增加渐变遮罩保证文字对比度，同时兼容“减少透明度/提高对比度”辅助功能。
-- 控件与动效需呈现柔和高光与折射变化，并在旧设备或性能模式下降级模糊效果。
-- 使用 Apple 官方 iOS 26 设计资源（Sketch/Figma），在组件库建立可复用的 Liquid Glass 变量与动效标注。
+---
 
-## 起步指南
-1. 阅读 `DesignDocument.md`，掌握规格、经济与 AI 方案。
-2. 按路线图绘制线框与流程，再进入开发。
-3. 搭建语音体系：Apple TTS → 后端 Piper/F5 → 豆包 TTS → MegaTTS3 试点环境。
-4. 先完成里程碑 A，补充埋点监控，再逐步解锁 AI/语音能力。
+## 致谢
 
-## 沟通与支持
-- 每阶段复盘记录风险与反馈。
-- 自定义声线开放前完成法律/隐私审查。
-- 欢迎贡献与本地化建议，持续维护双语资料。
+由 **Jimmy Chen** 与 **Kayli Cheung** 共同开发。
+
+欢迎贡献代码 — 请保持中英双语资源同步更新。
 
 </details>

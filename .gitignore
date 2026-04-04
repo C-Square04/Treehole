@@ -1,0 +1,28 @@
+# Xcode user data
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Build
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Dependencies
+Pods/
+Carthage/
+
+# OS
+.DS_Store
+*.swp
+*~
+
+# Python
+*.pyc
+__pycache__/
+
+# Temp
+*.tmp
+generate_icon.py

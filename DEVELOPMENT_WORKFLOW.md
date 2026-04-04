@@ -1,95 +1,152 @@
 # Treehole Development Workflow Guide
 
-## Core Principle
-**MVP First** — Build the smallest working version, verify it compiles and runs, then iterate.
+## Core Principles
+
+- **MVP First** — Build the smallest working version, verify it compiles, then iterate.
+- **Tests Required** — Every new feature MUST include tests. No exceptions.
+- **Zero warnings** — New code should introduce no new compiler warnings.
+
+---
 
 ## Compilation Verification (Mandatory)
 
 After every code change, run:
+
 ```bash
 cd /Users/jimmychen/Treehole/Treehole
-/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
-  -project Treehole.xcodeproj -scheme Treehole \
+xcodebuild -project Treehole.xcodeproj -scheme Treehole \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   build 2>&1 | grep -E "(error:|BUILD)" | tail -20
 ```
 
-**Rules:**
-- Never move to the next feature until the current one compiles
-- Fix errors immediately — don't accumulate technical debt
-- Zero warnings policy for new code
+Rules:
+- Never move to the next feature until the current one compiles.
+- Fix errors immediately — don't accumulate technical debt.
+
+---
+
+## Test Commands
+
+```bash
+# Run all tests (unit + UI)
+cd /Users/jimmychen/Treehole/Treehole
+xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  2>&1 | grep -E "(Test Case|passed|failed|error:)" | tail -30
+
+# Run only unit tests
+xcodebuild test -project Treehole.xcodeproj -scheme TreeholeTests \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  2>&1 | grep -E "(Test Case|passed|failed)" | tail -30
+```
+
+**Current test count: 83 total — 65 unit tests + 18 UI tests**
+
+New features must ship with accompanying tests before merging.
+
+---
 
 ## Architecture
 
-- **Pattern:** MVVM with @Observable (not ObservableObject)
-- **Persistence:** SwiftData (@Model classes)
-- **Navigation:** TabView + NavigationStack
-- **Design:** iOS 26 Liquid Glass + warm macaroon palette
-- **Concurrency:** Swift 6 strict (MainActor isolation)
+| Concern | Approach |
+|---|---|
+| Pattern | MVVM with @Observable (not ObservableObject) |
+| Persistence | SwiftData (@Model classes) |
+| Navigation | TabView (5 tabs) + NavigationStack |
+| Design | iOS 26 Liquid Glass + warm macaroon palette |
+| Concurrency | Swift 6 strict (MainActor isolation) |
 
-## Current State: MVP (Phase 1) Complete
+---
 
-### What's Built (22 files)
+## Current State: 26 Swift Files
+
 | Layer | Files | Description |
-|-------|-------|-------------|
+|---|---|---|
 | Models (4) | CloudPost, Pet, Plant, JournalEntry | SwiftData @Model classes |
-| ViewModels (3) | AppState, CloudPostVM, PetVM | @Observable business logic |
-| Views (11) | Onboarding, Cloud (3), Pet (2), Plant (2), Journal, Settings, Auth | Full UI |
-| Theme (1) | TreeholeTheme | Design system |
+| ViewModels (4) | AppState, CloudPostVM, PetVM, ShopVM | @Observable business logic |
+| Views (14) | Onboarding (4pp), Cloud (3), Pet (2), Garden (2), Journal (2), Shop, Settings | Full UI |
+| Theme (1) | TreeholeTheme | Design system (colors, spacing, typography) |
 | Components (1) | SharedComponents | MoodPicker, StatBadge, ProgressBar, EmptyState |
 | Core (2) | TreeholeApp, ContentView | App entry + tab navigation |
 
-### Features Working
-- 4-page onboarding with privacy/alias explanation
-- Cloud posts: create, view, delete with NPC template replies
-- Virtual pet: display with mood-based animations, feeding
-- Plant garden: single plant, watering, growth stages
-- Journal: entries with mood tags, daily prompts, stats
-- Settings: account, alias explanation, appearance
-- Login prompt with Apple Sign-In
-- Anonymous alias system with 7-day rotation + notification
+---
 
-## Phase 2 Roadmap
-1. Economy system (food currency, decoration tokens)
-2. Daily tasks & check-in rewards
-3. Pet decorations & home themes
-4. Shop view
-5. Multiple plants
-6. Full bilingual localization (String Catalog)
-7. Enhanced animations
+## Phase 1 — COMPLETE
 
-## Phase 3 Roadmap
-1. Weekly challenges
-2. Login streaks
-3. Advanced pet interactions (energy, level, experience)
-4. Translation service for posts
-5. Push notification reminders
-6. Dark mode polish
+Core loop: 4-page onboarding, cloud posts with NPC replies, virtual pet, single plant garden, journal with mood tags, settings.
+
+---
+
+## Phase 2 — COMPLETE
+
+- Economy system: food, tokens, gems
+- Daily tasks (4 types) and weekly challenges (4 types)
+- Login streak tracking with tiered rewards
+- Shop: buy food with tokens
+- Multiple plants (5 species, per-species growth stages)
+- Full bilingual localization (EN/ZH, String Catalog)
+- Push notifications: feeding, watering, daily check-in reminders
+- Dark mode
+- Pet enhancements: XP, levels, energy, unlockable themes
+- Test suite: 65 unit tests + 18 UI tests
+
+---
+
+## Phase 3 Roadmap — NEXT
+
+1. **UI Polish** — Implement Figma design specs, refine Liquid Glass usage, animation pass on pet and plant transitions.
+2. **Accessibility** — VoiceOver labels, Dynamic Type support, Reduce Motion fallbacks.
+3. **Performance** — Profile SwiftData query costs, reduce main-thread work in list views.
+
+---
+
+## Phase 4 Roadmap — PLANNED
+
+1. **Backend** — Real cloud posts stored server-side (Supabase or Cloud Functions).
+2. **Social features** — Real user replies, moderation pipeline (DeepSeek API).
+3. **Accounts** — Sign in with Apple, cross-device SwiftData/CloudKit sync.
+
+---
+
+## Phase 5 Roadmap — PLANNED
+
+1. **App Store prep** — Privacy manifest, App Store screenshots, age rating.
+2. **TestFlight beta** — External tester invites, crash reporting (Crashlytics or MetricKit).
+3. **Analytics** — Amplitude or PostHog for funnel tracking (opt-in only).
+
+---
 
 ## File Structure
+
 ```
-Treehole/Treehole/Treehole/
+Treehole/Treehole/
 ├── TreeholeApp.swift          # @main entry, SwiftData container
-├── ContentView.swift          # Onboarding gate + TabView
+├── ContentView.swift          # Onboarding gate + TabView (5 tabs)
 ├── Assets.xcassets/           # App icons, accent color
 ├── Models/                    # SwiftData @Model classes
 ├── ViewModels/                # @Observable business logic
 ├── Views/
 │   ├── Onboarding/            # 4-page onboarding flow
 │   ├── Cloud/                 # Post list, creation, detail
-│   ├── Pet/                   # Pet home, cartoon cat art
-│   ├── Plant/                 # Garden, plant visual art
+│   ├── Pet/                   # Pet home, interactions
+│   ├── Garden/                # Multi-plant garden
 │   ├── Journal/               # Entry list, editor, prompts
-│   ├── Settings/              # Settings + alias explanation
-│   └── Auth/                  # Login prompt
-├── Theme/                     # Design system (colors, spacing)
+│   ├── Shop/                  # Economy & store
+│   └── Settings/              # Settings + alias explanation
+├── Theme/                     # Design system
 └── Components/                # Reusable UI components
+
+TreeholeTests/                 # 65 unit tests
+TreeholeUITests/               # 18 UI tests
 ```
 
+---
+
 ## Key Technical Notes
-- Xcode project uses objectVersion 77 (auto-discovers files)
-- No need to edit project.pbxproj — just place files in directories
-- Bundle ID: com.Toki.Treehole
+
+- Xcode project uses objectVersion 77 (auto-discovers files in directories).
+- No need to edit `project.pbxproj` manually — just place Swift files in the right folder.
+- Bundle ID: `com.Toki.Treehole`
 - Deployment target: iOS 26
-- SwiftData models use raw string properties for enums (e.g., moodTagRaw)
-- Backup of Milestone 2 code: `backup/milestone2-complete` branch
+- SwiftData models use raw string properties for enums (e.g. `moodTagRaw`, `themeRaw`).
+- Milestone 2 backup: `backup/milestone2-complete` branch.

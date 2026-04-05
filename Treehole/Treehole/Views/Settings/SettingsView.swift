@@ -33,11 +33,43 @@ struct SettingsView: View {
                         }
                     }
 
+                    if appState.isCloudSyncAvailable {
+                        HStack {
+                            Image(systemName: "icloud.fill")
+                                .foregroundStyle(.green)
+                            Text(L10n.t("iCloud Sync Active", "iCloud 同步已开启"))
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "icloud.slash")
+                                .foregroundStyle(.secondary)
+                            Text(L10n.t("iCloud Not Available", "iCloud 不可用"))
+                        }
+                    }
+
                     if appState.isGuest {
                         Button {
                             appState.showLoginPrompt = true
                         } label: {
                             Label(L10n.t("Sign In", "登录"), systemImage: "person.badge.plus")
+                        }
+                    } else {
+                        // Signed in with Apple
+                        HStack(spacing: TreeholeTheme.spacingSmall) {
+                            Image(systemName: "apple.logo")
+                                .font(.subheadline)
+                                .foregroundStyle(TreeholeTheme.textPrimary)
+                            Text(L10n.t("Signed in with Apple", "已通过 Apple 登录"))
+                                .font(.subheadline)
+                                .foregroundStyle(TreeholeTheme.textSecondary)
+                        }
+                        if let email = appState.appleUserEmail {
+                            Text(email)
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.textLight)
+                        }
+                        Button(L10n.t("Sign Out", "退出登录"), role: .destructive) {
+                            appState.logout()
                         }
                     }
                 }
@@ -130,14 +162,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // Logout
-                if !appState.isGuest {
-                    Section {
-                        Button(L10n.t("Sign Out", "退出登录"), role: .destructive) {
-                            appState.logout()
-                        }
-                    }
-                }
+
             }
             .navigationTitle(L10n.t("Settings", "设置"))
             .sheet(isPresented: $state.showLoginPrompt) {

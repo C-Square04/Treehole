@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct OnboardingFlowView: View {
     @Environment(AppState.self) private var appState
@@ -234,17 +235,22 @@ private struct GetStartedPage: View {
                 .buttonStyle(.borderedProminent)
                 .tint(TreeholeTheme.coral)
 
-                // Apple Sign-In placeholder
-                Button {
-                    appState.loginWithApple()
-                } label: {
-                    Label(L10n.t("Sign in with Apple", "通过 Apple 登录"), systemImage: "apple.logo")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, TreeholeTheme.spacingSmall)
+                // Apple Sign-In
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.email]
+                } onCompletion: { result in
+                    switch result {
+                    case .success(let auth):
+                        if let credential = auth.credential as? ASAuthorizationAppleIDCredential {
+                            appState.loginWithApple(userID: credential.user, email: credential.email)
+                        }
+                    case .failure:
+                        break
+                    }
                 }
-                .buttonStyle(.bordered)
-                .tint(TreeholeTheme.textPrimary)
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 50)
+                .cornerRadius(TreeholeTheme.cornerMedium)
             }
             .padding(.horizontal)
 

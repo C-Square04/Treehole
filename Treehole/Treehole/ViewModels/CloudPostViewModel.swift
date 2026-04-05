@@ -109,7 +109,7 @@ final class CloudPostViewModel {
                 let withReply = RemoteCloudPost(
                     id: old.id, authorAlias: old.authorAlias, moodTag: old.moodTag,
                     text: old.text, npcReplyText: npcReply, sourceLanguage: old.sourceLanguage,
-                    deviceId: old.deviceId, createdAt: old.createdAt
+                    deviceId: old.deviceId, appleUserId: old.appleUserId, createdAt: old.createdAt
                 )
                 remotePosts[index] = withReply
                 try? await SupabaseService.updatePostNPCReply(id: postId, npcReply: npcReply)

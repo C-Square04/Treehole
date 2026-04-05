@@ -6,30 +6,47 @@ struct TreeholeApp: App {
     @State private var appState = AppState()
     @State private var lockManager = PrivacyLockManager()
 
+    // IMPORTANT: User must enable these in Xcode:
+    // 1. Target → Signing & Capabilities → + Capability → "Sign in with Apple"
+    // 2. Target → Signing & Capabilities → + Capability → "iCloud" → Check "CloudKit"
+    //    → Add container: "iCloud.com.Toki.Treehole"
+    // 3. Target → Signing & Capabilities → + Capability → "Push Notifications"
+    // 4. Select your Development Team in Signing
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            CloudPost.self, Pet.self, Plant.self,
-            JournalEntry.self, Economy.self, DailyTask.self,
-            WeeklyChallenge.self
+            Pet.self, Plant.self, JournalEntry.self,
+            Economy.self, DailyTask.self, WeeklyChallenge.self
         ])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        // Try CloudKit first, fall back to local-only
         do {
-            return try ModelContainer(for: schema, configurations: [config])
+            let cloudConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .automatic
+            )
+            return try ModelContainer(for: schema, configurations: [cloudConfig])
         } catch {
-            // Schema migration failed — delete old store and retry
-            print("SwiftData migration failed: \(error). Recreating store...")
-            let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            if let appSupport = urls.first {
-                let storeURL = appSupport.appendingPathComponent("default.store")
-                try? FileManager.default.removeItem(at: storeURL)
-                // Also remove WAL and SHM files
-                try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
-                try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
-            }
+            print("CloudKit setup failed, falling back to local: \(error)")
+            // Fall back to local storage
+            let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             do {
-                return try ModelContainer(for: schema, configurations: [config])
+                return try ModelContainer(for: schema, configurations: [localConfig])
             } catch {
-                fatalError("Could not create ModelContainer after reset: \(error)")
+                // Last resort: delete and recreate
+                print("Local setup failed, recreating: \(error)")
+                let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                if let appSupport = urls.first {
+                    let storeURL = appSupport.appendingPathComponent("default.store")
+                    try? FileManager.default.removeItem(at: storeURL)
+                    try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
+                    try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
+                }
+                do {
+                    return try ModelContainer(for: schema, configurations: [localConfig])
+                } catch {
+                    fatalError("Could not create ModelContainer: \(error)")
+                }
             }
         }
     }()

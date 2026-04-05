@@ -21,6 +21,10 @@ final class AppState {
     var isDeveloperMode: Bool = false {
         didSet { saveState() }
     }
+    var appleUserID: String? = nil {
+        didSet { saveState() }
+    }
+    var appleUserEmail: String? = nil
 
     // MARK: - Alias Name Pool
 
@@ -42,6 +46,10 @@ final class AppState {
     }
 
     // MARK: - Alias System
+
+    var isCloudSyncAvailable: Bool {
+        FileManager.default.ubiquityIdentityToken != nil
+    }
 
     var isAliasExpired: Bool {
         Date() > aliasExpiryDate
@@ -75,10 +83,20 @@ final class AppState {
         saveState()
     }
 
-    func loginWithApple() {
-        // Placeholder — real Apple Sign-In integration in Phase 2+
+    func loginWithApple(userID: String, email: String?) {
+        appleUserID = userID
+        appleUserEmail = email
         isGuest = false
         hasCompletedOnboarding = true
+
+        // Migrate existing device_id posts to this apple_user_id
+        Task {
+            try? await SupabaseService.migratePostsToAppleUser(
+                deviceId: SupabaseConfig.deviceId,
+                appleUserId: userID
+            )
+        }
+
         saveState()
     }
 
@@ -89,6 +107,8 @@ final class AppState {
 
     func logout() {
         isGuest = true
+        appleUserID = nil
+        appleUserEmail = nil
         saveState()
     }
 
@@ -103,6 +123,8 @@ final class AppState {
         defaults.set(preferredLanguage, forKey: "preferredLanguage")
         defaults.set(isDarkMode, forKey: "isDarkMode")
         defaults.set(isDeveloperMode, forKey: "isDeveloperMode")
+        defaults.set(appleUserID, forKey: "appleUserID")
+        defaults.set(appleUserEmail, forKey: "appleUserEmail")
     }
 
     private func loadState() {
@@ -116,6 +138,8 @@ final class AppState {
         preferredLanguage = defaults.string(forKey: "preferredLanguage") ?? "en"
         isDarkMode = defaults.bool(forKey: "isDarkMode")
         isDeveloperMode = defaults.bool(forKey: "isDeveloperMode")
+        appleUserID = defaults.string(forKey: "appleUserID")
+        appleUserEmail = defaults.string(forKey: "appleUserEmail")
     }
 
     // MARK: - Notifications

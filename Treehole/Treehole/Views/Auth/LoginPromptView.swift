@@ -45,11 +45,15 @@ struct LoginPromptView: View {
                             request.requestedScopes = [.email]
                         } onCompletion: { result in
                             switch result {
-                            case .success:
-                                appState.loginWithApple()
-                                dismiss()
-                            case .failure:
-                                break
+                            case .success(let auth):
+                                if let credential = auth.credential as? ASAuthorizationAppleIDCredential {
+                                    let userID = credential.user
+                                    let email = credential.email
+                                    appState.loginWithApple(userID: userID, email: email)
+                                    dismiss()
+                                }
+                            case .failure(let error):
+                                print("Apple Sign-In failed: \(error)")
                             }
                         }
                         .signInWithAppleButtonStyle(.black)

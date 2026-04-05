@@ -15,6 +15,15 @@ enum SupabaseConfig {
         UserDefaults.standard.set(newId, forKey: "supabase_device_id")
         return newId
     }
+
+    static var appleUserID: String? {
+        UserDefaults.standard.string(forKey: "appleUserID")
+    }
+
+    // The effective user identifier (apple_user_id if signed in, otherwise device_id)
+    static var effectiveUserId: String {
+        appleUserID ?? deviceId
+    }
 }
 
 // MARK: - Remote Cloud Post (JSON DTO)
@@ -27,6 +36,7 @@ struct RemoteCloudPost: Codable, Identifiable {
     let npcReplyText: String?
     let sourceLanguage: String
     let deviceId: String
+    let appleUserId: String?
     let createdAt: String
 
     enum CodingKeys: String, CodingKey {
@@ -37,11 +47,15 @@ struct RemoteCloudPost: Codable, Identifiable {
         case npcReplyText = "npc_reply_text"
         case sourceLanguage = "source_language"
         case deviceId = "device_id"
+        case appleUserId = "apple_user_id"
         case createdAt = "created_at"
     }
 
     var isOwn: Bool {
-        deviceId == SupabaseConfig.deviceId
+        if let appleId = SupabaseConfig.appleUserID, let postAppleId = appleUserId, appleId == postAppleId {
+            return true
+        }
+        return deviceId == SupabaseConfig.deviceId
     }
 
     var mood: MoodTag {
@@ -64,6 +78,7 @@ struct CreatePostRequest: Codable {
     let npcReplyText: String?
     let sourceLanguage: String
     let deviceId: String
+    let appleUserId: String?
 
     enum CodingKeys: String, CodingKey {
         case authorAlias = "author_alias"
@@ -72,6 +87,7 @@ struct CreatePostRequest: Codable {
         case npcReplyText = "npc_reply_text"
         case sourceLanguage = "source_language"
         case deviceId = "device_id"
+        case appleUserId = "apple_user_id"
     }
 }
 
@@ -117,7 +133,8 @@ enum SupabaseService {
             text: text,
             npcReplyText: npcReply,
             sourceLanguage: language,
-            deviceId: SupabaseConfig.deviceId
+            deviceId: SupabaseConfig.deviceId,
+            appleUserId: SupabaseConfig.appleUserID
         )
 
         var request = URLRequest(url: url)
@@ -318,11 +335,13 @@ enum SupabaseService {
             let authorAlias: String
             let text: String
             let deviceId: String
+            let appleUserId: String?
             enum CodingKeys: String, CodingKey {
                 case postId = "post_id"
                 case authorAlias = "author_alias"
                 case text
                 case deviceId = "device_id"
+                case appleUserId = "apple_user_id"
             }
         }
 
@@ -330,7 +349,8 @@ enum SupabaseService {
             postId: postId,
             authorAlias: authorAlias,
             text: text,
-            deviceId: SupabaseConfig.deviceId
+            deviceId: SupabaseConfig.deviceId,
+            appleUserId: SupabaseConfig.appleUserID
         )
 
         var request = URLRequest(url: url)
@@ -377,7 +397,11 @@ enum SupabaseService {
 
         struct MyPostsRequest: Codable {
             let requestingDeviceId: String
-            enum CodingKeys: String, CodingKey { case requestingDeviceId = "requesting_device_id" }
+            let requestingAppleUserId: String?
+            enum CodingKeys: String, CodingKey {
+                case requestingDeviceId = "requesting_device_id"
+                case requestingAppleUserId = "requesting_apple_user_id"
+            }
         }
 
         var request = URLRequest(url: url)
@@ -385,7 +409,10 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(MyPostsRequest(requestingDeviceId: SupabaseConfig.deviceId))
+        request.httpBody = try JSONEncoder().encode(MyPostsRequest(
+            requestingDeviceId: SupabaseConfig.deviceId,
+            requestingAppleUserId: SupabaseConfig.appleUserID
+        ))
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
@@ -393,6 +420,34 @@ enum SupabaseService {
         }
 
         return try JSONDecoder().decode([RemoteCloudPost].self, from: data)
+    }
+
+    // MARK: - Migrate device posts to apple user
+
+    static func migratePostsToAppleUser(deviceId: String, appleUserId: String) async throws {
+        let urlString = "\(SupabaseConfig.restURL)/rpc/migrate_posts_to_apple_user"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        struct MigrateRequest: Codable {
+            let pDeviceId: String
+            let pAppleUserId: String
+            enum CodingKeys: String, CodingKey {
+                case pDeviceId = "p_device_id"
+                case pAppleUserId = "p_apple_user_id"
+            }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(MigrateRequest(pDeviceId: deviceId, pAppleUserId: appleUserId))
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
     }
 
     // MARK: - Add reaction (upsert, ignore duplicates)

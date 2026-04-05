@@ -12,40 +12,44 @@ struct TreeholeApp: App {
     //    → Add container: "iCloud.com.Toki.Treehole"
     // 3. Target → Signing & Capabilities → + Capability → "Push Notifications"
     // 4. Select your Development Team in Signing
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Pet.self, Plant.self, JournalEntry.self,
             Economy.self, DailyTask.self, WeeklyChallenge.self
         ])
 
-        // Try CloudKit first, fall back to local-only
+        // Helper to delete all SwiftData stores
+        func deleteAllStores() {
+            let fm = FileManager.default
+            if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                // Delete all .store files and related files
+                if let files = try? fm.contentsOfDirectory(at: appSupport, includingPropertiesForKeys: nil) {
+                    for file in files where file.lastPathComponent.contains(".store") {
+                        try? fm.removeItem(at: file)
+                    }
+                }
+            }
+        }
+
+        // Step 1: Try local-only first (most reliable)
+        // CloudKit can be enabled later once schema is stable
+        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
-            let cloudConfig = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .automatic
-            )
-            return try ModelContainer(for: schema, configurations: [cloudConfig])
+            return try ModelContainer(for: schema, configurations: [localConfig])
         } catch {
-            print("CloudKit setup failed, falling back to local: \(error)")
-            // Fall back to local storage
-            let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            print("Local ModelContainer failed: \(error). Deleting store and retrying...")
+            deleteAllStores()
             do {
                 return try ModelContainer(for: schema, configurations: [localConfig])
             } catch {
-                // Last resort: delete and recreate
-                print("Local setup failed, recreating: \(error)")
-                let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-                if let appSupport = urls.first {
-                    let storeURL = appSupport.appendingPathComponent("default.store")
-                    try? FileManager.default.removeItem(at: storeURL)
-                    try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
-                    try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
-                }
+                // Absolute last resort: in-memory only (no persistence, but no crash)
+                print("Recreate also failed: \(error). Using in-memory store.")
+                let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
                 do {
-                    return try ModelContainer(for: schema, configurations: [localConfig])
+                    return try ModelContainer(for: schema, configurations: [memoryConfig])
                 } catch {
-                    fatalError("Could not create ModelContainer: \(error)")
+                    fatalError("Could not create any ModelContainer: \(error)")
                 }
             }
         }
@@ -65,3 +69,9 @@ struct TreeholeApp: App {
         .modelContainer(sharedModelContainer)
     }
 }
+
+// NOTE: CloudKit sync is temporarily disabled to ensure stability.
+// To re-enable later (when schema is stable):
+// 1. Change ModelConfiguration to: cloudKitDatabase: .automatic
+// 2. Ensure ALL @Model properties have defaults or are optional
+// 3. Test on a fresh install first

@@ -58,6 +58,10 @@ final class PrivacyLockManager {
     func setPasscode(_ passcode: String) {
         KeychainHelper.save(passcode, forKey: "privacyPasscode")
         hasPasscode = true
+        // Auto-enable biometric if available
+        if biometricType != .none {
+            isBiometricEnabled = true
+        }
         save()
     }
 

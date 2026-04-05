@@ -114,7 +114,13 @@ struct JournalView: View {
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
                         if !draftPhotoData.isEmpty {
-                            entry.photoData = draftPhotoData
+                            var filenames: [String] = []
+                            for data in draftPhotoData {
+                                if let filename = PhotoStorage.savePhoto(data) {
+                                    filenames.append(filename)
+                                }
+                            }
+                            entry.photoFilenames = filenames.isEmpty ? nil : filenames
                         }
                         modelContext.insert(entry)
                         let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)

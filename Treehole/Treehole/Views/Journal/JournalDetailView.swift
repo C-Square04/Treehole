@@ -45,7 +45,7 @@ struct JournalDetailView: View {
                     .glassCard()
 
                     // MARK: - Photo Gallery
-                    if let photos = entry.photoData, !photos.isEmpty {
+                    if let filenames = entry.photoFilenames, !filenames.isEmpty {
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
                             HStack {
                                 Image(systemName: "photo.on.rectangle.angled")
@@ -54,18 +54,18 @@ struct JournalDetailView: View {
                                     .font(.headline)
                                     .foregroundStyle(TreeholeTheme.textPrimary)
                                 Spacer()
-                                Text("\(photos.count)")
+                                Text("\(filenames.count)")
                                     .font(.caption)
                                     .foregroundStyle(TreeholeTheme.textLight)
                             }
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: TreeholeTheme.spacingSmall) {
-                                    ForEach(Array(photos.enumerated()), id: \.offset) { _, data in
-                                        if let uiImage = UIImage(data: data) {
-                                            Image(uiImage: uiImage)
+                                    ForEach(filenames, id: \.self) { filename in
+                                        if let image = PhotoStorage.loadImage(filename) {
+                                            Image(uiImage: image)
                                                 .resizable()
-                                                .scaledToFill()
+                                                .aspectRatio(contentMode: .fill)
                                                 .frame(width: 120, height: 120)
                                                 .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
                                         }
@@ -101,6 +101,9 @@ struct JournalDetailView: View {
             titleVisibility: .visible
         ) {
             Button(L10n.t("Delete", "删除"), role: .destructive) {
+                if let filenames = entry.photoFilenames {
+                    PhotoStorage.deletePhotos(filenames)
+                }
                 modelContext.delete(entry)
                 try? modelContext.save()
                 dismiss()

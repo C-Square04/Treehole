@@ -38,6 +38,7 @@ struct RemoteCloudPost: Codable, Identifiable {
     let deviceId: String
     let appleUserId: String?
     let createdAt: String
+    let flagged: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -49,6 +50,7 @@ struct RemoteCloudPost: Codable, Identifiable {
         case deviceId = "device_id"
         case appleUserId = "apple_user_id"
         case createdAt = "created_at"
+        case flagged
     }
 
     var isOwn: Bool {

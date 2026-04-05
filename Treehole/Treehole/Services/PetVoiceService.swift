@@ -8,6 +8,46 @@ enum PetVoiceService {
     private static var audioPlayer: AVAudioPlayer?
     private static let synthesizer = AVSpeechSynthesizer() // Apple TTS fallback
 
+    // MARK: - Audio Cache (LRU, max 10)
+    private static var audioCache: [(key: String, data: Data)] = []
+    private static let cacheLimit = 10
+
+    private static func cacheAudio(key: String, data: Data) {
+        // Remove existing entry with same key
+        audioCache.removeAll { $0.key == key }
+        // Add to front (most recent)
+        audioCache.insert((key: key, data: data), at: 0)
+        // Evict oldest if over limit
+        if audioCache.count > cacheLimit {
+            audioCache.removeLast()
+        }
+    }
+
+    private static func getCachedAudio(key: String) -> Data? {
+        guard let index = audioCache.firstIndex(where: { $0.key == key }) else { return nil }
+        // Move to front (LRU touch)
+        let entry = audioCache.remove(at: index)
+        audioCache.insert(entry, at: 0)
+        return entry.data
+    }
+
+    /// Replay audio for a specific message (from cache)
+    static func replay(messageId: String) {
+        if let cached = getCachedAudio(key: messageId) {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default, options: .duckOthers)
+                try session.setActive(true)
+            } catch {}
+            playAudio(cached)
+        }
+    }
+
+    /// Check if audio is cached for a message
+    static func hasCachedAudio(messageId: String) -> Bool {
+        audioCache.contains { $0.key == messageId }
+    }
+
     private static let minimaxAPIKey = "sk-cp-z4CQ1mXhW7zic_yooLH76BxPnerSaOfmrM4eaYiu1iP-ArmWhAjB8JLvZKQN67OLubHnV3Xy8QX7Mn2AOnDIQcONI4yaEPUgPqQvmivxwot3fMJJyNxBdLI"
 
     // MARK: - Emoji Stripping
@@ -22,7 +62,7 @@ enum PetVoiceService {
 
     // MARK: - TTS: Mode-aware
 
-    static func speak(_ text: String, language: String = "en", emotion: String = "calm", mode: ChatMode = .basic) {
+    static func speak(_ text: String, language: String = "en", emotion: String = "calm", mode: ChatMode = .basic, messageId: String? = nil) {
         let cleanText = stripEmoji(text)
         guard !cleanText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
@@ -37,6 +77,7 @@ enum PetVoiceService {
                     print("[TTS] Audio session error: \(error)")
                 }
                 if let audioData = await fetchMiniMaxTTS(text: cleanText, language: language, emotion: emotion) {
+                    if let mid = messageId { cacheAudio(key: mid, data: audioData) }
                     await MainActor.run { playAudio(audioData) }
                 } else {
                     await MainActor.run { speakWithApple(cleanText, language: language) }

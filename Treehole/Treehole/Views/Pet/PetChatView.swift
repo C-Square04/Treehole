@@ -353,7 +353,7 @@ struct PetChatView: View {
         // TTS with mode
         if ttsEnabled {
             isSpeaking = true
-            PetVoiceService.speak(reply, language: appState.preferredLanguage, mode: chatMode)
+            PetVoiceService.speak(reply, language: appState.preferredLanguage, mode: chatMode, messageId: petMsg.id)
             let estimatedDuration = Double(reply.count) * 0.08 + 1.0
             DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
                 isSpeaking = false
@@ -433,7 +433,18 @@ struct ChatBubbleView: View {
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
                                 .strokeBorder(TreeholeTheme.softPurple.opacity(0.3), lineWidth: 1)
                         )
-                    HStack {
+                    HStack(spacing: 8) {
+                        // Replay button
+                        if PetVoiceService.hasCachedAudio(messageId: message.id) {
+                            Button {
+                                PetVoiceService.replay(messageId: message.id)
+                            } label: {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(TreeholeTheme.softPurple)
+                            }
+                            .buttonStyle(.plain)
+                        }
                         Spacer()
                         Text(L10n.t(message.mode.labelEN, message.mode.labelZH))
                             .font(.system(size: 9))

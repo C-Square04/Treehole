@@ -1,265 +1,782 @@
-## 项目概览
-- 目标打造匿名情绪出口与陪伴生态，结合漂浮云吐槽、虚拟宠物、养植物等轻量自愈机制。
-- 首发聚焦 iOS 17+，并完整适配 iOS 26 的 Liquid Glass 视觉与交互规范，采用 SwiftUI、Combine、Core Data/CloudKit，AI 能力分阶段引入。
-- 支持多重登录方案与游客体验，确保可低门槛试用再逐步沉淀账户价值。
-- 默认提供中英双语界面（可随时切换），逐步扩展更多语言。
-- 全程强调用户隐私、安全与舒适体验，避免社交压力与身份暴露。
+# Treehole — Design Document & PRD
+
+> **Version:** Phase 3 Complete (April 2026)
+> **Authors:** Jimmy Chen & Kayli Cheung / Toki Studio
+
+---
+
+## Table of Contents
+
+1. [Product Vision](#1-product-vision)
+2. [Target Users](#2-target-users)
+3. [Feature Specifications](#3-feature-specifications)
+4. [Data Model](#4-data-model)
+5. [AI Integration](#5-ai-integration)
+6. [Privacy & Security Design](#6-privacy--security-design)
+7. [Economy System Design](#7-economy-system-design)
+8. [Architecture](#8-architecture)
+9. [Monetization Plans](#9-monetization-plans)
+10. [Roadmap](#10-roadmap)
+
+---
+
+## 1. Product Vision
+
+**English:** Treehole is a safe, anonymous emotional outlet and gentle self-care companion for mobile users. Named after the old idea of whispering secrets into a tree hollow, the app lets people release feelings as anonymous "drift bottle clouds" that float in a shared sky. Alongside the social cloud layer, a virtual pet, multi-plant garden, and private journal create daily rituals of care and reflection. The entire experience is wrapped in warm iOS 26 Liquid Glass design and full English/Simplified Chinese bilingual support.
+
+**中文：** Treehole（树洞）是一款安全、匿名的情绪出口与温柔自我关怀伴侣应用。名字源自"把秘密说进树洞"的古老意象——用户将心情化为匿名"漂流瓶云朵"飘向共享天空。除社交云层外，虚拟宠物、多种植物花园和私密日记共同构成每日关怀与反思的仪式。整体体验采用温暖的 iOS 26 Liquid Glass 设计，全程支持中英双语。
+
+**Core pillars / 核心支柱:**
+- Emotional release without identity exposure / 无身份暴露的情绪释放
+- Gentle gamified care rituals / 温柔游戏化的日常仪式
+- Long-term motivation through economy & progression / 经济与成长系统驱动长期留存
+- Trust through transparent privacy design / 透明隐私设计建立信任
+
+---
+
+## 2. Target Users
+
+**Primary / 核心用户:** Gen Z (18–28) experiencing workplace or campus stress, seeking anonymous venting and emotional companionship without social pressure.
+
+**Secondary / 次级用户:** Casual simulation / light game players who enjoy virtual pet and plant cultivation mechanics.
+
+**Accessibility requirements / 无障碍要求:**
+- Dynamic Type support for all text
+- VoiceOver labels on all interactive elements
+- Reduce Motion fallbacks for all animations
+- Sufficient color contrast (WCAG AA minimum)
+
+**Privacy-sensitive users / 隐私敏感用户:** Users who need clear, plain-language explanations of how anonymity and data storage work — provided via the alias explanation screen in Settings and during Onboarding.
+
+---
+
+## 3. Feature Specifications
+
+### 3.1 Drift Bottle Clouds (漂流瓶云朵)
+
+**Concept:** Users post anonymous thoughts as floating cloud bubbles. Others can discover them by "grabbing a cloud" (random post), read, react, and receive AI NPC replies.
+
+**Posting:**
+- Text entry with mood tag selection
+- 3-layer content moderation before publish:
+  1. Client-side keyword filter (instant, no network)
+  2. MiniMax M2.7-highspeed AI moderation via Supabase Edge Function `moderate-post`
+  3. PostgreSQL trigger for server-side rule enforcement
+- Post stored in Supabase `cloud_posts` with `apple_user_id` and `device_id`; display alias generated per session
+
+**Discovery:**
+- Cloud list view with floating bubble animations
+- "Grab a cloud" button surfaces a random post the user hasn't seen
+- Post detail shows content, reaction counts (breeze / hug / starlight), and NPC reply
+
+**Reactions:**
+- Three reaction types: breeze (微风), hug (拥抱), starlight (星光)
+- Each device can react once per post per type (enforced via `cloud_reactions` unique constraint)
+- Visual particle effects on reaction
+- Counts shown via `post_reaction_counts` view
+
+**Comments:**
+- Stored in `cloud_comments` with post reference and device/user ID
+- Shown in post detail view
+
+**NPC Replies:**
+- Generated via Supabase Edge Function `generate-npc-reply` using MiniMax M2.7-highspeed
+- Templates stored in `npc_reply_templates` as fallback
+- Replies are attributed to named NPC personas (e.g., wise cloud, warm cat)
+
+**My Clouds:**
+- Management page listing the user's own posts
+- Delete option removes from Supabase
+
+---
+
+### 3.2 Virtual Pet (虚拟宠物)
+
+**Character:** Cartoon cat with multiple mood states (happy, neutral, hungry, tired, excited).
+
+**Stats:**
+- `hungerLevel` (0–100): Decreases over time; triggers hungry animation below threshold
+- `energyLevel` (0–100): Decreases with interactions; replenished by rest
+- `xp` / `level`: XP gained from feeding, petting, rest
+- `mood`: Computed from combined stats
+
+**Actions:**
+- **Feed:** Costs food currency from Economy; restores hunger; grants XP
+- **Pet:** Boosts mood; costs small energy; grants XP
+- **Rest:** Restores energy over time; shows sleep animation
+
+**Animations:** Mood-based idle animations, action-response animations, level-up celebration.
+
+**Home Themes:** 4 unlockable themes (e.g., meadow, night sky, cozy room, forest); switched via Economy tokens or level unlock.
+
+**Notifications:** Feeding reminder fires 4 hours after last feed via `NotificationService`.
+
+---
+
+### 3.3 Plant Garden (植物花园)
+
+**Capacity:** Up to 5 concurrent plants.
+
+**Species:** 5 plant species, each with distinct visual art and growth behavior.
+
+**Growth Stages:** 5 stages per species (seed → sprout → young → mature → bloom). Stage advances when watering XP threshold is met.
+
+**Watering:** Daily watering action grants plant XP. Watering reminder fires 24 hours after last water.
+
+**Visual:** Custom 2D plant art for each species × stage combination. Idle sway animation.
+
+---
+
+### 3.4 Journal (日记)
+
+**Entry creation:**
+- Rich text editor with mood tag selection (multiple moods supported)
+- Photo attachment: up to 3 photos per entry, stored via `PhotoStorage` in iCloud ubiquity container
+- Timestamp recorded at save
+
+**Mood Calendar Strip:** Week view showing mood emoji for each day; tappable to navigate to that day's entry.
+
+**Mood Statistics Page:**
+- Segmented control: week / month / year
+- Bar/area chart of mood distribution
+- Streak counter (consecutive days with entries)
+
+**Entry Detail View:** Full entry with photos, mood tags, timestamp; edit and delete options.
+
+**Privacy Lock integration:** Journal tab is lockable via the Privacy Lock system; requires passcode / biometric to access if enabled.
+
+**iCloud Sync:** Entries stored in SwiftData (CloudKit container); photos stored separately in iCloud ubiquity container via `PhotoStorage`.
+
+---
+
+### 3.5 Economy System (经济系统)
+
+**Currencies:**
+- `food`: Used to feed the virtual pet. Earned via daily tasks, purchased in Shop.
+- `decorationTokens`: Used for theme unlocks and shop purchases. Earned via tasks and challenges.
+- `gems`: Premium currency. Reserved for future monetization (not yet spendable).
+
+**Daily Tasks (4 types):**
+1. Write a journal entry
+2. Water a plant
+3. Feed the pet
+4. Post a drift bottle cloud
+
+**Weekly Challenges (4 types):**
+1. Complete 5 daily tasks
+2. Maintain a 3-day journal streak
+3. Grow a plant to the next stage
+4. React to 3 drift bottle clouds
+
+**Login Streak Rewards:** Tiered rewards (food, tokens) for consecutive daily logins. Streak counter displayed on home screen.
+
+**Shop:** Buy food bundles with decoration tokens. Managed by `EconomyViewModel`.
+
+---
+
+### 3.6 Privacy Lock (隐私锁)
+
+**Passcode:** Apple-style 4-digit PIN entry UI. Stored in iOS Keychain via `PrivacyLockManager`. Never stored in SwiftData or Supabase.
+
+**Biometrics:** FaceID / TouchID via LocalAuthentication framework as an alternative to PIN entry.
+
+**Scope control:** User can independently enable / disable lock for:
+- My Clouds (personal posts list)
+- Journal (all journal entries)
+
+**Gate page:** Before the PIN pad is shown, a landing screen confirms which section is locked and gives context (prevents accidental lock-outs).
+
+**Lock buttons:** Padlock icon on the My Clouds and Journal tab headers to enable locking from within each section.
+
+---
+
+### 3.7 Onboarding (新手引导)
+
+4-page sequential flow:
+1. **Welcome** — App name, tagline, warm illustration
+2. **Features** — Brief tour of the 4 main modules (clouds, pet, garden, journal)
+3. **Privacy & Aliases** — Explains the alias system: display names are randomized per session, real Apple ID or device ID never shown to other users
+4. **Get Started** — Apple Sign-In button (ASAuthorizationController) or "Continue as Guest" option
+
+**Shown once:** `AppState.hasCompletedOnboarding` flag in SwiftData prevents re-show.
+
+---
+
+### 3.8 Settings (设置)
+
+**Sections:**
+- **Account:** Signed-in Apple ID display name, sign out, guest-to-account migration prompt
+- **Alias Explanation:** Dedicated screen explaining how anonymous aliases work
+- **Privacy Lock:** Toggle lock for My Clouds and/or Journal; set / change passcode; enable/disable biometrics
+- **Appearance:** Runtime language switch (EN / ZH); dark mode preference
+- **iCloud Sync Status:** Shows CloudKit container sync state; link to iCloud settings
+- **Privacy Policy:** In-app web view of the privacy policy
+- **Debug Panel (hidden):** Activated by tapping the version label 5 times. Shows pet/plant/economy sliders, reset buttons, device info (apple_user_id, device_id, SwiftData record counts)
+
+---
+
+### 3.9 Authentication (身份验证)
+
+**Apple Sign-In:**
+- Uses `ASAuthorizationAppleIDButton` and `ASAuthorizationController`
+- Credential: `ASAuthorizationAppleIDCredential` with `user` (stable apple_user_id)
+- `apple_user_id` stored in SwiftData `AppState` and sent to Supabase for social data linking
+- Full name and email collected only on first sign-in; subsequent sign-ins return only the user ID
+
+**Guest Mode:**
+- Device UUID used as `device_id` for Supabase interactions
+- All local SwiftData (pet, plant, journal, economy) available in guest mode
+- Supabase social features (posting clouds, reactions, comments) also available via device_id
+
+**Device-to-account migration:** When a Guest user signs in with Apple, existing local SwiftData is retained; `device_id` is linked to `apple_user_id` in Supabase to preserve cloud posts.
+
+---
+
+### 3.10 iCloud Sync (iCloud 同步)
+
+**SwiftData + CloudKit:**
+- All local models (Pet, Plant, JournalEntry, Economy, WeeklyChallenge, CloudPost cache) in a CloudKit-backed SwiftData container
+- Sync happens automatically when the device is online and the user has iCloud enabled
+
+**Journal Photos:**
+- Stored via `PhotoStorage` in the app's iCloud ubiquity container (`NSFileManager.default.url(forUbiquityContainerIdentifier:)`)
+- Referenced by filename in `JournalEntry`; loaded on demand
+
+**Supabase (social layer):**
+- Cloud posts, comments, reactions stored server-side in Supabase PostgreSQL
+- Linked to user via `apple_user_id` (authenticated) or `device_id` (guest)
+- Not synced via CloudKit; fetched from Supabase REST API
+
+---
+
+### 3.11 Push Notifications (推送通知)
+
+Managed by `NotificationService`:
+
+| Notification | Trigger | Schedule |
+|---|---|---|
+| Feeding reminder | 4 hours after last pet feed | Local, rescheduled on each feed |
+| Watering reminder | 24 hours after last plant water | Local, rescheduled on each water |
+| Daily check-in | Every day at 9:00 AM | Recurring local notification |
+
+All notifications are local (no APNs server required). User is prompted for permission during onboarding.
+
+---
+
+### 3.12 Localization (双语本地化)
+
+- **Languages:** English (en) and Simplified Chinese (zh-Hans)
+- **Implementation:** `L10n.swift` with `L10n.t()` helper used throughout all Views and ViewModels. String Catalog (`Localizable.xcstrings`) for all user-facing strings.
+- **Runtime switch:** Language preference stored in `AppState`; app reloads localization bundle without restart.
+- **Bilingual parity:** Every string key must have both EN and ZH values before shipping.
+
+---
+
+### 3.13 Developer Debug Panel (开发者调试面板)
+
+**Access:** Tap the version/build label in Settings 5 times.
+
+**Contents:**
+- Pet stat sliders (hunger, energy, XP)
+- Plant stage and watering XP adjustment
+- Economy currency adjusters (food, tokens, gems)
+- Quick actions: reset onboarding, clear notifications, trigger streak bonus
+- Device info: `apple_user_id`, `device_id`, SwiftData record counts, app version, build number
+
+**Distribution:** Debug panel is included in all builds but is UI-hidden. It does not gate on DEBUG preprocessor flag, enabling QA use on TestFlight.
+
+---
+
+## 4. Data Model
+
+### 4.1 SwiftData Models (Local + CloudKit Synced)
+
+```swift
+// Pet — the virtual cat
+@Model class Pet {
+    var name: String
+    var hungerLevel: Double       // 0–100
+    var energyLevel: Double       // 0–100
+    var xp: Double
+    var level: Int
+    var moodRaw: String           // enum stored as raw string
+    var themeRaw: String          // enum stored as raw string
+    var lastFedAt: Date
+    var lastPettedAt: Date
+}
+
+// Plant
+@Model class Plant {
+    var speciesRaw: String        // enum: 5 species
+    var growthStage: Int          // 0–4
+    var wateringXP: Double
+    var lastWateredAt: Date
+    var customName: String?
+}
+
+// JournalEntry
+@Model class JournalEntry {
+    var createdAt: Date
+    var text: String
+    var moodTagsRaw: String       // comma-separated mood tags
+    var photoFilenames: [String]  // iCloud ubiquity filenames
+}
+
+// Economy
+@Model class Economy {
+    var food: Int
+    var decorationTokens: Int
+    var gems: Int
+    var loginStreak: Int
+    var lastLoginDate: Date
+    var lastDailyTaskDate: Date
+    var dailyTasksCompleted: [String]  // task type raw values
+}
+
+// WeeklyChallenge
+@Model class WeeklyChallenge {
+    var typeRaw: String
+    var progress: Int
+    var goal: Int
+    var weekStartDate: Date
+    var isCompleted: Bool
+}
+
+// CloudPost (local cache of fetched Supabase posts)
+@Model class CloudPost {
+    var id: String                // Supabase UUID
+    var content: String
+    var moodTagRaw: String
+    var authorAlias: String
+    var createdAt: Date
+    var reactionCounts: [String: Int]
+    var npcReply: String?
+    var isOwn: Bool
+}
+```
+
+### 4.2 Supabase PostgreSQL Schema
+
+**Table: `cloud_posts`**
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | auto-generated |
+| content | text | moderated before insert |
+| mood_tag | text | enum-like string |
+| author_alias | text | random per session |
+| apple_user_id | text nullable | null for guest |
+| device_id | text | always present |
+| created_at | timestamptz | default now() |
+| is_flagged | bool | set by moderation |
+
+**Table: `cloud_comments`**
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| post_id | uuid FK → cloud_posts | |
+| content | text | |
+| apple_user_id | text nullable | |
+| device_id | text | |
+| created_at | timestamptz | |
+
+**Table: `cloud_reactions`**
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| post_id | uuid FK → cloud_posts | |
+| reaction_type | text | breeze / hug / starlight |
+| device_id | text | |
+| created_at | timestamptz | |
+| UNIQUE | (post_id, device_id, reaction_type) | one reaction type per device per post |
+
+**Table: `npc_reply_templates`**
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| mood_tag | text | matches post mood_tag |
+| reply_text | text | template body |
+| persona | text | NPC name |
+
+**View: `post_reaction_counts`**
+Aggregates `cloud_reactions` grouped by `post_id` and `reaction_type`.
+
+**Edge Functions:**
+- `moderate-post`: Accepts post content, calls MiniMax M2.7-highspeed moderation API, returns allow/reject + reason. Called by client before insert.
+- `generate-npc-reply`: Accepts post_id, calls MiniMax to generate a contextual NPC reply, falls back to `npc_reply_templates` on failure.
+
+---
+
+## 5. AI Integration
+
+### 5.1 Model: MiniMax M2.7-highspeed
+
+Used for two purposes:
+1. **Content moderation** — Determines whether a draft post is safe to publish. Invoked via the `moderate-post` Edge Function. Returns a confidence score and category labels. Posts rejected by AI are blocked client-side with a user-friendly message.
+2. **NPC reply generation** — Generates a short, empathetic reply from an NPC persona. Invoked via `generate-npc-reply` Edge Function after a post is saved. Falls back to `npc_reply_templates` if the AI call fails or times out.
+
+### 5.2 Three-Layer Moderation Pipeline
+
+```
+User submits post
+       │
+       ▼
+[Layer 1] Client-side keyword filter
+   Pass → continue   Fail → block instantly, no network call
+       │
+       ▼
+[Layer 2] MiniMax AI via Edge Function moderate-post
+   Pass → continue   Fail → block with AI reason message
+       │
+       ▼
+[Layer 3] PostgreSQL trigger (server-side rules)
+   Pass → post saved   Fail → post rejected, client notified
+```
+
+### 5.3 NPC Reply Flow
+
+```
+Post saved to Supabase
+       │
+       ▼
+Edge Function generate-npc-reply called
+       │
+   ┌───┴────────────────────┐
+   │ MiniMax available?     │
+   │ Yes → generate reply   │
+   │ No  → fallback template│
+   └───┬────────────────────┘
+       │
+       ▼
+Reply stored in cloud_posts.npc_reply
+Client polls / receives updated post
+```
+
+### 5.4 Cost Controls
+
+- All AI calls routed through Supabase Edge Functions (not called directly from client) — enables rate limiting, logging, and key security.
+- `generate-npc-reply` fires once per post (not per view).
+- Client-side keyword filter reduces AI call volume by blocking obvious violations early.
+
+---
+
+## 6. Privacy & Security Design
+
+### 6.1 Identity & Anonymity
+
+- **Display aliases** are randomly generated per session (e.g., "Drifting Cloud #4821"). Other users see only the alias, never the Apple user ID or device ID.
+- `apple_user_id` and `device_id` are stored in Supabase to enforce reaction uniqueness and support post deletion, but are never displayed in the UI.
+- Supabase Row Level Security (RLS) ensures users can only delete their own posts (matching `apple_user_id` or `device_id`).
+
+### 6.2 Privacy Lock
+
+- 4-digit passcode stored in iOS Keychain via `PrivacyLockManager`. Never leaves the device.
+- Biometric authentication (FaceID / TouchID) via `LocalAuthentication` as a convenience alternative.
+- Individual sections (My Clouds, Journal) can be locked independently.
+- On incorrect passcode, a short lockout cooldown is applied.
+
+### 6.3 Data Storage
+
+| Data | Storage | Notes |
+|---|---|---|
+| Pet, Plant, Economy, Journal text | SwiftData + CloudKit | Encrypted at rest by iOS |
+| Journal photos | iCloud ubiquity container | User controls via iCloud settings |
+| Passcode | iOS Keychain | Never in SwiftData |
+| Apple user ID | SwiftData + Supabase | Used for linking only |
+| Cloud posts / comments / reactions | Supabase PostgreSQL | Anonymous alias only shown in UI |
+| App preferences | SwiftData AppState | Language, theme, lock settings |
+
+### 6.4 Minimum PII Principle
+
+- No real name is ever collected or stored beyond what Apple provides at first Sign-In (and that is stored locally only).
+- No email address is transmitted to Supabase.
+- Guest mode uses only a device UUID (no identity linkage).
+
+### 6.5 Transport Security
+
+- All Supabase communication uses HTTPS/TLS.
+- Supabase anon key is stored in the app bundle (standard practice); RLS policies enforce data access rules on the server.
+
+---
+
+## 7. Economy System Design
+
+### 7.1 Currency Overview
+
+| Currency | Symbol | Earned by | Spent on |
+|---|---|---|---|
+| Food | 🍖 | Daily tasks, login streak | Feeding the pet |
+| Decoration Tokens | 🪙 | Daily tasks, weekly challenges, login streak | Shop purchases, future theme unlocks |
+| Gems | 💎 | Reserved (future monetization) | Reserved |
+
+### 7.2 Task & Reward Structure
+
+**Daily tasks reset at midnight local time. Weekly challenges reset Monday.**
+
+| Daily Task | Reward |
+|---|---|
+| Write a journal entry | 2 food + 1 token |
+| Water a plant | 2 food + 1 token |
+| Feed the pet | 1 food + 2 tokens |
+| Post a drift bottle cloud | 3 tokens |
+
+| Weekly Challenge | Reward |
+|---|---|
+| Complete 5 daily tasks | 10 tokens |
+| Maintain 3-day journal streak | 5 food + 5 tokens |
+| Grow a plant to next stage | 8 food |
+| React to 3 drift bottle clouds | 6 tokens |
+
+### 7.3 Login Streak Rewards
+
+| Streak (days) | Reward |
+|---|---|
+| 1–2 | 2 food |
+| 3–6 | 3 food + 2 tokens |
+| 7 | 5 food + 5 tokens (weekly bonus) |
+| 14 | 10 food + 10 tokens |
+| 30 | 20 food + 20 tokens + 1 gem |
+
+Streak resets to 0 if a day is missed.
+
+### 7.4 Anti-Hoarding Measures
+
+- Food is consumed on each pet feeding — natural drain.
+- Decoration tokens have no cap currently; future monetization may introduce seasonal expiry for promotional tokens.
+- Gems reserved for future; no accumulation currently possible.
+
+---
+
+## 8. Architecture
+
+### 8.1 App Architecture: MVVM + @Observable
+
+```
+View (SwiftUI)
+  │ reads / binds
+  ▼
+ViewModel (@Observable)
+  │ calls
+  ▼
+Service (SupabaseService, NotificationService, PhotoStorage, PrivacyLockManager)
+  │ reads/writes
+  ▼
+Data Layer (SwiftData / Supabase REST / Keychain / iCloud)
+```
+
+- Views are purely declarative; no business logic.
+- ViewModels hold all state and orchestrate service calls.
+- Services are stateless utilities injected via `@Environment` or passed directly.
+- `AppState` (@Observable, SwiftData-backed) is the single source of truth for global state (auth, onboarding, language).
+
+### 8.2 Navigation
+
+- Root: `ContentView` gates on `AppState.hasCompletedOnboarding` to show Onboarding or the main TabView.
+- `TabView` with 5 tabs: Clouds, Pet, Garden, Journal, Settings.
+- Each tab uses `NavigationStack` for push navigation.
+- Privacy Lock intercepts navigation to locked tabs with a gate view.
+
+### 8.3 Concurrency
+
+- Swift 6 strict concurrency throughout.
+- All UI updates on `@MainActor`.
+- Supabase network calls use `async/await` in non-isolated async functions, with results published back to `@MainActor` ViewModels.
+
+### 8.4 SwiftData + CloudKit
+
+- `ModelContainer` configured with CloudKit container ID (`iCloud.com.Toki.Treehole`) for automatic sync.
+- All `@Model` classes are CloudKit-compatible (no non-optional relationships without defaults).
+- Journal photos use a separate iCloud ubiquity container to avoid CloudKit attachment size limits.
+
+---
+
+## 9. Monetization Plans
+
+**Current state (Phase 3):** No in-app purchases implemented. Economy system uses soft currencies only.
+
+**Planned (Phase 4–5):**
+
+| Tier | Offering | Notes |
+|---|---|---|
+| Free | Full core experience (clouds, pet, garden, journal, economy) | No paywall on primary features |
+| Decoration Pack (one-time) | Extra home themes, plant skins | One-time IAP |
+| Subscription (monthly) | Bonus food allowance, exclusive themes, priority NPC reply quality | StoreKit 2 subscription |
+| Gem top-up (one-time) | Bundles of gems for future premium items | StoreKit 2 consumable |
+
+**Principles:**
+- No paywalls on emotional/wellness features (posting, journaling, pet care basics).
+- Monetization is additive (cosmetic, convenience), never punishing.
+- No ads. Ever.
+
+---
+
+## 10. Roadmap
+
+### Phase 1 — COMPLETE
+Core loop: onboarding, cloud posts with NPC replies, virtual pet, single plant, journal, settings.
+
+### Phase 2 — COMPLETE
+Economy system, shop, daily tasks, weekly challenges, login streaks, 5 plant species with growth stages, full EN/ZH bilingual, push notifications, dark mode, pet XP/levels/themes, 84+ unit tests + 21 UI tests.
+
+### Phase 3 — COMPLETE
+Apple Sign-In, CloudKit sync, Privacy Lock (passcode + biometrics), drift bottle reactions (breeze / hug / starlight), My Clouds management, Supabase social layer, MiniMax AI moderation + NPC replies, journal photos (iCloud), mood statistics page, developer debug panel.
+
+### Phase 4 — CURRENT
+- UI polish pass aligned to Figma design specs
+- Animation refinement (pet, plant, cloud transitions)
+- Accessibility audit (VoiceOver, Dynamic Type, Reduce Motion)
+- Performance profiling (SwiftData query costs, main-thread work)
+- Additional AI features (enhanced NPC personas, mood-aware replies)
+
+### Phase 5 — PLANNED
+- App Store submission (privacy manifest, age rating, screenshots)
+- TestFlight external beta
+- Analytics integration (opt-in, privacy-preserving)
+- IAP implementation (StoreKit 2)
+- Additional languages (Traditional Chinese, Japanese)
+
+---
+
+## Appendix: Open Questions
+
+- NPC content boundary policy and mental health compliance review
+- Human moderation fallback tooling for edge cases
+- Long-term content storage policy (auto-expiry of old posts?)
+- COPPA compliance if underage users are detected
+- Subscription pricing and regional pricing tiers
+- Advanced AI features: pet chat (conversational AI with memory/quota)
+
+---
+
+# 产品设计文档（中文摘要）
+
+> 以下为中文版完整摘要，与上方英文文档对应。
 
 ## 产品愿景
-- 陪伴 20-30 岁都市青年减压，建立温柔自我关怀仪式。
-- 用轻游戏化机制鼓励持续签到、记录、互动。
-- 构建正向变现体系，确保不破坏情绪安全感。
+
+Treehole（树洞）是一款安全、匿名的情绪出口与温柔自我关怀伴侣应用。用户将心情化为匿名"漂流瓶云朵"飘向共享天空，陌生人可以抓住云朵、阅读、用微风/拥抱/星光回应，并收到 AI NPC 留言。虚拟宠物、植物花园和私密日记共同构成每日仪式。全程采用 iOS 26 Liquid Glass 设计，支持中英双语。
 
 ## 目标用户
-- 核心用户：职场/校园压力大的 Z 世代，寻找匿名宣泄与情绪陪伴。
-- 次级用户：喜欢虚拟养成、轻度休闲游戏的玩家。
-- 无障碍：支持动态字体、VoiceOver、色盲友好、减少动画。
-- 隐私敏感人群：需透明的匿名与数据处理说明。
 
-## 体验支柱
-- 情绪释放：一键投递漂浮云，快速获得 NPC 回复。
-- 温柔陪伴：虚拟宠物与植物反馈用户关怀。
-- 引导仪式：签到、写日记、情绪标签。
-- 长期动力：可持续经济系统与轻任务。
-- 信任安全：匿名别名、AI/规则混合审核、清晰社区规范。
+**核心用户：** 18-28 岁的 Z 世代，面对职场或校园压力，寻求匿名宣泄与情绪陪伴，无需社交压力。
 
-## 核心功能 – 漂浮云倾诉
-- 匿名发帖界面含情绪选择、可选标签、安抚提示。
-- 用户真实用户名仅自见，对外展示会话随机别名。
-- 漂浮云动画列表，点击展开内容与 NPC 回复。
-- 初版内容审核采用关键词/规则引擎；后续接入 AI 复核。
-- NPC 回复初版使用模版/规则生成；AI 版本待后续迭代。
-- 互动限制为温柔反馈（如“轻拂”），避免社交压力。
-- 信息流混合个人历史、精选云朵、NPC 每日提示。
-- 未登录用户可浏览经过精选与脱敏的公开云朵、NPC 每日提示与基础指南，但不可发帖、互动或记录个人历史。
-- 云朵详情页提供“翻译/还原”按钮，支持中英互译并提示原文语言，翻译结果在本地缓存以便离线查看。
+**次级用户：** 喜欢虚拟养成、轻度休闲游戏的玩家。
 
-## 核心功能 – 虚拟宠物之家
-- 宠物状态含饥饿值、心情、能量；饥饿值代表可聊天额度。
-- 喂食（通过签到/任务获得食物）恢复聊天额度；额度耗尽后需再次喂食或付费。
-- 宠物闲置动画与时间同步；情绪随玩家操作变化。
-- 家园装饰：主题、家具、背景，分可获得与付费两类。
-- 屋内入口通往日记角，写作可获奖励（食物/装饰币）。
-- 宠物成长：阶段解锁新行为、对话、故事线。
-- 初版宠物聊天使用脚本化对话；后续迭代 AI 对话。
+**无障碍：** 支持动态字体、VoiceOver、减少动画、高对比度模式。
 
-## 核心功能 – 植物养成
-- 每日浇水签到给植物经验、种子、少量食物。
-- 植物多阶段外观，加入轻量闲置动画与天气变化。
-- 可扩展多花盆、季节限定植物。
+## 核心功能规格
 
-## 变现设计
-- 免费基础体验含漂浮云、签到、基础宠物/植物。
-- 订阅（月卡/Pro Plan）：提升喂食上限、加速成长、专属装饰、月度食物包、解锁多套宠物语音声线与更长 AI 对话配额；提供 7 天免费试用或一次性体验券，试用期间可体验全部 Pro 功能；后续逐步开放自定义声线升级包。
-- 战令：每日/每周任务获取阶梯奖励（食物、装饰、服装）。
-- 单次充值：食物补给、装饰套装、宠物服饰。
-- 广告策略：
+### 漂流瓶云朵
+- 匿名发帖，别名按会话随机生成
+- 三层内容审核：客户端关键词过滤 → MiniMax AI 审核 → PostgreSQL 触发器
+- "抓一朵云"随机浏览，微风/拥抱/星光三种反应（每设备每帖每类型限一次）
+- 评论功能，AI NPC 回复（MiniMax M2.7-highspeed）
+- 我的云朵管理（查看/删除自己的帖子）
 
-## Pro 订阅用户功能
-- 个性化声线库：解锁豆包语音合成大模型（火山引擎 TTS）优质音色，可在宠物聊天、NPC 回复朗读中自由选择；部分稀有声线按季限定或战令奖励解锁后在订阅期内使用。
-- 语音情绪控制：支持为豆包音色设置情感参数与语速、音量等高级配置，订阅用户可保存多套偏好。
-- AI 对话扩容：每日宠物 AI 对话额度翻倍，接入 DeepSeek 高频对话并优先分配高性能模型。
-- 语音对话增强：支持宠物语音双工（STT+TTS）模式及语音历史回放，非订阅用户仅限文本模式或基础声线试听。
-- 主题与装饰：额外获得高阶主题、室内家具、植物皮肤，以及语音主题联动装饰包（与所选声线匹配的视觉特效）。
-- 免费试用：新用户首次开通享 7 天试用（或等效体验券），试用期结束自动转为订阅或回退基础权益，并保留已解锁声线记录以便续费。
-- 离线语音包：在支持机型上下载 MegaTTS3 语音资源，实现离线 TTS 体验并减少云端调用成本。
-- 自定义声线（规划中）：基于 MegaTTS3/用户提交样本的专属声线定制，作为高级付费增值服务，待模型与审批流程稳定后开放。
+### 虚拟宠物
+- 卡通猫，心情动画，喂食/抚摸/休息三种互动
+- 饥饿值/精力值/经验值/等级系统
+- 4 套可解锁家居主题，喂食消耗食物货币
+- 喂食提醒通知（4 小时后触发）
 
-## 经济与进度
-- 货币：Food（食物）、Decor Token（装饰币）、Gem（付费）、Plant XP。
-- 获取：签到、日记、植物养成、NPC 任务。
-- 消耗：喂食宠物、装饰商店、战令进阶、服饰购买。
-- 保留机制：每日登录奖励、周常任务、节日活动。
-- 防囤积：软上限、限时增益、季节奖励过期。
-- 声线解锁：Pro 订阅直接启用高阶声线；非订阅用户可通过战令/活动兑换限时体验券，统一由 `VoiceConfig.unlockedVoices` 管理有效期与来源。
+### 植物花园
+- 最多 5 株并行，5 种植物，每种 5 个成长阶段
+- 每日浇水获得经验值，浇水提醒（24 小时后触发）
+- 自定义 2D 植物视觉艺术
 
-## 身份与隐私
-- 设备级随机别名池，对外展示按会话或帖子刷新。
-- 真实用户名存于本地安全存储，仅用户可见。
-- 设置中展示匿名机制、内容审核说明与数据导出/删除入口。
-- 游客模式仅存储最小化临时标识；启用 iCloud Keychain/本地安全区保存已注册账户凭证。
+### 日记
+- 心情标签记录，最多 3 张照片（iCloud 同步）
+- 心情周历带状视图，心情统计页（周/月/年）
+- 心情分布图，连续打卡天数追踪
 
-## 账号与访问策略
-- 登录方式：支持 Sign in with Apple、Google 登录、邮箱+密码注册/登录。
-- 不强制登录；首次进入可作为游客浏览限定内容，并在关键操作（发帖、喂宠物、写日记）时引导登录。
-- 游客限制：无法同步数据、不可发帖、宠物/植物仅展示演示状态、日记仅预览模板、无法参与任务与经济系统。
-- 鼓励转化：通过完成首次发帖、首次喂食等激励引导游客创建账户，提供一次性装饰/食物奖励。
-- 多端同步与安全：登录后使用唯一 userId 管理数据，支持退出/切换账户；异常登录触发二次验证（邮箱验证码）。
+### 经济系统
+- 三种货币：食物、装饰代币、宝石
+- 4 类每日任务，4 类每周挑战，登录连续奖励
+- 商店：用代币购买食物
 
-## AI 集成规划
-- 模型选择：优先接入 DeepSeek API（如 DeepSeek-V3/DeepSeek-R1）处理审核、NPC 回复与宠物对话，利用其相对低延迟与成本优势；关键节点保留 OpenAI/GPT-4o-mini 或本地模型作为备用，依据结果质量动态切换。
-- 内容审核：初期规则+人工复核；中期由 DeepSeek 审核模型负责主判（多轮推理），失败时回退至备用模型或人工。
-- NPC 回复：模版+槽位填充；迭代为 DeepSeek 生成短文本，并通过风格约束与关键词过滤保证安全。
-- 宠物聊天：初版脚本；后续基于短上下文 AI 对话，记忆限制、额度控制；进一步加入语音播报（TTS）与语音输入（STT）双向互动。
-- 成本控制：请求批处理、提示模板优化、字数限制、每日上限预警，根据 DeepSeek 计费实时监控。
-- 离线兜底：本地脚本回复，提示网络状态。
-- 语音体验：采用分层策略——基础层使用 iOS 本地 AVSpeechSynthesizer（离线 TTS，响应最快）；中间层由后端部署的轻量模型（如 Piper/F5-TTS）作为游客与免费用户的稳定 fallback；高阶层接入火山引擎豆包语音合成大模型提供在线高质量声线，作为订阅与活动特权；同时预研开源 MegaTTS3 作为本地化备份与未来自定义声线的核心能力。
-- TTS 方案对比：`本地 AVSpeechSynthesizer`→零网络依赖、声线有限；`轻量后端模型（Piper/F5-TTS）`→部署简单，适合免费层与 fallback；`开源 MegaTTS3 离线推理`→需部署 0.45B 模型、依赖 GPU/CPU 推理但可实现高质量克隆与双语支持，是自定义声线核心；`离线 SDK 模型`→需随包部署 20-200MB、可自定义音色；`在线云端（豆包 TTS 等）`→音质最佳、情感参数丰富但需网络且成本较高。根据响应目标（<500ms）按“本地 → 后端轻量 → 高品质云端”逐级降级。
-- 声线管理：后端同步豆包音色列表（voice_type、支持 emotion、情绪范围），按 Pro/活动标签分级；客户端缓存常用声线并提供试听音频，支持 emotion、speed_ratio、loudness 等参数在订阅范围内配置。
-- 翻译服务：调用 Apple Translation API、Azure Translator 或自建 LLM，为中英互译提供快速响应；结合缓存与质量评估流程降低成本。
+### 隐私锁
+- 4 位数字密码（iOS Keychain 存储）
+- FaceID/TouchID 生物识别
+- 独立锁定我的云朵和/或日记
 
-## 系统架构
-- 客户端：SwiftUI 模块化架构，导航用 Tab + Stack，动画用 Lottie/SpriteKit。
-- 数据层：Combine + URLSession/Alamofire，离线缓存 Core Data；同步优先本地，后续接入 CloudKit。
-- 鉴权：集成 Sign in with Apple、Google Sign-In SDK、邮箱注册（自建或 Firebase Auth），支持游客 token。
-- 后端：轻量 Serverless（Cloud Functions/Supabase）管理帖子、经济、AI 网关，统一鉴权校验；数据库可选 MongoDB Atlas（灵活文档结构适配帖子、翻译缓存）、Supabase Postgres 或 Firebase Firestore，依据团队栈与成本决定。
-- 推送：提醒喂食、浇水、NPC 故事。
-- AI 网关：封装 DeepSeek API 调用，统一超时、重试与降级策略（切换至备用模型或脚本回复），并记录 prompt/响应指标用于质量评估。
-- 语音服务：TTS 优先调用 AVFoundation 本地合成；后端部署 Piper/F5-TTS 作为免费用户和故障 fallback 的服务化节点；订阅层调用火山引擎豆包语音在线接口；语音识别用苹果 Speech Framework 并支持离线包；对延迟敏感场景设置本地预读缓存并缓存豆包声线示例片段；MegaTTS3 作为本地/私有部署模块由独立微服务或设备端推理提供高阶自定义声线与离线兜底。
-- 翻译服务：独立微服务维护翻译缓存、记录语言来源与更新时间；离线时展示上次成功翻译并提示可能过期。
-- 分析：App Center/Amplitude 记录留存、功能使用、付费漏斗。
-- 发布流水线：Fastlane 自动打包，TestFlight 分发，Xcode Cloud UI 测试。
+### 新手引导
+4 页：欢迎 → 功能介绍 → 隐私与别名说明 → 开始（Apple 登录或游客）
 
-## 多语言与翻译策略
-- 初期支持中文（简体）与英文界面，设置页可即时切换；后续通过本地化框架扩展更多语言。
-- 帖子与 NPC 回复默认显示原文，用户可点击“翻译/还原”按钮切换至目标语言；离线使用展示最近缓存翻译并提示更新时间。
-- 自动语言检测：发帖时客户端或服务端检测语言，写入 `sourceLanguage` 字段，异常时默认中文但允许用户手动改。
-- 翻译缓存策略：同一帖子同一语言翻译结果存储在本地与后端缓存中，定期根据翻译版本号与更新时间刷新。
-- 翻译失败或敏感内容时提供提示并允许用户请求人工复查（待定）。
+### 设置
+账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态、隐私政策、隐藏调试面板
 
-## 数据模型草案
-- `UserProfile`: id, privateName, themePrefs, subscriptionStatus, authProviders[], isGuest
-- `AliasSession`: aliasId, generatedName, expiryTimestamp
-- `CloudPost`: postId, authorAlias, moodTag, text, createdAt, npcReplyId, visibilityState, sourceLanguage, translations{language,text,updatedAt}
-- `PetState`: petId, hungerLevel, mood, energy, unlockedSkins[], lastFedAt, chatQuota
-- `InventoryItem`: itemId, type, quantity, rarity
-- `JournalEntry`: entryId, createdAt, mood, text, rewardGranted
-- `PlantState`: plantId, growthStage, hydrationLevel, lastWateredAt, decorations[]
-- `EconomyLedger`: currencyType, balance, lastUpdated
-- `VoiceConfig`: ttsVoiceId, voiceProvider, sttLanguage, lastConsentAt, unlockedVoices[], preferredEmotion
-- `LocalizationState`: preferredLocale, translationCacheVersion, lastUpdated
+### 身份验证
+Apple Sign-In（stable apple_user_id），游客模式（device_id），设备迁移至账户
 
-## UX/UI 指南
-- 视觉：柔和马卡龙色+云朵元素，统一设计系统组件。
-- 首页：上方漂浮云，下方宠物家园；底部 Tab（云朵/宠物/植物/日记/商店）。
-- 动画：云朵点击弹跳，宠物闲置循环，植物随风摇曳；尊重“减少动态”设置。
-- 空状态配 NPC 引导文案，鼓励首次操作。
-- 多语言：设置入口支持即时切换中英文，所有界面文案通过本地化字符串管理，支持复数与性别占位；帖子翻译按钮与提醒采用统一样式。
-- 语音选项：在宠物对话与设置页提供声线选择器，区分基础/Pro 声线并展示豆包音色试听，提示网络/流量消耗。
+### iCloud 同步
+SwiftData + CloudKit 同步本地数据；日记照片存储于 iCloud 容器；Supabase 处理社交数据
 
-### iOS 26 Liquid Glass 适配
-- 设计原则：遵循 Apple Liquid Glass 材质“半透明 / 模糊 / 折射 + 流体高光”的动态玻璃语言，强调内容优先与分层深度。
-- 玻璃分层：在 Figma/Sketch 原型中采用透明度分级（100%/70%/40%/20%）标注各层控件，卡片、模态、导航栏均视作漂浮玻璃片。
-- 导航与标签栏：半透明底座随滚动渐变、缩放，高光和投影随交互细腻变化，确保图标在透背景下可读。
-- 控件与文字：按钮采用玻璃底 + 轻高光边缘，文字/图标保持不透明填充；复杂背景下附加微渐变遮罩提升对比度，兼顾“减少透明度”无障碍模式。
-- 动效与反射：滑动、滚动或设备倾斜时更新模糊与高光，必要时使用 parallax/光反射动画，同时对低性能机型提供降级版本。
-- 设计资源：同步使用 Apple 更新的 iOS 26 Design Resources（Sketch/Figma），在组件库中创建“Liquid Glass”变体并定义模糊半径、阴影、高光参数，便于跨界面复用。
+### 推送通知
+喂食提醒（4 小时）、浇水提醒（24 小时）、每日签到（上午 9 点）
 
-## NPC 与内容设计
-- NPC 人设：智慧云、暖心猫等，定义语气、禁忌话题。
-- 回复模版贴合情绪标签，包含情绪镜像+轻建议。
-- 节日活动引入限定 NPC 故事线与装饰。
-- 语音演绎：为订阅用户提供 NPC 语音朗读选项，使用豆包声线对应人设情绪，并在文本下展示“播放/翻译”按钮。
-- 社区规范内嵌可申诉流程（待定义）。
+### 双语本地化
+L10n.t() 贯穿全局，运行时切换语言，中英字符串完全同步
 
-## 留存与游戏化
-- 签到连续奖励，喂食/浇水/日记 streak。
-- 日常任务：投递烦恼、浇水、喂食、装饰一次。
-- 无排行榜，避免社交比较。
-- 神秘礼盒：NPC 不定期投递惊喜奖励。
-- 声线活动：节日任务可掉落声线体验券或限定 emotion 方案，刺激订阅或战令升级。
-- 订阅转化漏斗：为试用用户设计日程提醒、到期提示与一次性复购礼包。
+### 开发者调试面板
+连击版本号 5 次解锁，含数值滑条、快捷操作、设备信息
 
-## 技术风险与对策
-- 审核误判 → 多层过滤、灰度上线、人工工具（待构建）。
-- AI 成本 → 严格配额、缓存、降级脚本。
-- 第三方 API 依赖 → DeepSeek 可用性监控，提供备用模型与脱机脚本回退。
-- MegaTTS3 运行资源 → 评估端侧/服务端算力与包体限制，必要时限定机型或采用云端弹性推理。
-- 动画性能 → 使用 Profiler，限定并行动画数量，优先矢量资源。
-- 离线 → 提供只读模式，操作排队同步。
-- 合规 → 评估未成年人使用、心理健康声明。
+## 数据模型
 
-## 测试策略
-- 单元测试：数据模型、经济逻辑、配额计算。
-- Snapshot/UI 测试：主要界面多主题/状态校验。
-- 集成测试：发帖、喂食、IAP 流程（StoreKit Test）。
-- 审核沙盒：样本内容验证过滤准确率。
-- 语音测试：TTS 音色回归（含豆包在线声线与本地声线对比）、语音识别准确率、弱网与静音场景降级验证。
-- MegaTTS3 评估：离线推理耗时、GPU/CPU 资源占用、与豆包/本地 TTS 的音质对比与一致性校验。
-- 翻译测试：常见情绪表达、俚语、敏感词的双语准确率与脱敏验证，关注延迟与缓存更新。
-- AI 质量测试：建立 DeepSeek 与备用模型的对比集，监测延迟、成本与安全性；定期抽检 NPC 回复与审核结果。
-- Beta：内部+封闭 TestFlight，重点收集 NPC 口吻、语音互动体验与留存反馈。
+### SwiftData 本地模型
+- `Pet`：饥饿值、精力、经验值、等级、心情、主题、最后喂食时间
+- `Plant`：种类、成长阶段、浇水经验、最后浇水时间
+- `JournalEntry`：时间、内容、心情标签、照片文件名
+- `Economy`：食物、代币、宝石、登录连续天数、任务完成状态
+- `WeeklyChallenge`：类型、进度、目标、周开始日期
+- `CloudPost`（缓存）：Supabase UUID、内容、别名、反应数、NPC 回复
 
-## 指标体系
-- 核心指标：7 日留存、日均倾诉次数、宠物互动次数。
-- 辅助：审核通过率、NPC 满意度、订阅转化。
-- 漏斗：完成引导→首次发帖→首次喂食→首次付费。
-- A/B：NPC 回复风格、饥饿衰减速度、装饰定价、不同 AI 模型/声线对满意度与成本的影响。
+### Supabase 表结构
+- `cloud_posts`：帖子（apple_user_id、device_id、别名、内容、心情标签、审核标记）
+- `cloud_comments`：评论
+- `cloud_reactions`：反应（每设备每帖每类型唯一约束）
+- `npc_reply_templates`：NPC 回复模板
+- `post_reaction_counts`：反应数聚合视图
 
-## 安全与合规
-- 最小化 PII，服务器仅存匿名别名。
-- 鉴权：Sign in with Apple/Firebase Auth。
-- 数据加密：Keychain + TLS。
-- COPPA/GDPR 审核，应用内隐私政策。
-- 审核失效应急流程（待补充）。
-- 语音数据：收集前提示并征得同意，优先本地处理，必要时上传仅限实时识别且不留存原始音频。
+Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 
-## 功能优先级与迭代路线
-### 里程碑 A（核心可用 MVP）
-- 游客引导、匿名别名机制
-- Sign in with Apple（最低要求）与邮箱注册基础流程
-- 漂浮云发帖、查看、删除
-- 规则式内容审核与 NPC 模版回复
-- 虚拟宠物基础：显示、饥饿值、喂食签到
-- 植物每日浇水基础循环
-- 本地数据存储、基础分析埋点
+## AI 集成
 
-### 里程碑 B（核心体验强化）
-- 扩展登录方式（Google）、账户设置与安全中心
-- 漂浮云动画与交互打磨、情绪标签强化
-- 宠物家园装饰、闲置动画、心情反馈
-- 日记角与奖励
-- 经济系统初版（食物/装饰币）、任务面板
-- 推送提醒、中英界面完善、帖子翻译按钮上线
+**模型：** MiniMax M2.7-highspeed
 
-### 里程碑 C（AI 与高级体验）
-- AI 审核与 NPC AI 回复接入
-- 宠物 AI 聊天（额度控制、记忆管理）
-- 植物扩展（多花盆、阶段演进）
-- 高级动画与无障碍细节
-- 语音互动预研：宠物 TTS 默认声音设计、语音隐私授权流程
-- 翻译服务优化：引入 AI 质量评估与用户反馈纠错机制
-- MegaTTS3 离线原型验证：完成模型部署、缓存策略与与豆包声线对齐测试
+**用途：**
+1. 内容审核 — 通过 `moderate-post` Edge Function 判断帖子是否安全
+2. NPC 回复生成 — 通过 `generate-npc-reply` Edge Function 生成共情回复，失败时回退到模板
 
-### 里程碑 D（商业化）
-- 订阅（月卡）、战令、商品化商店
-- 支付风控、收据校验
-- 高级数据分析与 A/B 测试框架
-- 宠物语音模式试运营（TTS 播报、语音输入内测），订阅用户优先体验
-- 声线商城上线：集成豆包 TTS 声线列表与预览，支持按订阅、活动、战令解锁。
-- 推出 Pro 免费试用：设计 7 天试用/体验券流程、到期提醒与续费转化路径。
+**三层审核管道：**
+客户端关键词过滤 → MiniMax AI 审核 → PostgreSQL 触发器
 
-### 里程碑 E（拓展与运营）
-- 节日活动、NPC 剧情系统
-- 人工审核后台工具
-- 更深层社区功能（如需）
-- 语音互动全面上线，加入语音日记/语音 NPC 回复探索
-- MegaTTS3 自定义声线试运营：面向 Pro 用户开放样本上传、审批与生成流程，逐步扩展至付费增值套餐
+所有 AI 调用通过 Supabase Edge Functions 路由（非客户端直调），便于速率限制与密钥安全。
 
-## 实施路径建议
-- 先完成里程碑 A 形成闭环；AI 能力在 C 阶段上线，前期以规则+模版保证稳定。
-- 每里程碑结束进行用户测试与指标复盘，必要时调整优先级。
-- 若资源有限，战令/高级商业模块可推迟至稳定后期。
-- 语音功能随商业化阶段灰度测试，依据性能与成本决定推广节奏。
-- 多语言功能在 B 阶段上线前完成翻译文案与服务集成验证，确保翻译质量与成本可控。
-- AI 迭代流程：在灰度环境先接入 DeepSeek，持续对比备用模型延迟与成本，必要时按场景混合部署；TTS 则优先评估本地 AVSpeechSynthesizer 如满足体验，即保留线上声线作为可选升级。
-- 豆包 TTS 集成建议：先完成声线挑选与费用评估，灰度开放给 Pro 用户并监控延迟/并发上限，必要时缓存热门句子音频。
-- Pro 试用策略：上线前配置试用额度、到期提醒、保留期；追踪试用→订阅转化并动态调整权益。
-- 分层语音布局：明确“端侧（Apple TTS）→ 后端轻量（Piper/F5）→ 高品质云（豆包）→ 高阶定制（MegaTTS3）”的降级顺序，并为每一层建立监控与熔断策略。
-- MegaTTS3 部署策略：评估端侧算力与包体限制，可在高端设备/离线模式启用，或提供私有云推理服务，确保语音体验在无网络场景下保持一致；先作为内部 fallback，再扩展自定义声线服务。
+## 隐私与安全设计
 
-## 开放问题 / 待确认
-- NPC 文案边界与心理健康合规评估
-- AI 模型托管与延迟指标
-- 人工审核流程与工具
-- 用户内容长期存储策略（是否自动清除）
-- 广告策略
-- 未成年人使用政策与家长保护机制
-- 语音数据存储与隐私策略（是否离线处理、是否保留语音日志）
-- 第三方语音服务授权成本与合规审核
-- 翻译服务供应商选择、成本与缓存策略的法律限制
-- DeepSeek API 数据合规、区域部署与可用性保障方案
-- 豆包 TTS 商业授权、并发配额与音色更新频率
-- Pro 试用政策的地区合规与订阅自动续费规则
-- MegaTTS3 模型许可、推理资源成本与声音安全审核流程
-- 自定义声线审核：用户样本上传的版权、同意证明与违规撤销流程
+- 展示别名随会话随机生成，其他用户永远看不到 apple_user_id 或 device_id
+- 密码存于 iOS Keychain，永不离开设备
+- Supabase RLS 确保用户只能删除自己的帖子
+- 最小化 PII：不向 Supabase 传输真实姓名或邮箱
+- 全程 HTTPS/TLS 通信
+
+## 经济系统设计
+
+**货币体系：** 食物（喂宠）、装饰代币（购物）、宝石（未来付费）
+
+**每日任务奖励：** 写日记、浇水、喂食、发帖，各奖励不同数量食物/代币
+
+**每周挑战奖励：** 完成 5 个每日任务、连续 3 天日记、植物成长一阶段、对 3 个云朵做出反应
+
+**登录连续奖励：** 按天数递增，7 天、14 天、30 天有特殊奖励
+
+**变现原则：** 不在情感/健康功能上设置付费墙，货币化为装饰/便利性，绝不投放广告。
+
+## 迭代路线图
+
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| Phase 1 | 核心闭环 | 已完成 |
+| Phase 2 | 经济系统、任务、双语、通知 | 已完成 |
+| Phase 3 | Apple 登录、CloudKit、隐私锁、反应、漂流瓶社交 | 已完成 |
+| Phase 4 | UI 精修、动效、无障碍、更多 AI 功能 | 当前阶段 |
+| Phase 5 | App Store 上架、TestFlight、分析、IAP | 规划中 |

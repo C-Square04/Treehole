@@ -380,6 +380,20 @@ struct SettingsView: View {
     // MARK: - Account Deletion
 
     private func performAccountDeletion() {
+        // 1. Delete cloud posts from Supabase FIRST (before clearing device_id)
+        let deviceId = SupabaseConfig.deviceId
+        let appleId = SupabaseConfig.appleUserID
+        Task {
+            // Fetch and delete all own posts
+            if let posts = try? await SupabaseService.fetchMyPosts() {
+                for post in posts {
+                    try? await SupabaseService.deletePost(id: post.id)
+                }
+            }
+            print("[DELETE] Supabase posts deleted")
+        }
+
+        // 2. Delete all SwiftData (local + iCloud CloudKit)
         do {
             try modelContext.delete(model: Pet.self)
             try modelContext.delete(model: Plant.self)
@@ -389,32 +403,49 @@ struct SettingsView: View {
             try modelContext.delete(model: WeeklyChallenge.self)
             try modelContext.delete(model: ChatMessage.self)
             try modelContext.save()
+            print("[DELETE] SwiftData cleared")
         } catch {
-            print("Delete data error: \(error)")
+            print("[DELETE] SwiftData error: \(error)")
         }
 
-        Task {
-            if let posts = try? await SupabaseService.fetchMyPosts() {
-                for post in posts {
-                    try? await SupabaseService.deletePost(id: post.id)
-                }
-            }
-        }
+        // 3. Delete Keychain (passcode + any stored credentials)
+        KeychainHelper.delete(forKey: "privacyPasscode")
+        print("[DELETE] Keychain cleared")
 
+        // 4. Reset PrivacyLockManager state
+        lockManager.isCloudLockEnabled = false
+        lockManager.isJournalLockEnabled = false
+        lockManager.isBiometricEnabled = false
+
+        // 5. Delete photos (local + iCloud ubiquity container)
+        let fm = FileManager.default
+        // Local photos
+        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? fm.removeItem(at: docs.appendingPathComponent("journal_photos"))
+        }
+        // iCloud photos
+        if let icloud = fm.url(forUbiquityContainerIdentifier: nil)?
+            .appendingPathComponent("Documents/journal_photos") {
+            try? fm.removeItem(at: icloud)
+        }
+        print("[DELETE] Photos cleared")
+
+        // 6. Clear ALL UserDefaults
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)
+            UserDefaults.standard.synchronize()
         }
+        print("[DELETE] UserDefaults cleared")
 
-        KeychainHelper.delete(forKey: "privacyPasscode")
-
-        let fm = FileManager.default
-        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let photosDir = docs.appendingPathComponent("journal_photos")
-            try? fm.removeItem(at: photosDir)
-        }
-
-        appState.logout()
+        // 7. Reset app state (must be LAST)
+        appState.isSubscribed = false
+        appState.appleUserID = nil
+        appState.appleUserEmail = nil
+        appState.isDeveloperMode = false
+        appState.isGuest = true
         appState.hasCompletedOnboarding = false
+        appState.currentAlias = "Anonymous"
+        print("[DELETE] Account deletion complete")
     }
 }
 

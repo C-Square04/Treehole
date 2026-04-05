@@ -7,6 +7,11 @@ final class ChatMessage {
     var text: String = ""
     var isFromUser: Bool = true
     var createdAt: Date = Date()
+    var modeRaw: String = "basic"  // "basic" or "premium"
+
+    var mode: ChatMode {
+        modeRaw == "premium" ? .premium : .basic
+    }
 
     init() {}
     init(text: String, isFromUser: Bool) {
@@ -14,5 +19,6 @@ final class ChatMessage {
         self.text = text
         self.isFromUser = isFromUser
         self.createdAt = Date()
+        self.modeRaw = "basic"
     }
 }

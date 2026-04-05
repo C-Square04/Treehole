@@ -25,6 +25,12 @@ final class AppState {
         didSet { saveState() }
     }
     var appleUserEmail: String? = nil
+    var isSubscribed: Bool = false {
+        didSet { saveState() }
+    }
+    var selectedVoiceId: String = "apple_default" {
+        didSet { saveState() }
+    }
 
     // MARK: - Alias Name Pool
 
@@ -132,6 +138,8 @@ final class AppState {
         defaults.set(isDeveloperMode, forKey: "isDeveloperMode")
         defaults.set(appleUserID, forKey: "appleUserID")
         defaults.set(appleUserEmail, forKey: "appleUserEmail")
+        defaults.set(isSubscribed, forKey: "isSubscribed")
+        defaults.set(selectedVoiceId, forKey: "selectedVoiceId")
     }
 
     private func loadState() {
@@ -147,6 +155,21 @@ final class AppState {
         isDeveloperMode = defaults.bool(forKey: "isDeveloperMode")
         appleUserID = defaults.string(forKey: "appleUserID")
         appleUserEmail = defaults.string(forKey: "appleUserEmail")
+        isSubscribed = defaults.bool(forKey: "isSubscribed")
+        selectedVoiceId = defaults.string(forKey: "selectedVoiceId") ?? "apple_default"
+    }
+
+    // MARK: - Subscriber Bonus
+
+    func grantSubscriberDailyBonus(economy: Economy) {
+        guard isSubscribed else { return }
+        let defaults = UserDefaults.standard
+        let today = Calendar.current.startOfDay(for: Date())
+        let lastBonus = defaults.object(forKey: "lastSubscriberBonus") as? Date
+        if lastBonus == nil || !Calendar.current.isDate(lastBonus!, inSameDayAs: today) {
+            economy.addFood(30)
+            defaults.set(today, forKey: "lastSubscriberBonus")
+        }
     }
 
     // MARK: - Notifications

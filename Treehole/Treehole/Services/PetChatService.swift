@@ -26,27 +26,54 @@ enum PetChatService {
         petMood: String,
         petHunger: Int
     ) async -> String {
+        await generateReply(
+            userMessage: userMessage,
+            recentHistory: recentHistory,
+            petMood: petMood,
+            petHunger: petHunger,
+            mode: .basic
+        )
+    }
+
+    // Mode-aware reply generation
+    static func generateReply(
+        userMessage: String,
+        recentHistory: [(role: String, content: String)],
+        petMood: String,
+        petHunger: Int,
+        mode: ChatMode
+    ) async -> String {
         // Build system prompt with pet state
         let systemPrompt = petSystemPrompt
             .replacingOccurrences(of: "{MOOD}", with: petMood)
             .replacingOccurrences(of: "{HUNGER}", with: "\(petHunger)")
 
-        // Try Apple Foundation Models first
-        if let localReply = await tryFoundationModels(
-            systemPrompt: systemPrompt,
-            userMessage: userMessage,
-            history: recentHistory
-        ) {
-            return localReply
-        }
-
-        // Fallback: MiniMax API
-        if let apiReply = await tryMiniMaxAPI(
-            systemPrompt: systemPrompt,
-            userMessage: userMessage,
-            history: recentHistory
-        ) {
-            return apiReply
+        if mode == .premium {
+            // Premium: always use MiniMax API
+            if let apiReply = await tryMiniMaxAPI(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage,
+                history: recentHistory
+            ) {
+                return apiReply
+            }
+            // Fallback to Foundation Models if MiniMax fails
+            if let localReply = await tryFoundationModels(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage,
+                history: recentHistory
+            ) {
+                return localReply
+            }
+        } else {
+            // Basic: Foundation Models → scripted fallback (skip MiniMax)
+            if let localReply = await tryFoundationModels(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage,
+                history: recentHistory
+            ) {
+                return localReply
+            }
         }
 
         // Last resort: scripted response

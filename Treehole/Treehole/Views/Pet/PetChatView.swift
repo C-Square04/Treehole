@@ -16,6 +16,7 @@ struct PetChatView: View {
     @State private var voiceTranscript = ""
     @State private var ttsEnabled = true
     @State private var errorMessage: String?
+    @State private var chatMode: ChatMode = .basic
 
     private var messages: [ChatMessage] {
         Array(allMessages.suffix(20))
@@ -40,6 +41,8 @@ struct PetChatView: View {
                         typingIndicator
                     }
 
+                    modeSwitcher
+
                     inputBar
                 }
             }
@@ -50,12 +53,20 @@ struct PetChatView: View {
                     Button(L10n.t("Done", "完成")) { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        ttsEnabled.toggle()
-                        if !ttsEnabled { PetVoiceService.stopSpeaking() }
-                    } label: {
-                        Image(systemName: ttsEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                            .foregroundStyle(ttsEnabled ? TreeholeTheme.softPurple : TreeholeTheme.textSecondary)
+                    HStack(spacing: 8) {
+                        NavigationLink {
+                            VoiceSelectorView()
+                        } label: {
+                            Image(systemName: "waveform.circle")
+                                .foregroundStyle(TreeholeTheme.softPurple)
+                        }
+                        Button {
+                            ttsEnabled.toggle()
+                            if !ttsEnabled { PetVoiceService.stopSpeaking() }
+                        } label: {
+                            Image(systemName: ttsEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                .foregroundStyle(ttsEnabled ? TreeholeTheme.softPurple : TreeholeTheme.textSecondary)
+                        }
                     }
                 }
             }
@@ -73,16 +84,19 @@ struct PetChatView: View {
     // MARK: - Subviews
 
     private var hungerBanner: some View {
-        HStack(spacing: 6) {
+        let hunger = pet?.hungerLevel ?? 0
+        let isPremiumExpensive = chatMode == .premium && !appState.isSubscribed
+        return HStack(spacing: 6) {
             Image(systemName: "fork.knife")
                 .foregroundStyle(TreeholeTheme.coral)
-            let hunger = pet?.hungerLevel ?? 0
-            Text(L10n.t("Hunger: \(hunger)/100", "饥饿度: \(hunger)/100"))
+            Text(isPremiumExpensive
+                ? L10n.t("🍖 \(hunger)/100 (10 per msg)", "🍖 \(hunger)/100 (每条10)")
+                : L10n.t("🍖 \(hunger)/100 (1 per msg)", "🍖 \(hunger)/100 (每条1)"))
                 .font(.caption.bold())
                 .foregroundStyle(hunger == 0 ? TreeholeTheme.coral : TreeholeTheme.textSecondary)
             Spacer()
             if hunger == 0 {
-                Text(L10n.t("Feed me to chat!", "喂我才能聊天！"))
+                Text(L10n.t("I'm hungry! Feed me to continue chatting 🍖", "我饿了！喂我才能继续聊天 🍖"))
                     .font(.caption)
                     .foregroundStyle(TreeholeTheme.coral)
             }
@@ -161,6 +175,44 @@ struct PetChatView: View {
         .background(TreeholeTheme.softPurple.opacity(0.1), in: Capsule())
     }
 
+    private var modeSwitcher: some View {
+        HStack(spacing: 8) {
+            Button {
+                chatMode = .basic
+            } label: {
+                Text(L10n.t("⚡ Basic", "⚡ 基础"))
+                    .font(.caption.bold())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(chatMode == .basic ? TreeholeTheme.skyBlue.opacity(0.3) : Color.clear,
+                                in: Capsule())
+            }
+
+            Button {
+                chatMode = .premium
+            } label: {
+                VStack(spacing: 1) {
+                    Text(L10n.t("✨ Premium", "✨ 高级"))
+                        .font(.caption.bold())
+                    Text(appState.isSubscribed
+                        ? L10n.t("1 🍖/msg", "1 🍖/条")
+                        : L10n.t("10 🍖/msg", "10 🍖/条"))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(chatMode == .premium ? TreeholeTheme.warmGold.opacity(0.3) : Color.clear,
+                            in: Capsule())
+            }
+
+            Spacer()
+        }
+        .foregroundStyle(TreeholeTheme.textPrimary)
+        .padding(.horizontal)
+        .padding(.vertical, 4)
+    }
+
     private var inputBar: some View {
         VStack(spacing: 0) {
             Divider()
@@ -222,7 +274,9 @@ struct PetChatView: View {
 
     private var canSend: Bool {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !text.isEmpty && !isThinking && (pet?.hungerLevel ?? 0) > 0
+        let hunger = pet?.hungerLevel ?? 0
+        let cost: Int = chatMode == .premium && !appState.isSubscribed ? 10 : 1
+        return !text.isEmpty && !isThinking && hunger >= cost
     }
 
     // MARK: - Actions
@@ -250,7 +304,16 @@ struct PetChatView: View {
     private func sendMessage() async {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let pet = pets.first else { return }
-        guard pet.hungerLevel > 0 else { return }
+
+        // Determine hunger cost
+        let cost: Int
+        if chatMode == .premium {
+            cost = appState.isSubscribed ? 1 : 10  // Subscribers pay 1 even for premium
+        } else {
+            cost = 1
+        }
+
+        guard pet.hungerLevel >= cost else { return }
 
         inputText = ""
 
@@ -258,8 +321,8 @@ struct PetChatView: View {
         let userMsg = ChatMessage(text: text, isFromUser: true)
         modelContext.insert(userMsg)
 
-        // Decrease hunger by 1
-        pet.hungerLevel = max(0, pet.hungerLevel - 1)
+        // Decrease hunger
+        pet.hungerLevel = max(0, pet.hungerLevel - cost)
         try? modelContext.save()
 
         // Show typing indicator
@@ -270,25 +333,27 @@ struct PetChatView: View {
             (role: msg.isFromUser ? "user" : "assistant", content: msg.text)
         }
 
-        // Get AI reply
+        // Get AI reply using current mode
         let reply = await PetChatService.generateReply(
             userMessage: text,
             recentHistory: history,
             petMood: pet.mood.labelEN,
-            petHunger: pet.hungerLevel
+            petHunger: pet.hungerLevel,
+            mode: chatMode
         )
 
         isThinking = false
 
-        // Save pet reply
+        // Save pet reply with mode label
         let petMsg = ChatMessage(text: reply, isFromUser: false)
+        petMsg.modeRaw = chatMode == .premium ? "premium" : "basic"
         modelContext.insert(petMsg)
         try? modelContext.save()
 
-        // TTS
+        // TTS with mode
         if ttsEnabled {
             isSpeaking = true
-            PetVoiceService.speak(reply, language: appState.preferredLanguage)
+            PetVoiceService.speak(reply, language: appState.preferredLanguage, mode: chatMode)
             let estimatedDuration = Double(reply.count) * 0.08 + 1.0
             DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
                 isSpeaking = false
@@ -357,16 +422,25 @@ struct ChatBubbleView: View {
             } else {
                 Text("🐱")
                     .font(.title3)
-                Text(message.text)
-                    .font(.subheadline)
-                    .foregroundStyle(TreeholeTheme.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(TreeholeTheme.softPurple.opacity(0.15), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(TreeholeTheme.softPurple.opacity(0.3), lineWidth: 1)
-                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(message.text)
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(TreeholeTheme.softPurple.opacity(0.15), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .strokeBorder(TreeholeTheme.softPurple.opacity(0.3), lineWidth: 1)
+                        )
+                    HStack {
+                        Spacer()
+                        Text(L10n.t(message.mode.labelEN, message.mode.labelZH))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.trailing, 4)
+                }
                 Spacer(minLength: 60)
             }
         }

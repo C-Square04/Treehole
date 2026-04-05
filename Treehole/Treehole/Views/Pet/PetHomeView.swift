@@ -200,9 +200,10 @@ struct PetHomeView: View {
         }
         .onAppear {
             pet.updateHunger()
-            _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+            let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
             economyVM.resetDailyTasksIfNeeded(tasks: dailyTasks, context: modelContext)
             economyVM.createDailyTasks(context: modelContext, existingTasks: dailyTasks)
+            appState.grantSubscriberDailyBonus(economy: economy)
             try? modelContext.save()
         }
     }

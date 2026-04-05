@@ -169,6 +169,41 @@ struct SettingsView: View {
                     Toggle(L10n.t("Dark Mode", "深色模式"), isOn: $state.isDarkMode)
                 }
 
+                // Subscription section (mock)
+                Section(L10n.t("Subscription", "订阅")) {
+                    HStack {
+                        Image(systemName: appState.isSubscribed ? "crown.fill" : "crown")
+                            .foregroundStyle(appState.isSubscribed ? TreeholeTheme.warmGold : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(appState.isSubscribed
+                                ? L10n.t("Pro Member", "专业会员")
+                                : L10n.t("Free Plan", "免费版"))
+                                .font(.headline)
+                            Text(appState.isSubscribed
+                                ? L10n.t("Premium voices + AI chat unlocked", "已解锁高级声线和AI聊天")
+                                : L10n.t("Upgrade for natural voices & smart AI", "升级获得自然声线和智能AI"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if !appState.isSubscribed {
+                        Button {
+                            // Mock subscribe (will be real IAP later)
+                            appState.isSubscribed = true
+                        } label: {
+                            Label(L10n.t("Subscribe (Mock)", "订阅（模拟）"), systemImage: "star.fill")
+                        }
+                        .tint(TreeholeTheme.warmGold)
+                    } else {
+                        Button(role: .destructive) {
+                            appState.isSubscribed = false
+                        } label: {
+                            Label(L10n.t("Cancel Subscription (Mock)", "取消订阅（模拟）"), systemImage: "xmark.circle")
+                        }
+                    }
+                }
+
                 // About
                 Section(L10n.t("About", "关于")) {
                     HStack {

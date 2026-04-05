@@ -10,11 +10,40 @@ enum PetVoiceService {
 
     private static let minimaxAPIKey = "sk-cp-z4CQ1mXhW7zic_yooLH76BxPnerSaOfmrM4eaYiu1iP-ArmWhAjB8JLvZKQN67OLubHnV3Xy8QX7Mn2AOnDIQcONI4yaEPUgPqQvmivxwot3fMJJyNxBdLI"
 
-    // MARK: - TTS: MiniMax first, Apple fallback
+    // MARK: - Emoji Stripping
 
-    static func speak(_ text: String, language: String = "en", emotion: String = "calm") {
-        Task {
-            // Activate audio session
+    private static func stripEmoji(_ text: String) -> String {
+        text.unicodeScalars.filter { scalar in
+            guard scalar.properties.isEmoji else { return true }
+            // Keep ASCII characters (basic punctuation / numbers that report isEmoji)
+            return scalar.value < 128
+        }.map(String.init).joined()
+    }
+
+    // MARK: - TTS: Mode-aware
+
+    static func speak(_ text: String, language: String = "en", emotion: String = "calm", mode: ChatMode = .basic) {
+        let cleanText = stripEmoji(text)
+        guard !cleanText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        if mode == .premium {
+            // Premium: MiniMax natural voice
+            Task {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(.playback, mode: .default, options: .duckOthers)
+                    try session.setActive(true)
+                } catch {
+                    print("[TTS] Audio session error: \(error)")
+                }
+                if let audioData = await fetchMiniMaxTTS(text: cleanText, language: language, emotion: emotion) {
+                    await MainActor.run { playAudio(audioData) }
+                } else {
+                    await MainActor.run { speakWithApple(cleanText, language: language) }
+                }
+            }
+        } else {
+            // Basic: Apple TTS (free)
             do {
                 let session = AVAudioSession.sharedInstance()
                 try session.setCategory(.playback, mode: .default, options: .duckOthers)
@@ -22,25 +51,17 @@ enum PetVoiceService {
             } catch {
                 print("[TTS] Audio session error: \(error)")
             }
-
-            // Try MiniMax TTS first (natural voice)
-            if let audioData = await fetchMiniMaxTTS(text: text, language: language, emotion: emotion) {
-                await MainActor.run { playAudio(audioData) }
-                return
-            }
-
-            // Fallback: Apple TTS (robotic but offline)
-            await MainActor.run { speakWithApple(text, language: language) }
+            speakWithApple(cleanText, language: language)
         }
     }
 
     // MARK: - MiniMax T2A API
 
-    private static func fetchMiniMaxTTS(text: String, language: String, emotion: String) async -> Data? {
+    static func fetchMiniMaxTTS(text: String, language: String, emotion: String, voiceId: String? = nil) async -> Data? {
         guard let url = URL(string: "https://api.minimaxi.com/v1/t2a_v2") else { return nil }
 
-        // Pick voice based on language
-        let voiceId = language == "zh-Hans" ? "female-tianmei" : "English_Graceful_Lady"
+        // Pick voice based on language (or use provided voiceId)
+        let voiceId = voiceId ?? (language == "zh-Hans" ? "female-tianmei" : "English_Graceful_Lady")
 
         let body: [String: Any] = [
             "model": "speech-2.8-hd",
@@ -87,6 +108,10 @@ enum PetVoiceService {
     }
 
     // MARK: - Audio Playback
+
+    static func playAudioPublic(_ data: Data) {
+        playAudio(data)
+    }
 
     private static func playAudio(_ data: Data) {
         do {

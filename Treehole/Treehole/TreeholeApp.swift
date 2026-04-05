@@ -32,24 +32,31 @@ struct TreeholeApp: App {
             }
         }
 
-        // Step 1: Try local-only first (most reliable)
-        // CloudKit can be enabled later once schema is stable
-        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // Try CloudKit first
         do {
-            return try ModelContainer(for: schema, configurations: [localConfig])
+            let config = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .automatic
+            )
+            return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            print("Local ModelContainer failed: \(error). Deleting store and retrying...")
+            print("CloudKit ModelContainer failed: \(error). Deleting stores and retrying...")
             deleteAllStores()
             do {
-                return try ModelContainer(for: schema, configurations: [localConfig])
+                let config = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .automatic
+                )
+                return try ModelContainer(for: schema, configurations: [config])
             } catch {
-                // Absolute last resort: in-memory only (no persistence, but no crash)
-                print("Recreate also failed: \(error). Using in-memory store.")
-                let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                print("CloudKit retry failed: \(error). Falling back to local.")
                 do {
-                    return try ModelContainer(for: schema, configurations: [memoryConfig])
+                    let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+                    return try ModelContainer(for: schema, configurations: [config])
                 } catch {
-                    fatalError("Could not create any ModelContainer: \(error)")
+                    fatalError("Could not create ModelContainer: \(error)")
                 }
             }
         }
@@ -70,8 +77,4 @@ struct TreeholeApp: App {
     }
 }
 
-// NOTE: CloudKit sync is temporarily disabled to ensure stability.
-// To re-enable later (when schema is stable):
-// 1. Change ModelConfiguration to: cloudKitDatabase: .automatic
-// 2. Ensure ALL @Model properties have defaults or are optional
-// 3. Test on a fresh install first
+// NOTE: CloudKit sync is enabled. All @Model properties have inline defaults for compatibility.

@@ -77,12 +77,14 @@ enum ChallengeType: String, Codable, CaseIterable {
 
 @Model
 final class WeeklyChallenge {
-    var id: String
-    var typeRaw: String
-    var currentCount: Int
-    var isCompleted: Bool
-    var weekStartDate: Date
-    var createdAt: Date
+    var id: String = UUID().uuidString
+    var typeRaw: String = "postStreak"
+    var currentCount: Int = 0
+    var isCompleted: Bool = false
+    var weekStartDate: Date = Date()
+    var createdAt: Date = Date()
+
+    init() {}
 
     init(type: ChallengeType, weekStartDate: Date) {
         self.id = UUID().uuidString

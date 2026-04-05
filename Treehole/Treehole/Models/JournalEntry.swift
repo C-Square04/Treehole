@@ -3,11 +3,13 @@ import SwiftData
 
 @Model
 final class JournalEntry {
-    var id: String
-    var createdAt: Date
-    var moodTagRaw: String
-    var text: String
-    var photoFilenames: [String]?
+    var id: String = UUID().uuidString
+    var createdAt: Date = Date()
+    var moodTagRaw: String = "calm"
+    var text: String = ""
+    var photoFilenames: [String]? = nil
+
+    init() {}
 
     init(moodTag: MoodTag, text: String) {
         self.id = UUID().uuidString

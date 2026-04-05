@@ -41,23 +41,15 @@ enum TaskType: String, Codable, CaseIterable {
 
 @Model
 final class Economy {
-    var id: String
-    var food: Int
-    var decorationTokens: Int
-    var gems: Int
-    var loginStreak: Int
-    var lastLoginDate: Date?
-    var lastDailyResetDate: Date?
+    var id: String = UUID().uuidString
+    var food: Int = 50
+    var decorationTokens: Int = 10
+    var gems: Int = 0
+    var loginStreak: Int = 0
+    var lastLoginDate: Date? = nil
+    var lastDailyResetDate: Date? = nil
 
-    init() {
-        self.id = UUID().uuidString
-        self.food = 50
-        self.decorationTokens = 10
-        self.gems = 0
-        self.loginStreak = 0
-        self.lastLoginDate = nil
-        self.lastDailyResetDate = nil
-    }
+    init() {}
 
     func addFood(_ amount: Int) {
         guard amount > 0 else { return }
@@ -121,14 +113,16 @@ final class Economy {
 
 @Model
 final class DailyTask {
-    var id: String
-    var title: String
-    var taskDescription: String
-    var typeRaw: String
-    var isCompleted: Bool
-    var foodReward: Int
-    var tokenReward: Int
-    var createdAt: Date
+    var id: String = UUID().uuidString
+    var title: String = ""
+    var taskDescription: String = ""
+    var typeRaw: String = "post"
+    var isCompleted: Bool = false
+    var foodReward: Int = 0
+    var tokenReward: Int = 0
+    var createdAt: Date = Date()
+
+    init() {}
 
     init(type: TaskType) {
         self.id = UUID().uuidString

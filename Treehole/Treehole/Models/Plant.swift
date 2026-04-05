@@ -89,16 +89,18 @@ enum GrowthStage: String, Codable, CaseIterable {
 
 @Model
 final class Plant {
-    var id: String
-    var name: String
-    var speciesRaw: String
-    var growthStageRaw: String
-    var hydrationLevel: Int
-    var experience: Int
-    var lastWateredAt: Date?
-    var createdAt: Date
+    var id: String = UUID().uuidString
+    var name: String = "My Plant"
+    var speciesRaw: String = "sunflower"
+    var growthStageRaw: String = "seed"
+    var hydrationLevel: Int = 100
+    var experience: Int = 0
+    var lastWateredAt: Date? = nil
+    var createdAt: Date = Date()
 
-    init(name: String = "My Plant", species: PlantSpecies = .sunflower) {
+    init() {}
+
+    init(name: String, species: PlantSpecies) {
         self.id = UUID().uuidString
         self.name = name
         self.speciesRaw = species.rawValue

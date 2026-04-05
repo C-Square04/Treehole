@@ -79,22 +79,24 @@ enum PetMood: String, Codable, CaseIterable {
 
 @Model
 final class Pet {
-    var id: String
-    var name: String
-    var hungerLevel: Int
-    var moodRaw: String
-    var lastFedAt: Date?
-    var lastHungerUpdateAt: Date?
-    var createdAt: Date
+    var id: String = UUID().uuidString
+    var name: String = "Companion"
+    var hungerLevel: Int = 80
+    var moodRaw: String = "neutral"
+    var lastFedAt: Date? = nil
+    var lastHungerUpdateAt: Date? = nil
+    var createdAt: Date = Date()
 
     // Phase 2: energy, level, XP, theme
-    var energy: Int
-    var level: Int
-    var experience: Int
-    var nextLevelExp: Int
-    var homeThemeRaw: String
+    var energy: Int = 80
+    var level: Int = 1
+    var experience: Int = 0
+    var nextLevelExp: Int = 100
+    var homeThemeRaw: String = "daylight"
 
-    init(name: String = "Companion") {
+    init() {}
+
+    init(name: String) {
         self.id = UUID().uuidString
         self.name = name
         self.hungerLevel = 80

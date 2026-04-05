@@ -52,13 +52,15 @@ enum MoodTag: String, Codable, CaseIterable, Identifiable {
 
 @Model
 final class CloudPost {
-    var id: String
-    var authorAlias: String
-    var moodTagRaw: String
-    var text: String
-    var createdAt: Date
-    var npcReplyText: String?
-    var sourceLanguage: String
+    var id: String = UUID().uuidString
+    var authorAlias: String = ""
+    var moodTagRaw: String = "calm"
+    var text: String = ""
+    var createdAt: Date = Date()
+    var npcReplyText: String? = nil
+    var sourceLanguage: String = "en"
+
+    init() {}
 
     init(
         authorAlias: String,

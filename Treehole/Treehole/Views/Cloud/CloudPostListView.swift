@@ -6,22 +6,20 @@ import SwiftData
 struct CloudPostListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyLockManager.self) private var lockManager
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
     @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var viewModel = CloudPostViewModel()
     @State private var economyVM = EconomyViewModel()
     @State private var didCreatePost = false
+    @State private var showMyClouds: Bool = false
 
     // Drift bottle state
     @State private var grabbedPost: RemoteCloudPost? = nil
     @State private var showGrabbedCloud: Bool = false
     @State private var isGrabbing: Bool = false
     @State private var grabError: String? = nil
-
-    // My Clouds
-    @State private var myPosts: [RemoteCloudPost] = []
-    @State private var isLoadingMyPosts: Bool = false
 
     // Floating animation offsets for decorative clouds
     @State private var floatOffsets: [CGFloat] = Array(repeating: 0, count: 6)
@@ -146,51 +144,12 @@ struct CloudPostListView: View {
                                 .transition(.move(edge: .top).combined(with: .opacity))
                         }
 
-                        // My Clouds section
-                        if !myPosts.isEmpty || isLoadingMyPosts {
-                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                                HStack {
-                                    Rectangle()
-                                        .frame(height: 1)
-                                        .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
-                                    HStack(spacing: 4) {
-                                        Text(
-                                            myPosts.isEmpty
-                                                ? L10n.t("My Clouds", "我的云朵")
-                                                : L10n.t("My Clouds (\(myPosts.count))", "我的云朵 (\(myPosts.count))")
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(TreeholeTheme.textLight)
-                                        if isLoadingMyPosts {
-                                            ProgressView()
-                                                .scaleEffect(0.5)
-                                        }
-                                    }
-                                    .fixedSize()
-                                    Rectangle()
-                                        .frame(height: 1)
-                                        .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
-                                }
-                                .padding(.horizontal)
-
-                                LazyVStack(spacing: TreeholeTheme.spacingTight) {
-                                    ForEach(myPosts) { post in
-                                        OwnCloudCard(post: post) {
-                                            Task { await deleteMyPost(id: post.id) }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-
                         // Bottom padding
                         Spacer(minLength: TreeholeTheme.spacingXL)
                     }
                 }
                 .refreshable {
                     await viewModel.fetchPosts()
-                    await loadMyPosts()
                 }
 
                 // viewModel error banner
@@ -217,6 +176,18 @@ struct CloudPostListView: View {
                             .foregroundStyle(TreeholeTheme.coral)
                     }
                 }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showMyClouds = true
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .font(.title3)
+                            .foregroundStyle(TreeholeTheme.softPurple)
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showMyClouds) {
+                MyCloudsView()
             }
             .sheet(isPresented: $showGrabbedCloud) {
                 if let post = grabbedPost {
@@ -234,15 +205,13 @@ struct CloudPostListView: View {
                     }
                     economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
                     try? modelContext.save()
-                    // Reload My Clouds after posting
-                    Task { await loadMyPosts() }
+                    // My Clouds is now a separate page
                 }
             }) {
                 CloudPostCreationView(viewModel: viewModel)
             }
             .task {
                 await viewModel.fetchPosts()
-                await loadMyPosts()
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                 try? modelContext.save()
                 // Start floating animations
@@ -271,26 +240,6 @@ struct CloudPostListView: View {
         isGrabbing = false
     }
 
-    private func loadMyPosts() async {
-        isLoadingMyPosts = true
-        do {
-            myPosts = try await SupabaseService.fetchMyPosts()
-        } catch {
-            // Silently fail — My Clouds is supplementary
-        }
-        isLoadingMyPosts = false
-    }
-
-    private func deleteMyPost(id: String) async {
-        do {
-            try await SupabaseService.deletePost(id: id)
-            myPosts.removeAll { $0.id == id }
-            // Also remove from public feed if present
-            viewModel.remotePosts.removeAll { $0.id == id }
-        } catch {
-            viewModel.errorMessage = error.localizedDescription
-        }
-    }
 }
 
 // MARK: - Own Cloud Card (compact)

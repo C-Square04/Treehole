@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct TreeholeApp: App {
     @State private var appState = AppState()
+    @State private var lockManager = PrivacyLockManager()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -37,6 +38,7 @@ struct TreeholeApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .environment(lockManager)
                 .preferredColorScheme(appState.isDarkMode ? .dark : .light)
                 .onAppear {
                     appState.requestNotificationPermission()

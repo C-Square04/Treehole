@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyLockManager.self) private var lockManager
 
     @State private var versionTapCount: Int = 0
     @State private var versionTapTimer: Timer? = nil
@@ -53,6 +54,20 @@ struct SettingsView: View {
                         "Your alias changes every 7 days to protect your privacy. No one can see your real identity.",
                         "你的别名每7天更换一次以保护你的隐私。没有人能看到你的真实身份。"
                     ))
+                }
+
+                // Privacy Lock
+                Section(L10n.t("Privacy Lock", "隐私锁")) {
+                    @Bindable var lm = lockManager
+                    Toggle(L10n.t("Lock My Clouds", "锁定我的云朵"), isOn: $lm.isCloudLockEnabled)
+                    Toggle(L10n.t("Lock Journal", "锁定日记"), isOn: $lm.isJournalLockEnabled)
+                    if lockManager.isCloudLockEnabled || lockManager.isJournalLockEnabled {
+                        NavigationLink {
+                            PINSettingsView(lockManager: lockManager)
+                        } label: {
+                            Label(L10n.t("Set PIN Code", "设置 PIN 码"), systemImage: "lock.fill")
+                        }
+                    }
                 }
 
                 // Appearance

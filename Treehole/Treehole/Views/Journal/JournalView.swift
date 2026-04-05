@@ -5,6 +5,7 @@ import PhotosUI
 struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyLockManager.self) private var lockManager
     @Query(sort: \JournalEntry.createdAt, order: .reverse) private var entries: [JournalEntry]
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
@@ -16,6 +17,23 @@ struct JournalView: View {
     @State private var draftPhotoData: [Data] = []
 
     var body: some View {
+        Group {
+            if lockManager.isJournalLockEnabled && !lockManager.isJournalUnlocked {
+                NavigationStack {
+                    PrivacyLockView(lockType: .journal, title: L10n.t("Journal", "日记"))
+                        .navigationTitle(L10n.t("Journal", "日记"))
+                }
+            } else {
+                journalContent
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            lockManager.lock()
+        }
+    }
+
+    @ViewBuilder
+    private var journalContent: some View {
         NavigationStack {
             ZStack {
                 TreeholeTheme.warmBackground.ignoresSafeArea()

@@ -510,23 +510,33 @@ struct ICloudSyncStatusView: View {
 
     var body: some View {
         List {
-            Section(L10n.t("Status", "状态")) {
+            Section {
                 HStack {
-                    Image(systemName: appState.isCloudSyncAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    Image(systemName: appState.isCloudSyncAvailable ? "person.icloud.fill" : "icloud.slash")
                         .foregroundStyle(appState.isCloudSyncAvailable ? .green : .red)
-                    Text(appState.isCloudSyncAvailable
-                        ? L10n.t("Connected", "已连接")
-                        : L10n.t("Not Connected", "未连接"))
-                }
-                HStack {
-                    Image(systemName: "clock")
-                        .foregroundStyle(TreeholeTheme.skyBlue)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.t("Last Sync", "最近同步"))
-                        Text(Date(), style: .relative)
+                        Text(L10n.t("iCloud Account", "iCloud 账户"))
+                        Text(appState.iCloudAccountStatus)
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(TreeholeTheme.skyBlue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t("Sync Mode", "同步模式"))
+                        Text(L10n.t("Automatic (when online)", "自动（联网时）"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text(L10n.t("Status", "状态"))
+            } footer: {
+                Text(L10n.t(
+                    "iCloud syncs when online. Data is safe locally even offline.",
+                    "iCloud 联网时自动同步。离线时数据安全保存在本地。"
+                ))
             }
             Section(L10n.t("Synced Data", "同步数据")) {
                 SyncDataRow(icon: "cat.fill", color: TreeholeTheme.coral, title: L10n.t("Pet", "宠物"), detail: L10n.t("Hunger, energy, level, theme", "饥饿、能量、等级、主题"))

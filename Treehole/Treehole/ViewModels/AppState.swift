@@ -51,6 +51,13 @@ final class AppState {
         FileManager.default.ubiquityIdentityToken != nil
     }
 
+    var iCloudAccountStatus: String {
+        if FileManager.default.ubiquityIdentityToken == nil {
+            return L10n.t("Not signed into iCloud", "未登录 iCloud")
+        }
+        return L10n.t("Signed in", "已登录")
+    }
+
     var isAliasExpired: Bool {
         Date() > aliasExpiryDate
     }

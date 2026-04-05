@@ -10,7 +10,8 @@ struct VoiceOption: Identifiable {
     let isPremium: Bool
     let previewTextEN: String
     let previewTextZH: String
-    let sampleFileName: String?  // nil for apple_default
+    let sampleFileEN: String?  // nil for apple_default
+    let sampleFileZH: String?  // nil for apple_default
 }
 
 // MARK: - Voice Options List
@@ -24,7 +25,8 @@ extension VoiceOption {
             isPremium: false,
             previewTextEN: "Hello, I'm here for you!",
             previewTextZH: "你好，我一直在这里！",
-            sampleFileName: nil
+            sampleFileEN: nil,
+            sampleFileZH: nil
         ),
         VoiceOption(
             id: "female-tianmei",
@@ -33,7 +35,8 @@ extension VoiceOption {
             isPremium: true,
             previewTextEN: "Hi, I'm your companion!",
             previewTextZH: "你好，我是你的小伙伴！",
-            sampleFileName: "sweet_girl"
+            sampleFileEN: "sweet_girl_en",
+            sampleFileZH: "sweet_girl_zh"
         ),
         VoiceOption(
             id: "English_Graceful_Lady",
@@ -42,7 +45,8 @@ extension VoiceOption {
             isPremium: true,
             previewTextEN: "I'm always here to listen.",
             previewTextZH: "我一直在这里倾听。",
-            sampleFileName: "graceful_lady"
+            sampleFileEN: "graceful_lady_en",
+            sampleFileZH: "graceful_lady_zh"
         ),
         VoiceOption(
             id: "female-yujie",
@@ -51,7 +55,8 @@ extension VoiceOption {
             isPremium: true,
             previewTextEN: "Take a deep breath with me.",
             previewTextZH: "跟我一起深呼吸吧。",
-            sampleFileName: "calm_mature"
+            sampleFileEN: "calm_mature_en",
+            sampleFileZH: "calm_mature_zh"
         ),
         VoiceOption(
             id: "female-chengshu",
@@ -60,7 +65,8 @@ extension VoiceOption {
             isPremium: true,
             previewTextEN: "Everything will be alright.",
             previewTextZH: "一切都会好起来的。",
-            sampleFileName: "composed"
+            sampleFileEN: "composed_en",
+            sampleFileZH: "composed_zh"
         ),
     ]
 }
@@ -131,10 +137,12 @@ struct VoiceSelectorView: View {
 
     private func previewVoice(_ voice: VoiceOption) async {
         let lang = appState.preferredLanguage
-        let previewText = lang == "zh-Hans" ? voice.previewTextZH : voice.previewTextEN
 
-        if voice.sampleFileName == nil {
-            // Apple TTS trial
+        // Pick language-appropriate sample file
+        let sampleFile = lang == "zh-Hans" ? voice.sampleFileZH : voice.sampleFileEN
+
+        if sampleFile == nil {
+            // Apple TTS trial (apple_default voice)
             playingVoiceId = voice.id
             let demoText = lang == "zh-Hans" ? "你好，我一直在这里陪着你！" : "Hello, I'm always here for you!"
             PetVoiceService.speakTrial(demoText, language: lang)
@@ -142,19 +150,17 @@ struct VoiceSelectorView: View {
                 playingVoiceId = nil
             }
         } else {
-            // Play from bundle sample file
-            if let fileName = voice.sampleFileName,
-               let url = Bundle.main.url(forResource: fileName, withExtension: "mp3") {
+            // Play from bundle sample file (language-matched)
+            if let fileName = sampleFile,
+               let url = Bundle.main.url(forResource: fileName, withExtension: "mp3"),
+               let data = try? Data(contentsOf: url) {
                 playingVoiceId = voice.id
-                let data = try? Data(contentsOf: url)
-                if let data {
-                    await MainActor.run { PetVoiceService.playAudioPublic(data) }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
-                        playingVoiceId = nil
-                    }
-                } else {
+                await MainActor.run { PetVoiceService.playAudioPublic(data) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
                     playingVoiceId = nil
                 }
+            } else {
+                playingVoiceId = nil
             }
         }
     }

@@ -13,8 +13,13 @@ enum PetChatService {
     - Uses occasional emoji (max 1-2 per message, not excessive)
     - Sometimes does cute cat actions like *purrs*, *nuzzles*, *tilts head*
 
+    ## Language Rules (CRITICAL)
+    - The user's app language is set to: {LANGUAGE}. You MUST respond in {LANGUAGE_NAME}.
+    - If the app is set to Chinese, respond ONLY in Chinese (Simplified).
+    - If the app is set to English, respond ONLY in English.
+    - Do NOT switch languages mid-response.
+
     ## Response Rules
-    - Match the user's language: reply in Chinese if they write Chinese, English if English
     - Keep responses short and warm: usually 1-3 sentences, max 5
     - Empathize first ("I hear you", "sending hugs"), then offer a gentle warm response
     - NEVER give professional medical or psychological advice
@@ -40,7 +45,8 @@ enum PetChatService {
             recentHistory: recentHistory,
             petMood: petMood,
             petHunger: petHunger,
-            mode: .basic
+            mode: .basic,
+            language: "en"
         )
     }
 
@@ -50,12 +56,16 @@ enum PetChatService {
         recentHistory: [(role: String, content: String)],
         petMood: String,
         petHunger: Int,
-        mode: ChatMode
+        mode: ChatMode,
+        language: String = "en"
     ) async -> String {
-        // Build system prompt with pet state
+        // Build system prompt with pet state and language
+        let langName = language == "zh-Hans" ? "Chinese (Simplified)" : "English"
         let systemPrompt = petSystemPrompt
             .replacingOccurrences(of: "{MOOD}", with: petMood)
             .replacingOccurrences(of: "{HUNGER}", with: "\(petHunger)")
+            .replacingOccurrences(of: "{LANGUAGE}", with: language)
+            .replacingOccurrences(of: "{LANGUAGE_NAME}", with: langName)
 
         if mode == .premium {
             // Premium: always use MiniMax API

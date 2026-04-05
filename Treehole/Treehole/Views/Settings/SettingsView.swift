@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
@@ -134,8 +135,29 @@ struct SettingsView: View {
                         Toggle(L10n.t("Lock Journal", "锁定日记"), isOn: journalLockBinding)
 
                         if lockManager.biometricType != .none {
-                            @Bindable var lm = lockManager
-                            Toggle(lockManager.biometricType.label, isOn: $lm.isBiometricEnabled)
+                            Toggle(lockManager.biometricType.label, isOn: Binding(
+                                get: { lockManager.isBiometricEnabled },
+                                set: { newValue in
+                                    if newValue {
+                                        // Request FaceID permission when enabling
+                                        Task {
+                                            let context = LAContext()
+                                            do {
+                                                let _ = try await context.evaluatePolicy(
+                                                    .deviceOwnerAuthenticationWithBiometrics,
+                                                    localizedReason: L10n.t("Enable biometric unlock", "启用生物识别解锁")
+                                                )
+                                                lockManager.isBiometricEnabled = true
+                                            } catch {
+                                                // User denied or biometrics unavailable
+                                                lockManager.isBiometricEnabled = false
+                                            }
+                                        }
+                                    } else {
+                                        lockManager.isBiometricEnabled = false
+                                    }
+                                }
+                            ))
                         }
 
                         NavigationLink {

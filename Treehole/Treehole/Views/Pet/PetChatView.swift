@@ -354,13 +354,14 @@ struct PetChatView: View {
             (role: msg.isFromUser ? "user" : "assistant", content: msg.text)
         }
 
-        // Get AI reply using current mode
+        // Get AI reply using current mode and app language
         let reply = await PetChatService.generateReply(
             userMessage: text,
             recentHistory: history,
             petMood: pet.mood.labelEN,
             petHunger: pet.hungerLevel,
-            mode: chatMode
+            mode: chatMode,
+            language: appState.preferredLanguage
         )
 
         isThinking = false

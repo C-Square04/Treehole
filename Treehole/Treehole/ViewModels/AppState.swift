@@ -156,12 +156,16 @@ final class AppState {
         aliasExpiryDate = defaults.object(forKey: "aliasExpiryDate") as? Date ?? Date()
         preferredLanguage = defaults.string(forKey: "preferredLanguage") ?? "en"
         isDarkMode = defaults.bool(forKey: "isDarkMode")
-        colorSchemePreference = defaults.string(forKey: "colorSchemePreference") ?? "system"
         isDeveloperMode = defaults.bool(forKey: "isDeveloperMode")
         appleUserID = defaults.string(forKey: "appleUserID")
         appleUserEmail = defaults.string(forKey: "appleUserEmail")
         isSubscribed = defaults.bool(forKey: "isSubscribed")
         selectedVoiceId = defaults.string(forKey: "selectedVoiceId") ?? "apple_default"
+        // Load colorSchemePreference last, and only if a value was previously saved,
+        // to avoid didSet firing and re-saving "system" before the real value is loaded.
+        if let saved = defaults.string(forKey: "colorSchemePreference") {
+            colorSchemePreference = saved
+        }
     }
 
     // MARK: - Subscriber Bonus

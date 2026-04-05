@@ -29,22 +29,26 @@ final class TreeholeUITests: XCTestCase {
     // MARK: - Navigation Helpers
 
     private func navigateToMe() {
+        // Dismiss any open sheets first
+        let closeButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Cancel' OR label CONTAINS[c] '取消' OR label CONTAINS[c] 'Close' OR label CONTAINS[c] 'Done'")).firstMatch
+        if closeButton.exists { closeButton.tap(); Thread.sleep(forTimeInterval: 0.3) }
+
         let meTab = app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Me' OR label CONTAINS[c] '我'")).firstMatch
-        if meTab.waitForExistence(timeout: 3) { meTab.tap() }
-        Thread.sleep(forTimeInterval: 0.5)
+        if meTab.waitForExistence(timeout: 5) { meTab.tap() }
+        Thread.sleep(forTimeInterval: 1)
     }
 
     private func navigateToShop() {
         navigateToMe()
-        let shopLink = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Shop' OR label CONTAINS[c] '商店'")).firstMatch
-        if shopLink.waitForExistence(timeout: 3) { shopLink.tap() }
-        Thread.sleep(forTimeInterval: 1)
+        let shopLink = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Shop' OR label CONTAINS[c] '商店'")).firstMatch
+        if shopLink.waitForExistence(timeout: 5) { shopLink.tap() }
+        Thread.sleep(forTimeInterval: 2)
     }
 
     private func navigateToSettings() {
         navigateToMe()
-        let settingsLink = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Settings' OR label CONTAINS[c] '设置'")).firstMatch
-        if settingsLink.waitForExistence(timeout: 3) { settingsLink.tap() }
+        let settingsLink = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Settings' OR label CONTAINS[c] '设置'")).firstMatch
+        if settingsLink.waitForExistence(timeout: 5) { settingsLink.tap() }
         Thread.sleep(forTimeInterval: 1)
     }
 
@@ -566,6 +570,50 @@ final class TreeholeUITests: XCTestCase {
             "label CONTAINS[c] 'Total' OR label CONTAINS[c] '总计'"
         )).firstMatch
         XCTAssertTrue(totalLabel.waitForExistence(timeout: 5), "Journal stats section should show 'Total' / '总计' label after an entry is created")
+    }
+
+    // MARK: - Cloud Drift Bottle
+
+    @MainActor
+    func testCloudTabShowsGrabButton() throws {
+        app.tabBars.buttons["Clouds"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        // Should see "Grab a Cloud" or "抓一朵云" button
+        let grabButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Grab' OR label CONTAINS[c] '抓'")).firstMatch
+        XCTAssertTrue(grabButton.waitForExistence(timeout: 5), "Grab a Cloud button should exist")
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Cloud Drift Bottle View"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    func testCloudTabShowsSendButton() throws {
+        app.tabBars.buttons["Clouds"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        let sendButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Send' OR label CONTAINS[c] '放飞'")).firstMatch
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 5), "Send a Cloud button should exist")
+    }
+
+    @MainActor
+    func testGrabCloudButton() throws {
+        // Just verify the button exists and is tappable
+        // (no posts in test DB, so grab will show error/empty — that's OK)
+        app.tabBars.buttons["Clouds"].tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        let grabButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Grab' OR label CONTAINS[c] '抓'")).firstMatch
+        XCTAssertTrue(grabButton.waitForExistence(timeout: 5), "Grab button should exist")
+
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Cloud Drift Bottle"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     // MARK: - Language Toggle

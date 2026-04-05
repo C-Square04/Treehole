@@ -663,6 +663,72 @@ struct AppStateTests {
     }
 }
 
+// MARK: - RemoteComment Tests
+
+@Suite("RemoteCommentTests")
+struct RemoteCommentTests {
+
+    @Test func testRemoteCommentIsOwn() {
+        // A comment whose deviceId matches the current device should be considered own
+        let myDeviceId = SupabaseConfig.deviceId
+        let comment = RemoteComment(
+            id: "test-id-1",
+            postId: "post-1",
+            authorAlias: "Me",
+            text: "My own comment",
+            deviceId: myDeviceId,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+        #expect(comment.isOwn == true)
+    }
+
+    @Test func testRemoteCommentNotOwn() {
+        // A comment with a different deviceId should not be considered own
+        let otherDeviceId = "other-device-\(UUID().uuidString)"
+        let comment = RemoteComment(
+            id: "test-id-2",
+            postId: "post-1",
+            authorAlias: "Someone Else",
+            text: "Their comment",
+            deviceId: otherDeviceId,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+        #expect(comment.isOwn == false)
+    }
+}
+
+// MARK: - ContentModerator Comment Tests
+
+@Suite("ContentModeratorCommentTests")
+struct ContentModeratorCommentTests {
+
+    @Test func testNormalCommentAllowed() {
+        let result = ContentModerator.check("Hang in there, friend!")
+        #expect(result.isAllowed == true)
+    }
+
+    @Test func testCommentWithThreatBlocked() {
+        let result = ContentModerator.check("I will kill you")
+        #expect(result.isAllowed == false)
+    }
+
+    @Test func testCommentWithLinkBlocked() {
+        let result = ContentModerator.check("Check https://spam.com")
+        #expect(result.isAllowed == false)
+    }
+
+    @Test func testEmptyCommentAllowed() {
+        // Empty check is handled by UI, not moderator
+        let result = ContentModerator.check("  ")
+        #expect(result.isAllowed == true)
+    }
+
+    @Test func testChineseCommentAllowed() {
+        let result = ContentModerator.check("加油！你不是一个人")
+        #expect(result.isAllowed == true)
+    }
+}
+
 // MARK: - Content Moderation Tests
 
 @Suite("ContentModeratorTests")

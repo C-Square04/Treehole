@@ -250,6 +250,147 @@ enum SupabaseService {
         }
         return language == "zh-Hans" ? template.replyZh : template.replyEn
     }
+
+    // MARK: - Fetch a random post (not from this device)
+
+    static func fetchRandomPost() async throws -> RemoteCloudPost? {
+        let urlString = "\(SupabaseConfig.restURL)/rpc/get_random_post"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct RandomPostRequest: Codable {
+            let requestingDeviceId: String
+            enum CodingKeys: String, CodingKey { case requestingDeviceId = "requesting_device_id" }
+        }
+        request.httpBody = try JSONEncoder().encode(RandomPostRequest(requestingDeviceId: SupabaseConfig.deviceId))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+
+        // The RPC may return a single object or an array with one element
+        if let single = try? JSONDecoder().decode(RemoteCloudPost.self, from: data) {
+            return single
+        }
+        let posts = try JSONDecoder().decode([RemoteCloudPost].self, from: data)
+        return posts.first
+    }
+
+    // MARK: - Fetch comments for a post
+
+    static func fetchComments(postId: String) async throws -> [RemoteComment] {
+        let urlString = "\(SupabaseConfig.restURL)/cloud_comments?post_id=eq.\(postId)&order=created_at.asc"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw SupabaseError.serverError
+        }
+
+        return try JSONDecoder().decode([RemoteComment].self, from: data)
+    }
+
+    // MARK: - Add a comment to a post
+
+    static func addComment(postId: String, authorAlias: String, text: String) async throws -> RemoteComment {
+        let urlString = "\(SupabaseConfig.restURL)/cloud_comments"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        struct AddCommentRequest: Codable {
+            let postId: String
+            let authorAlias: String
+            let text: String
+            let deviceId: String
+            enum CodingKeys: String, CodingKey {
+                case postId = "post_id"
+                case authorAlias = "author_alias"
+                case text
+                case deviceId = "device_id"
+            }
+        }
+
+        let body = AddCommentRequest(
+            postId: postId,
+            authorAlias: authorAlias,
+            text: text,
+            deviceId: SupabaseConfig.deviceId
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("return=representation", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+
+        let comments = try JSONDecoder().decode([RemoteComment].self, from: data)
+        guard let created = comments.first else { throw SupabaseError.noData }
+        return created
+    }
+
+    // MARK: - Delete own comment
+
+    static func deleteComment(id: String) async throws {
+        let urlString = "\(SupabaseConfig.restURL)/cloud_comments?id=eq.\(id)"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+    }
+}
+
+// MARK: - Remote Comment (JSON DTO)
+
+struct RemoteComment: Codable, Identifiable {
+    let id: String
+    let postId: String
+    let authorAlias: String
+    let text: String
+    let deviceId: String
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case postId = "post_id"
+        case authorAlias = "author_alias"
+        case text
+        case deviceId = "device_id"
+        case createdAt = "created_at"
+    }
+
+    var isOwn: Bool {
+        deviceId == SupabaseConfig.deviceId
+    }
+
+    var date: Date {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: createdAt) ?? Date()
+    }
 }
 
 // MARK: - Content Moderation (Client-side pre-check)

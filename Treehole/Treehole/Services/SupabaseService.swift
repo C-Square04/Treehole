@@ -289,21 +289,38 @@ enum SupabaseService {
 
         struct RandomPostRequest: Codable {
             let requestingDeviceId: String
-            enum CodingKeys: String, CodingKey { case requestingDeviceId = "requesting_device_id" }
+            let requestingAppleUserId: String?
+            enum CodingKeys: String, CodingKey {
+                case requestingDeviceId = "requesting_device_id"
+                case requestingAppleUserId = "requesting_apple_user_id"
+            }
         }
-        request.httpBody = try JSONEncoder().encode(RandomPostRequest(requestingDeviceId: SupabaseConfig.deviceId))
+        request.httpBody = try JSONEncoder().encode(
+            RandomPostRequest(
+                requestingDeviceId: SupabaseConfig.deviceId,
+                requestingAppleUserId: SupabaseConfig.appleUserID
+            )
+        )
 
         let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200...204).contains(statusCode) else {
+            throw SupabaseError.serverError(statusCode, nil)
         }
 
-        // The RPC may return a single object or an array with one element
+        // Empty response = no posts available
+        if data.isEmpty || String(data: data, encoding: .utf8) == "[]" || String(data: data, encoding: .utf8) == "null" {
+            return nil
+        }
+
+        // The RPC may return a single object or an array
         if let single = try? JSONDecoder().decode(RemoteCloudPost.self, from: data) {
             return single
         }
-        let posts = try JSONDecoder().decode([RemoteCloudPost].self, from: data)
-        return posts.first
+        if let posts = try? JSONDecoder().decode([RemoteCloudPost].self, from: data) {
+            return posts.first
+        }
+        return nil
     }
 
     // MARK: - Fetch comments for a post

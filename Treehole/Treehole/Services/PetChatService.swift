@@ -60,7 +60,10 @@ enum PetChatService {
         history: [(role: String, content: String)]
     ) async -> String? {
         let model = SystemLanguageModel.default
-        guard model.availability == .available else { return nil }
+        guard model.availability == .available else {
+            print("[PetChat] Foundation Models not available: \(model.availability)")
+            return nil
+        }
 
         do {
             let session = LanguageModelSession(instructions: systemPrompt)
@@ -116,7 +119,10 @@ enum PetChatService {
         request.timeoutInterval = 30
 
         do {
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            print("[PetChat] MiniMax response status: \(statusCode)")
+
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let choices = json["choices"] as? [[String: Any]],
                let first = choices.first,
@@ -125,10 +131,13 @@ enum PetChatService {
                 // Clean up think tags
                 content = content.replacingOccurrences(of: "<think>[\\s\\S]*?</think>", with: "", options: .regularExpression)
                 let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                print("[PetChat] MiniMax reply: \(trimmed.prefix(50))...")
                 return trimmed.isEmpty ? nil : trimmed
+            } else {
+                print("[PetChat] MiniMax parse failed. Raw: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "nil")")
             }
         } catch {
-            print("MiniMax API error: \(error)")
+            print("[PetChat] MiniMax API error: \(error)")
         }
         return nil
     }

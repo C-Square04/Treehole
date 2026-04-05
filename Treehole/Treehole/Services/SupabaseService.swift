@@ -114,18 +114,43 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
+        print("[API] fetchPosts: \(urlString)")
+
         var lastError: Error = SupabaseError.serverError(nil, nil)
 
         for attempt in 0..<2 {
-            if attempt > 0 { try? await Task.sleep(for: .seconds(1)) }
+            if attempt > 0 {
+                print("[API] fetchPosts: retrying (attempt \(attempt + 1))...")
+                try? await Task.sleep(for: .seconds(1))
+            }
             do {
                 let (data, response) = try await session.data(for: request)
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if (200..<300).contains(statusCode) {
-                    return try JSONDecoder().decode([RemoteCloudPost].self, from: data)
+                let responseURL = (response as? HTTPURLResponse)?.url?.absoluteString ?? "nil"
+                print("[API] fetchPosts: status=\(statusCode) url=\(responseURL) bytes=\(data.count)")
+
+                if statusCode >= 300 && statusCode < 400 {
+                    // Log redirect details
+                    let body = String(data: data, encoding: .utf8) ?? "nil"
+                    print("[API] fetchPosts: REDIRECT \(statusCode) body=\(body.prefix(200))")
                 }
-                lastError = SupabaseError.serverError(statusCode, nil)
+
+                if (200..<300).contains(statusCode) {
+                    do {
+                        let posts = try JSONDecoder().decode([RemoteCloudPost].self, from: data)
+                        print("[API] fetchPosts: decoded \(posts.count) posts")
+                        return posts
+                    } catch {
+                        print("[API] fetchPosts: DECODE ERROR: \(error)")
+                        let body = String(data: data, encoding: .utf8) ?? "nil"
+                        print("[API] fetchPosts: raw body=\(body.prefix(300))")
+                        lastError = error
+                    }
+                } else {
+                    lastError = SupabaseError.serverError(statusCode, nil)
+                }
             } catch {
+                print("[API] fetchPosts: NETWORK ERROR: \(error)")
                 lastError = error
             }
         }
@@ -313,8 +338,11 @@ enum SupabaseService {
             )
         )
 
+        print("[API] fetchRandomPost: POST \(urlString)")
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let body = String(data: data, encoding: .utf8) ?? "nil"
+        print("[API] fetchRandomPost: status=\(statusCode) bytes=\(data.count) body=\(body.prefix(200))")
         guard (200...204).contains(statusCode) else {
             throw SupabaseError.serverError(statusCode, nil)
         }

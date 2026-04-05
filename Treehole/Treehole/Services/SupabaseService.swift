@@ -368,6 +368,136 @@ enum SupabaseService {
             throw SupabaseError.serverError
         }
     }
+
+    // MARK: - Fetch own posts
+
+    static func fetchMyPosts() async throws -> [RemoteCloudPost] {
+        let urlString = "\(SupabaseConfig.restURL)/rpc/get_my_posts"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        struct MyPostsRequest: Codable {
+            let requestingDeviceId: String
+            enum CodingKeys: String, CodingKey { case requestingDeviceId = "requesting_device_id" }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(MyPostsRequest(requestingDeviceId: SupabaseConfig.deviceId))
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+
+        return try JSONDecoder().decode([RemoteCloudPost].self, from: data)
+    }
+
+    // MARK: - Add reaction (upsert, ignore duplicates)
+
+    static func addReaction(postId: String, type: String) async throws {
+        let urlString = "\(SupabaseConfig.restURL)/cloud_reactions"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        struct AddReactionRequest: Codable {
+            let postId: String
+            let reactionType: String
+            let deviceId: String
+            enum CodingKeys: String, CodingKey {
+                case postId = "post_id"
+                case reactionType = "reaction_type"
+                case deviceId = "device_id"
+            }
+        }
+
+        let body = AddReactionRequest(
+            postId: postId,
+            reactionType: type,
+            deviceId: SupabaseConfig.deviceId
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+    }
+
+    // MARK: - Remove reaction
+
+    static func removeReaction(postId: String, type: String) async throws {
+        let encodedType = type.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? type
+        let urlString = "\(SupabaseConfig.restURL)/cloud_reactions?post_id=eq.\(postId)&reaction_type=eq.\(encodedType)&device_id=eq.\(SupabaseConfig.deviceId)"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError
+        }
+    }
+
+    // MARK: - Fetch reaction counts for a post
+
+    static func fetchReactionCounts(postId: String) async throws -> ReactionCounts {
+        let urlString = "\(SupabaseConfig.restURL)/post_reaction_counts?post_id=eq.\(postId)"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw SupabaseError.serverError
+        }
+
+        let counts = try JSONDecoder().decode([ReactionCounts].self, from: data)
+        return counts.first ?? ReactionCounts(
+            postId: postId,
+            breezeCount: 0,
+            hugCount: 0,
+            starlightCount: 0,
+            totalCount: 0
+        )
+    }
+
+    // MARK: - Fetch current device's reactions on a post
+
+    static func fetchMyReactions(postId: String) async throws -> Set<String> {
+        let urlString = "\(SupabaseConfig.restURL)/cloud_reactions?post_id=eq.\(postId)&device_id=eq.\(SupabaseConfig.deviceId)&select=reaction_type"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw SupabaseError.serverError
+        }
+
+        struct ReactionTypeRow: Codable {
+            let reactionType: String
+            enum CodingKeys: String, CodingKey { case reactionType = "reaction_type" }
+        }
+
+        let rows = try JSONDecoder().decode([ReactionTypeRow].self, from: data)
+        return Set(rows.map { $0.reactionType })
+    }
 }
 
 // MARK: - Remote Comment (JSON DTO)
@@ -397,6 +527,23 @@ struct RemoteComment: Codable, Identifiable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: createdAt) ?? Date()
+    }
+}
+
+// MARK: - Reaction Counts (JSON DTO)
+
+struct ReactionCounts: Codable {
+    let postId: String
+    let breezeCount: Int
+    let hugCount: Int
+    let starlightCount: Int
+    let totalCount: Int
+    enum CodingKeys: String, CodingKey {
+        case postId = "post_id"
+        case breezeCount = "breeze_count"
+        case hugCount = "hug_count"
+        case starlightCount = "starlight_count"
+        case totalCount = "total_count"
     }
 }
 

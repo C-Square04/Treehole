@@ -19,6 +19,10 @@ struct CloudPostListView: View {
     @State private var isGrabbing: Bool = false
     @State private var grabError: String? = nil
 
+    // My Clouds
+    @State private var myPosts: [RemoteCloudPost] = []
+    @State private var isLoadingMyPosts: Bool = false
+
     // Floating animation offsets for decorative clouds
     @State private var floatOffsets: [CGFloat] = Array(repeating: 0, count: 6)
 
@@ -30,10 +34,6 @@ struct CloudPostListView: View {
         (-140, 100, 30),
         (70, 90, 48)
     ]
-
-    var ownPosts: [RemoteCloudPost] {
-        viewModel.remotePosts.filter { $0.isOwn }
-    }
 
     var body: some View {
         NavigationStack {
@@ -147,16 +147,26 @@ struct CloudPostListView: View {
                         }
 
                         // My Clouds section
-                        if !ownPosts.isEmpty {
+                        if !myPosts.isEmpty || isLoadingMyPosts {
                             VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
                                 HStack {
                                     Rectangle()
                                         .frame(height: 1)
                                         .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
-                                    Text(L10n.t("My Clouds", "我的云朵"))
+                                    HStack(spacing: 4) {
+                                        Text(
+                                            myPosts.isEmpty
+                                                ? L10n.t("My Clouds", "我的云朵")
+                                                : L10n.t("My Clouds (\(myPosts.count))", "我的云朵 (\(myPosts.count))")
+                                        )
                                         .font(.caption)
                                         .foregroundStyle(TreeholeTheme.textLight)
-                                        .fixedSize()
+                                        if isLoadingMyPosts {
+                                            ProgressView()
+                                                .scaleEffect(0.5)
+                                        }
+                                    }
+                                    .fixedSize()
                                     Rectangle()
                                         .frame(height: 1)
                                         .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
@@ -164,9 +174,9 @@ struct CloudPostListView: View {
                                 .padding(.horizontal)
 
                                 LazyVStack(spacing: TreeholeTheme.spacingTight) {
-                                    ForEach(ownPosts) { post in
+                                    ForEach(myPosts) { post in
                                         OwnCloudCard(post: post) {
-                                            Task { await viewModel.deletePost(id: post.id) }
+                                            Task { await deleteMyPost(id: post.id) }
                                         }
                                     }
                                 }
@@ -180,6 +190,7 @@ struct CloudPostListView: View {
                 }
                 .refreshable {
                     await viewModel.fetchPosts()
+                    await loadMyPosts()
                 }
 
                 // viewModel error banner
@@ -223,12 +234,15 @@ struct CloudPostListView: View {
                     }
                     economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
                     try? modelContext.save()
+                    // Reload My Clouds after posting
+                    Task { await loadMyPosts() }
                 }
             }) {
                 CloudPostCreationView(viewModel: viewModel)
             }
             .task {
                 await viewModel.fetchPosts()
+                await loadMyPosts()
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                 try? modelContext.save()
                 // Start floating animations
@@ -239,7 +253,7 @@ struct CloudPostListView: View {
         }
     }
 
-    // MARK: - Grab Cloud Action
+    // MARK: - Actions
 
     private func grabCloud() async {
         isGrabbing = true
@@ -256,6 +270,27 @@ struct CloudPostListView: View {
         }
         isGrabbing = false
     }
+
+    private func loadMyPosts() async {
+        isLoadingMyPosts = true
+        do {
+            myPosts = try await SupabaseService.fetchMyPosts()
+        } catch {
+            // Silently fail — My Clouds is supplementary
+        }
+        isLoadingMyPosts = false
+    }
+
+    private func deleteMyPost(id: String) async {
+        do {
+            try await SupabaseService.deletePost(id: id)
+            myPosts.removeAll { $0.id == id }
+            // Also remove from public feed if present
+            viewModel.remotePosts.removeAll { $0.id == id }
+        } catch {
+            viewModel.errorMessage = error.localizedDescription
+        }
+    }
 }
 
 // MARK: - Own Cloud Card (compact)
@@ -264,6 +299,7 @@ private struct OwnCloudCard: View {
     let post: RemoteCloudPost
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
+    @State private var reactionCounts: ReactionCounts? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: TreeholeTheme.spacingSmall) {
@@ -291,6 +327,33 @@ private struct OwnCloudCard: View {
                         .foregroundStyle(TreeholeTheme.softPurple)
                     }
                 }
+
+                // Reaction counts row
+                if let counts = reactionCounts, counts.totalCount > 0 {
+                    HStack(spacing: TreeholeTheme.spacingTight) {
+                        if counts.breezeCount > 0 {
+                            HStack(spacing: 2) {
+                                Text("🌬️").font(.caption2)
+                                Text("\(counts.breezeCount)").font(.caption2)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+                        }
+                        if counts.hugCount > 0 {
+                            HStack(spacing: 2) {
+                                Text("🤗").font(.caption2)
+                                Text("\(counts.hugCount)").font(.caption2)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+                        }
+                        if counts.starlightCount > 0 {
+                            HStack(spacing: 2) {
+                                Text("✨").font(.caption2)
+                                Text("\(counts.starlightCount)").font(.caption2)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer()
@@ -311,6 +374,9 @@ private struct OwnCloudCard: View {
                 onDelete()
             }
         }
+        .task {
+            reactionCounts = try? await SupabaseService.fetchReactionCounts(postId: post.id)
+        }
     }
 }
 
@@ -328,6 +394,15 @@ struct GrabbedCloudView: View {
     @State private var isPostingComment: Bool = false
     @State private var commentError: String? = nil
     @State private var isGrabbingAnother: Bool = false
+
+    // Reactions
+    @State private var reactionCounts: ReactionCounts? = nil
+    @State private var myReactions: Set<String> = []
+
+    // Visual effects
+    @State private var showBreezeEffect = false
+    @State private var showHugEffect = false
+    @State private var showStarlightEffect = false
 
     var body: some View {
         NavigationStack {
@@ -390,6 +465,19 @@ struct GrabbedCloudView: View {
                             }
                             .accentCard(TreeholeTheme.warmGold)
                         }
+
+                        // Reaction bar
+                        ReactionBar(
+                            postId: post.id,
+                            reactionCounts: reactionCounts,
+                            myReactions: $myReactions,
+                            showBreezeEffect: $showBreezeEffect,
+                            showHugEffect: $showHugEffect,
+                            showStarlightEffect: $showStarlightEffect,
+                            onCountsUpdated: { updated in
+                                reactionCounts = updated
+                            }
+                        )
 
                         // Comments section
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
@@ -493,6 +581,13 @@ struct GrabbedCloudView: View {
                     }
                     .padding()
                 }
+
+                // Reaction visual effects overlay
+                ReactionEffectsOverlay(
+                    showBreezeEffect: showBreezeEffect,
+                    showHugEffect: showHugEffect,
+                    showStarlightEffect: showStarlightEffect
+                )
             }
             .navigationTitle(L10n.t("A Cloud from...", "一朵来自...的云"))
             .navigationBarTitleDisplayMode(.inline)
@@ -508,6 +603,7 @@ struct GrabbedCloudView: View {
             }
             .task {
                 await loadComments()
+                await loadReactions()
             }
         }
     }
@@ -522,6 +618,13 @@ struct GrabbedCloudView: View {
             // Silently fail — comments are supplementary
         }
         isLoadingComments = false
+    }
+
+    private func loadReactions() async {
+        async let countsTask = SupabaseService.fetchReactionCounts(postId: post.id)
+        async let myReactionsTask = SupabaseService.fetchMyReactions(postId: post.id)
+        reactionCounts = try? await countsTask
+        myReactions = (try? await myReactionsTask) ?? []
     }
 
     private func postComment() async {

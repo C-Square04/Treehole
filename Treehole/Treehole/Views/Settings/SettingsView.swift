@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
 
+    @State private var versionTapCount: Int = 0
+    @State private var versionTapTimer: Timer? = nil
+
     var body: some View {
         @Bindable var state = appState
 
@@ -70,6 +73,19 @@ struct SettingsView: View {
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                             .foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        versionTapCount += 1
+                        versionTapTimer?.invalidate()
+                        if versionTapCount >= 5 {
+                            versionTapCount = 0
+                            appState.isDeveloperMode.toggle()
+                        } else {
+                            versionTapTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { _ in
+                                versionTapCount = 0
+                            }
+                        }
+                    }
                     HStack {
                         Text("Treehole")
                         Spacer()
@@ -81,6 +97,21 @@ struct SettingsView: View {
                         PrivacyPolicyView()
                     } label: {
                         Label(L10n.t("Privacy Policy", "隐私政策"), systemImage: "lock.shield")
+                    }
+                }
+
+                // Developer Mode (visible only when enabled)
+                if appState.isDeveloperMode {
+                    Section {
+                        NavigationLink {
+                            DeveloperSettingsView()
+                        } label: {
+                            Label(L10n.t("Developer Settings", "开发者设置"), systemImage: "wrench.and.screwdriver")
+                                .foregroundStyle(.orange)
+                        }
+                    } header: {
+                        Label(L10n.t("Developer", "开发者"), systemImage: "hammer")
+                            .foregroundStyle(.orange)
                     }
                 }
 

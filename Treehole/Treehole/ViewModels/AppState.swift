@@ -18,6 +18,9 @@ final class AppState {
     var isDarkMode: Bool = false {
         didSet { saveState() }
     }
+    var isDeveloperMode: Bool = false {
+        didSet { saveState() }
+    }
 
     // MARK: - Alias Name Pool
 
@@ -99,6 +102,7 @@ final class AppState {
         defaults.set(aliasExpiryDate, forKey: "aliasExpiryDate")
         defaults.set(preferredLanguage, forKey: "preferredLanguage")
         defaults.set(isDarkMode, forKey: "isDarkMode")
+        defaults.set(isDeveloperMode, forKey: "isDeveloperMode")
     }
 
     private func loadState() {
@@ -111,6 +115,7 @@ final class AppState {
         aliasExpiryDate = defaults.object(forKey: "aliasExpiryDate") as? Date ?? Date()
         preferredLanguage = defaults.string(forKey: "preferredLanguage") ?? "en"
         isDarkMode = defaults.bool(forKey: "isDarkMode")
+        isDeveloperMode = defaults.bool(forKey: "isDeveloperMode")
     }
 
     // MARK: - Notifications

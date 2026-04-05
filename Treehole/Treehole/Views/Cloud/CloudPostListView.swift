@@ -11,7 +11,7 @@ struct CloudPostListView: View {
     @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var viewModel = CloudPostViewModel()
     @State private var economyVM = EconomyViewModel()
-    @State private var previousPostCount: Int = 0
+    @State private var didCreatePost = false
 
     // Drift bottle state
     @State private var grabbedPost: RemoteCloudPost? = nil
@@ -215,7 +215,8 @@ struct CloudPostListView: View {
                 }
             }
             .sheet(isPresented: $viewModel.showCreation, onDismiss: {
-                if viewModel.remotePosts.count > previousPostCount {
+                if viewModel.didCreatePost {
+                    viewModel.didCreatePost = false
                     let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                     if let task = dailyTasks.first(where: { $0.type == .post && !$0.isCompleted }) {
                         economyVM.completeTask(task, economy: economy)
@@ -223,14 +224,12 @@ struct CloudPostListView: View {
                     economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
                     try? modelContext.save()
                 }
-                previousPostCount = viewModel.remotePosts.count
             }) {
                 CloudPostCreationView(viewModel: viewModel)
             }
             .task {
                 await viewModel.fetchPosts()
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
-                previousPostCount = viewModel.remotePosts.count
                 try? modelContext.save()
                 // Start floating animations
                 for i in 0..<6 {

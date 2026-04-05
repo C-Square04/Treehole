@@ -436,9 +436,21 @@ private struct JournalEntryEditor: View {
         for item in items {
             guard draftPhotoData.count < maxPhotos else { break }
             if let data = try? await item.loadTransferable(type: Data.self),
-               let uiImage = UIImage(data: data),
-               let jpegData = uiImage.jpegData(compressionQuality: 0.7) {
-                draftPhotoData.append(jpegData)
+               let uiImage = UIImage(data: data) {
+                // Resize if too large
+                let maxDimension: CGFloat = 1024
+                let resized: UIImage
+                if max(uiImage.size.width, uiImage.size.height) > maxDimension {
+                    let scale = maxDimension / max(uiImage.size.width, uiImage.size.height)
+                    let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                    let renderer = UIGraphicsImageRenderer(size: newSize)
+                    resized = renderer.image { _ in uiImage.draw(in: CGRect(origin: .zero, size: newSize)) }
+                } else {
+                    resized = uiImage
+                }
+                if let jpegData = resized.jpegData(compressionQuality: 0.7), jpegData.count <= 2_000_000 {
+                    draftPhotoData.append(jpegData)
+                }
             }
         }
         selectedItems = []

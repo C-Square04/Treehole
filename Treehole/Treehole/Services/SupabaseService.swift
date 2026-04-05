@@ -79,6 +79,13 @@ struct CreatePostRequest: Codable {
 
 enum SupabaseService {
 
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        return URLSession(configuration: config)
+    }()
+
     // MARK: - Fetch public feed (newest first, paginated)
 
     static func fetchPosts(limit: Int = 50, offset: Int = 0) async throws -> [RemoteCloudPost] {
@@ -89,7 +96,7 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw SupabaseError.serverError
         }
@@ -121,7 +128,7 @@ enum SupabaseService {
         request.addValue("return=representation", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError
         }
@@ -143,7 +150,7 @@ enum SupabaseService {
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError
         }
@@ -167,7 +174,7 @@ enum SupabaseService {
         }
         request.httpBody = try JSONEncoder().encode(UpdateBody(npcReplyText: npcReply))
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError
         }
@@ -187,7 +194,7 @@ enum SupabaseService {
         struct ModerationRequest: Codable { let text: String; let language: String }
         request.httpBody = try JSONEncoder().encode(ModerationRequest(text: text, language: language))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             // AI unavailable → allow (fail open, DB trigger is backup)
             return (true, nil)
@@ -212,7 +219,7 @@ enum SupabaseService {
         struct NPCRequest: Codable { let text: String; let mood: String; let language: String }
         request.httpBody = try JSONEncoder().encode(NPCRequest(text: text, mood: mood, language: language))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             // Fallback to template
             return try await fetchNPCReplyTemplate(mood: mood, language: language)
@@ -233,7 +240,7 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await session.data(for: request)
 
         struct NPCTemplate: Codable {
             let replyEn: String
@@ -269,7 +276,7 @@ enum SupabaseService {
         }
         request.httpBody = try JSONEncoder().encode(RandomPostRequest(requestingDeviceId: SupabaseConfig.deviceId))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError
         }
@@ -292,7 +299,7 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw SupabaseError.serverError
         }
@@ -334,7 +341,7 @@ enum SupabaseService {
         request.addValue("return=representation", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError
         }
@@ -356,7 +363,7 @@ enum SupabaseService {
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError
         }
@@ -423,7 +430,7 @@ enum ContentModerator {
         // 2. Hate speech / slurs
         let hateWords = ["nigger", "chink", "faggot", "kike", "wetback"]
         for word in hateWords {
-            if lower.contains(word) {
+            if lower.range(of: "\\b\(word)", options: .regularExpression) != nil {
                 return Result(isAllowed: false, reason: L10n.t(
                     "Hate speech is not allowed in this safe space.",
                     "这个安全空间不允许仇恨言论。"

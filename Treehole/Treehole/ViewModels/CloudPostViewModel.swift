@@ -13,6 +13,8 @@ final class CloudPostViewModel {
     var isLoading: Bool = false
     var errorMessage: String?
 
+    var didCreatePost: Bool = false
+
     var characterCount: Int { draftText.count }
     var isValid: Bool { !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draftText.count <= 500 }
 
@@ -59,6 +61,7 @@ final class CloudPostViewModel {
                 language: language
             )
             remotePosts.insert(newPost, at: 0)
+            didCreatePost = true
 
             // Step 2: AI moderation + NPC reply in background (non-blocking)
             let postId = newPost.id

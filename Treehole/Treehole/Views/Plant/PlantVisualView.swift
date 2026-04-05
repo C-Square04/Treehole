@@ -66,7 +66,7 @@ private struct SeedView: View {
                         .scaleEffect(isGrowing ? 1.1 : 1.0)
                 }
             }
-            Text("Seed").font(.caption).foregroundStyle(.secondary)
+            Text(L10n.t("Seed", "种子")).font(.caption).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -96,7 +96,7 @@ private struct SproutView: View {
                 }
                 .offset(y: -20)
             }
-            Text("Sprout").font(.caption).foregroundStyle(.secondary)
+            Text(L10n.t("Sprout", "幼苗")).font(.caption).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -135,7 +135,7 @@ private struct GrowingPlantView: View {
                 }
                 .offset(y: -20)
             }
-            Text("Growing").font(.caption).foregroundStyle(.secondary)
+            Text(L10n.t("Growing", "成长中")).font(.caption).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -177,7 +177,7 @@ private struct BloomingPlantView: View {
                 }
                 .offset(y: -30)
             }
-            Text("Blooming").font(.caption).foregroundStyle(.secondary)
+            Text(L10n.t("Blooming", "开花中")).font(.caption).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -219,7 +219,7 @@ private struct MaturePlantView: View {
                 }
                 .offset(y: -40)
             }
-            Text("Mature").font(.caption).foregroundStyle(.secondary)
+            Text(L10n.t("Mature", "成熟")).font(.caption).foregroundStyle(.secondary)
             Spacer()
         }
     }

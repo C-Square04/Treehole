@@ -84,6 +84,7 @@ final class Pet {
     var hungerLevel: Int
     var moodRaw: String
     var lastFedAt: Date?
+    var lastHungerUpdateAt: Date?
     var createdAt: Date
 
     // Phase 2: energy, level, XP, theme
@@ -135,12 +136,13 @@ final class Pet {
     }
 
     func updateHunger() {
-        guard let lastFed = lastFedAt else { return }
-        let hoursSinceFeeding = Date().timeIntervalSince(lastFed) / 3600
-        hungerLevel = max(0, hungerLevel - Int(hoursSinceFeeding))
-        if hungerLevel < 25 {
-            mood = .sad
-        }
+        let referenceDate = lastHungerUpdateAt ?? lastFedAt ?? createdAt
+        let hoursSince = Date().timeIntervalSince(referenceDate) / 3600
+        guard hoursSince >= 0.1 else { return }  // Skip if less than 6 minutes
+        let decay = Int(hoursSince)
+        hungerLevel = max(0, hungerLevel - decay)
+        lastHungerUpdateAt = Date()
+        if hungerLevel < 25 { mood = .sad }
     }
 
     func rest() {

@@ -6,6 +6,42 @@ struct SettingsView: View {
 
     @State private var versionTapCount: Int = 0
     @State private var versionTapTimer: Timer? = nil
+    @State private var showPasscodeSetup: Bool = false
+    @State private var showRemovePasscode: Bool = false
+    @State private var showCloudLockSetup: Bool = false
+    @State private var showJournalLockSetup: Bool = false
+    @State private var removePasscodeDigits: [Int] = []
+
+    // Binding helpers that present setup if no passcode yet
+    private var cloudLockBinding: Binding<Bool> {
+        Binding(
+            get: { lockManager.isCloudLockEnabled },
+            set: { newValue in
+                if newValue && lockManager.needsPasscodeSetup {
+                    showCloudLockSetup = true
+                } else if newValue {
+                    lockManager.enableLock(for: .cloud)
+                } else {
+                    lockManager.disableLock(for: .cloud)
+                }
+            }
+        )
+    }
+
+    private var journalLockBinding: Binding<Bool> {
+        Binding(
+            get: { lockManager.isJournalLockEnabled },
+            set: { newValue in
+                if newValue && lockManager.needsPasscodeSetup {
+                    showJournalLockSetup = true
+                } else if newValue {
+                    lockManager.enableLock(for: .journal)
+                } else {
+                    lockManager.disableLock(for: .journal)
+                }
+            }
+        )
+    }
 
     var body: some View {
         @Bindable var state = appState
@@ -90,14 +126,32 @@ struct SettingsView: View {
 
                 // Privacy Lock
                 Section(L10n.t("Privacy Lock", "隐私锁")) {
-                    @Bindable var lm = lockManager
-                    Toggle(L10n.t("Lock My Clouds", "锁定我的云朵"), isOn: $lm.isCloudLockEnabled)
-                    Toggle(L10n.t("Lock Journal", "锁定日记"), isOn: $lm.isJournalLockEnabled)
-                    if lockManager.isCloudLockEnabled || lockManager.isJournalLockEnabled {
+                    if lockManager.hasPasscode {
+                        Toggle(L10n.t("Lock My Clouds", "锁定我的云朵"), isOn: cloudLockBinding)
+                        Toggle(L10n.t("Lock Journal", "锁定日记"), isOn: journalLockBinding)
+
+                        if lockManager.biometricType != .none {
+                            @Bindable var lm = lockManager
+                            Toggle(lockManager.biometricType.label, isOn: $lm.isBiometricEnabled)
+                        }
+
                         NavigationLink {
-                            PINSettingsView(lockManager: lockManager)
+                            PasscodeChangeView()
+                                .environment(lockManager)
                         } label: {
-                            Label(L10n.t("Set PIN Code", "设置 PIN 码"), systemImage: "lock.fill")
+                            Label(L10n.t("Change Passcode", "更改密码"), systemImage: "lock.rotation")
+                        }
+
+                        Button(role: .destructive) {
+                            showRemovePasscode = true
+                        } label: {
+                            Label(L10n.t("Remove Passcode", "移除密码"), systemImage: "lock.slash")
+                        }
+                    } else {
+                        Button {
+                            showPasscodeSetup = true
+                        } label: {
+                            Label(L10n.t("Set Up Passcode", "设置密码"), systemImage: "lock.fill")
                         }
                     }
                 }
@@ -168,7 +222,49 @@ struct SettingsView: View {
             .sheet(isPresented: $state.showLoginPrompt) {
                 LoginPromptView()
             }
+            .sheet(isPresented: $showPasscodeSetup) {
+                NavigationStack {
+                    PasscodeSetupView()
+                        .environment(lockManager)
+                }
+            }
+            .sheet(isPresented: $showCloudLockSetup) {
+                NavigationStack {
+                    PasscodeSetupView {
+                        lockManager.enableLock(for: .cloud)
+                    }
+                    .environment(lockManager)
+                }
+            }
+            .sheet(isPresented: $showJournalLockSetup) {
+                NavigationStack {
+                    PasscodeSetupView {
+                        lockManager.enableLock(for: .journal)
+                    }
+                    .environment(lockManager)
+                }
+            }
+            .alert(L10n.t("Remove Passcode", "移除密码"), isPresented: $showRemovePasscode) {
+                RemovePasscodeAlert(lockManager: lockManager)
+            } message: {
+                Text(L10n.t("This will disable all privacy locks.", "这将关闭所有隐私锁。"))
+            }
         }
+    }
+}
+
+// MARK: - Remove Passcode Alert Content
+
+private struct RemovePasscodeAlert: View {
+    let lockManager: PrivacyLockManager
+    @State private var passcode: String = ""
+
+    var body: some View {
+        SecureField(L10n.t("Enter passcode to confirm", "输入密码以确认"), text: $passcode)
+        Button(L10n.t("Remove", "移除"), role: .destructive) {
+            _ = lockManager.removePasscode(verify: passcode)
+        }
+        Button(L10n.t("Cancel", "取消"), role: .cancel) { }
     }
 }
 

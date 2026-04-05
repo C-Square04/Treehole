@@ -1,71 +1,212 @@
 import Foundation
 import LocalAuthentication
+import Security
 import Observation
 
 @Observable
 final class PrivacyLockManager {
-    // Settings
-    var isCloudLockEnabled: Bool = false { didSet { save() } }
-    var isJournalLockEnabled: Bool = false { didSet { save() } }
-    var lockPIN: String? = nil { didSet { save() } }  // Optional PIN fallback
+    // Settings (persisted)
+    var isCloudLockEnabled: Bool = false
+    var isJournalLockEnabled: Bool = false
+    var isBiometricEnabled: Bool = false
+    private(set) var hasPasscode: Bool = false
 
-    // State
+    // Runtime state (not persisted)
     var isCloudUnlocked: Bool = false
     var isJournalUnlocked: Bool = false
 
-    init() { load() }
-
-    // Authenticate with FaceID/TouchID, fallback to PIN
-    func authenticate(for type: LockType) async -> Bool {
+    // Biometric availability
+    var biometricType: BiometricType {
         let context = LAContext()
         var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            return .none
+        }
+        switch context.biometryType {
+        case .faceID: return .faceID
+        case .touchID: return .touchID
+        default: return .none
+        }
+    }
 
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            do {
-                let success = try await context.evaluatePolicy(
-                    .deviceOwnerAuthenticationWithBiometrics,
-                    localizedReason: type == .cloud
-                        ? "Unlock My Clouds"
-                        : "Unlock Journal"
-                )
-                if success {
-                    if type == .cloud { isCloudUnlocked = true }
-                    else { isJournalUnlocked = true }
-                }
-                return success
-            } catch {
-                return false
+    enum BiometricType {
+        case none, faceID, touchID
+
+        var label: String {
+            switch self {
+            case .none: return "Biometric"
+            case .faceID: return "Face ID"
+            case .touchID: return "Touch ID"
             }
         }
-        // No biometrics available — use PIN if set
-        return false
-    }
 
-    func authenticateWithPIN(_ pin: String, for type: LockType) -> Bool {
-        guard pin == lockPIN else { return false }
-        if type == .cloud { isCloudUnlocked = true }
-        else { isJournalUnlocked = true }
-        return true
-    }
-
-    func lock() {
-        isCloudUnlocked = false
-        isJournalUnlocked = false
+        var icon: String {
+            switch self {
+            case .none: return "lock"
+            case .faceID: return "faceid"
+            case .touchID: return "touchid"
+            }
+        }
     }
 
     enum LockType { case cloud, journal }
 
+    init() { load() }
+
+    // MARK: - Passcode Management
+
+    func setPasscode(_ passcode: String) {
+        KeychainHelper.save(passcode, forKey: "privacyPasscode")
+        hasPasscode = true
+        save()
+    }
+
+    func verifyPasscode(_ input: String) -> Bool {
+        guard let stored = KeychainHelper.load(forKey: "privacyPasscode") else { return false }
+        return input == stored
+    }
+
+    func changePasscode(old: String, new: String) -> Bool {
+        guard verifyPasscode(old) else { return false }
+        setPasscode(new)
+        return true
+    }
+
+    func removePasscode(verify: String) -> Bool {
+        guard verifyPasscode(verify) else { return false }
+        KeychainHelper.delete(forKey: "privacyPasscode")
+        hasPasscode = false
+        isCloudLockEnabled = false
+        isJournalLockEnabled = false
+        isBiometricEnabled = false
+        save()
+        return true
+    }
+
+    var needsPasscodeSetup: Bool {
+        !hasPasscode
+    }
+
+    func enableLock(for type: LockType) {
+        switch type {
+        case .cloud: isCloudLockEnabled = true
+        case .journal: isJournalLockEnabled = true
+        }
+        save()
+    }
+
+    func disableLock(for type: LockType) {
+        switch type {
+        case .cloud: isCloudLockEnabled = false; isCloudUnlocked = false
+        case .journal: isJournalLockEnabled = false; isJournalUnlocked = false
+        }
+        save()
+    }
+
+    // MARK: - Unlock
+
+    func authenticateWithBiometric(for type: LockType) async -> Bool {
+        guard isBiometricEnabled else { return false }
+
+        let context = LAContext()
+        let reason = type == .cloud
+            ? "Unlock your private clouds"
+            : "Unlock your journal"
+
+        do {
+            let success = try await context.evaluatePolicy(
+                .deviceOwnerAuthenticationWithBiometrics,
+                localizedReason: reason
+            )
+            if success {
+                unlock(type)
+            }
+            return success
+        } catch {
+            return false
+        }
+    }
+
+    func authenticateWithPasscode(_ input: String, for type: LockType) -> Bool {
+        guard verifyPasscode(input) else { return false }
+        unlock(type)
+        return true
+    }
+
+    private func unlock(_ type: LockType) {
+        switch type {
+        case .cloud: isCloudUnlocked = true
+        case .journal: isJournalUnlocked = true
+        }
+    }
+
+    func isLocked(_ type: LockType) -> Bool {
+        switch type {
+        case .cloud: return isCloudLockEnabled && !isCloudUnlocked
+        case .journal: return isJournalLockEnabled && !isJournalUnlocked
+        }
+    }
+
+    func lockAll() {
+        isCloudUnlocked = false
+        isJournalUnlocked = false
+    }
+
+    // Legacy method name kept for compatibility
+    func lock() {
+        lockAll()
+    }
+
+    // MARK: - Persistence
+
     private func save() {
-        let defaults = UserDefaults.standard
-        defaults.set(isCloudLockEnabled, forKey: "privacyLockCloud")
-        defaults.set(isJournalLockEnabled, forKey: "privacyLockJournal")
-        defaults.set(lockPIN, forKey: "privacyLockPIN")
+        let d = UserDefaults.standard
+        d.set(isCloudLockEnabled, forKey: "pl_cloudLock")
+        d.set(isJournalLockEnabled, forKey: "pl_journalLock")
+        d.set(isBiometricEnabled, forKey: "pl_biometric")
     }
 
     private func load() {
-        let defaults = UserDefaults.standard
-        isCloudLockEnabled = defaults.bool(forKey: "privacyLockCloud")
-        isJournalLockEnabled = defaults.bool(forKey: "privacyLockJournal")
-        lockPIN = defaults.string(forKey: "privacyLockPIN")
+        let d = UserDefaults.standard
+        isCloudLockEnabled = d.bool(forKey: "pl_cloudLock")
+        isJournalLockEnabled = d.bool(forKey: "pl_journalLock")
+        isBiometricEnabled = d.bool(forKey: "pl_biometric")
+        hasPasscode = KeychainHelper.load(forKey: "privacyPasscode") != nil
+    }
+}
+
+// MARK: - Keychain Helper
+
+enum KeychainHelper {
+    static func save(_ value: String, forKey key: String) {
+        let data = Data(value.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data
+        ]
+        SecItemDelete(query as CFDictionary)
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    static func load(forKey key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func delete(forKey key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }

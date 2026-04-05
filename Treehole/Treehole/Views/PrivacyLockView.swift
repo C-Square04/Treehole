@@ -1,259 +1,544 @@
 import SwiftUI
 import LocalAuthentication
 
+// MARK: - Main Lock Screen (passcode entry)
+
 struct PrivacyLockView: View {
     let lockType: PrivacyLockManager.LockType
-    let title: String  // "My Clouds" or "Journal"
+    let title: String
     @Environment(PrivacyLockManager.self) private var lockManager
-    @State private var pinInput: String = ""
-    @State private var showPINField: Bool = false
-    @State private var authError: String?
+
+    @State private var enteredDigits: [Int] = []
+    @State private var shakeOffset: CGFloat = 0
+    @State private var dotsRed: Bool = false
     @State private var isAuthenticating: Bool = false
-    @State private var lockScale: CGFloat = 1.0
+
+    private let passcodeLength = 4
 
     var body: some View {
         ZStack {
             TreeholeTheme.warmBackground.ignoresSafeArea()
 
-            VStack(spacing: TreeholeTheme.spacingLarge) {
+            VStack(spacing: 0) {
                 Spacer()
 
-                // Lock icon (animated)
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 64, weight: .light))
-                    .foregroundStyle(TreeholeTheme.softPurple)
-                    .scaleEffect(lockScale)
-                    .animation(
-                        .easeInOut(duration: 1.8).repeatForever(autoreverses: true),
-                        value: lockScale
-                    )
-                    .onAppear { lockScale = 1.08 }
+                // Icon + title
+                VStack(spacing: TreeholeTheme.spacingSmall) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 48, weight: .light))
+                        .foregroundStyle(TreeholeTheme.softPurple)
 
-                // Title
-                VStack(spacing: TreeholeTheme.spacingTight) {
-                    Text(L10n.t("This content is locked", "此内容已锁定"))
+                    Text(L10n.t("Enter Passcode", "输入密码"))
                         .font(.title3.bold())
                         .foregroundStyle(TreeholeTheme.textPrimary)
+
                     Text(title)
                         .font(.subheadline)
                         .foregroundStyle(TreeholeTheme.textSecondary)
                 }
 
-                // Error message
-                if let error = authError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, TreeholeTheme.spacingSmall)
-                        .padding(.vertical, 6)
-                        .background(.red.opacity(0.8), in: Capsule())
-                        .transition(.opacity)
-                }
+                Spacer().frame(height: TreeholeTheme.spacingXL)
 
-                // FaceID/TouchID button (primary)
-                Button {
-                    Task { await authenticate() }
-                } label: {
-                    HStack(spacing: TreeholeTheme.spacingSmall) {
-                        Image(systemName: biometricIcon)
-                            .font(.title3)
-                        Text(biometricLabel)
-                            .font(.headline.weight(.semibold))
-                        if isAuthenticating {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .tint(TreeholeTheme.textPrimary)
-                        }
-                    }
-                    .foregroundStyle(TreeholeTheme.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, TreeholeTheme.spacingMedium)
-                }
-                .disabled(isAuthenticating)
-                .glassCard()
-                .padding(.horizontal)
+                // 4 dots
+                dotsRow
+                    .offset(x: shakeOffset)
 
-                // "Use PIN" button (secondary, if PIN is set)
-                if lockManager.lockPIN != nil {
-                    Button {
-                        withAnimation { showPINField.toggle() }
-                        authError = nil
-                    } label: {
-                        Text(showPINField
-                             ? L10n.t("Hide PIN", "隐藏 PIN")
-                             : L10n.t("Use PIN", "使用 PIN"))
-                            .font(.subheadline)
-                            .foregroundStyle(TreeholeTheme.softPurple)
-                    }
+                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
 
-                    // PIN input field
-                    if showPINField {
-                        VStack(spacing: TreeholeTheme.spacingSmall) {
-                            SecureField(L10n.t("Enter PIN", "输入 PIN"), text: $pinInput)
-                                .keyboardType(.numberPad)
-                                .textContentType(.oneTimeCode)
-                                .font(.title2)
-                                .multilineTextAlignment(.center)
-                                .padding(TreeholeTheme.spacingSmall)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-                                .frame(maxWidth: 200)
-
-                            Button {
-                                verifyPIN()
-                            } label: {
-                                Text(L10n.t("Confirm", "确认"))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, TreeholeTheme.spacingLarge)
-                                    .padding(.vertical, TreeholeTheme.spacingSmall)
-                                    .background(TreeholeTheme.softPurple, in: Capsule())
-                            }
-                            .disabled(pinInput.isEmpty)
-                        }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .padding(.horizontal)
-                    }
-                }
+                // Number pad
+                numberPad
 
                 Spacer()
             }
-            .padding()
+            .padding(.horizontal, TreeholeTheme.spacingLarge)
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            lockManager.lock()
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var biometricIcon: String {
-        let context = LAContext()
-        var error: NSError?
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            return context.biometryType == .faceID ? "faceid" : "touchid"
-        }
-        return "faceid"
-    }
-
-    private var biometricLabel: String {
-        let context = LAContext()
-        var error: NSError?
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            return context.biometryType == .faceID
-                ? L10n.t("Unlock with Face ID", "使用面容 ID 解锁")
-                : L10n.t("Unlock with Touch ID", "使用指纹 ID 解锁")
-        }
-        return L10n.t("Unlock with Biometrics", "使用生物识别解锁")
-    }
-
-    private func authenticate() async {
-        isAuthenticating = true
-        authError = nil
-        let success = await lockManager.authenticate(for: lockType)
-        if !success {
-            withAnimation {
-                authError = L10n.t("Authentication failed. Try again.", "认证失败，请重试。")
+        .onAppear {
+            if lockManager.isBiometricEnabled && lockManager.biometricType != .none {
+                Task { await triggerBiometric() }
             }
         }
+    }
+
+    // MARK: - Dots Row
+
+    private var dotsRow: some View {
+        HStack(spacing: 20) {
+            ForEach(0..<passcodeLength, id: \.self) { index in
+                Circle()
+                    .fill(index < enteredDigits.count
+                          ? (dotsRed ? Color.red : TreeholeTheme.softPurple)
+                          : Color(.systemGray4))
+                    .frame(width: 16, height: 16)
+                    .animation(.easeInOut(duration: 0.15), value: enteredDigits.count)
+                    .animation(.easeInOut(duration: 0.15), value: dotsRed)
+            }
+        }
+    }
+
+    // MARK: - Number Pad
+
+    private var numberPad: some View {
+        VStack(spacing: TreeholeTheme.spacingMedium) {
+            ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { row in
+                HStack(spacing: TreeholeTheme.spacingLarge) {
+                    ForEach(row, id: \.self) { digit in
+                        DigitButton(label: "\(digit)") {
+                            appendDigit(digit)
+                        }
+                    }
+                }
+            }
+
+            // Bottom row: biometric | 0 | delete
+            HStack(spacing: TreeholeTheme.spacingLarge) {
+                // Left: biometric or empty
+                if lockManager.isBiometricEnabled && lockManager.biometricType != .none {
+                    DigitButton(icon: lockManager.biometricType.icon) {
+                        Task { await triggerBiometric() }
+                    }
+                    .opacity(isAuthenticating ? 0.5 : 1)
+                } else {
+                    Color.clear.frame(width: 60, height: 60)
+                }
+
+                DigitButton(label: "0") {
+                    appendDigit(0)
+                }
+
+                DigitButton(icon: "delete.left") {
+                    deleteDigit()
+                }
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func appendDigit(_ digit: Int) {
+        guard enteredDigits.count < passcodeLength else { return }
+        enteredDigits.append(digit)
+        if enteredDigits.count == passcodeLength {
+            checkPasscode()
+        }
+    }
+
+    private func deleteDigit() {
+        guard !enteredDigits.isEmpty else { return }
+        enteredDigits.removeLast()
+    }
+
+    private func checkPasscode() {
+        let input = enteredDigits.map { String($0) }.joined()
+        let success = lockManager.authenticateWithPasscode(input, for: lockType)
+        if !success {
+            shakeDots()
+        }
+    }
+
+    private func shakeDots() {
+        dotsRed = true
+        withAnimation(.easeOut(duration: 0.08)) { shakeOffset = 10 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = -10 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = 8 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = -8 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+            withAnimation(.easeOut(duration: 0.08)) { shakeOffset = 0 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            dotsRed = false
+            enteredDigits = []
+        }
+    }
+
+    private func triggerBiometric() async {
+        isAuthenticating = true
+        _ = await lockManager.authenticateWithBiometric(for: lockType)
         isAuthenticating = false
     }
+}
 
-    private func verifyPIN() {
-        let success = lockManager.authenticateWithPIN(pinInput, for: lockType)
-        if success {
-            pinInput = ""
-            authError = nil
-        } else {
-            withAnimation {
-                authError = L10n.t("Incorrect PIN. Try again.", "PIN 不正确，请重试。")
+// MARK: - Digit Button
+
+private struct DigitButton: View {
+    var label: String? = nil
+    var icon: String? = nil
+    let action: () -> Void
+
+    @State private var isPressed: Bool = false
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Circle().stroke(Color(.systemGray5), lineWidth: 0.5)
+                    )
+                    .frame(width: 60, height: 60)
+
+                if let label = label {
+                    Text(label)
+                        .font(.title2.weight(.regular))
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+                } else if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+                }
             }
-            pinInput = ""
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+private struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.88 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Passcode Setup View
+
+struct PasscodeSetupView: View {
+    @Environment(PrivacyLockManager.self) private var lockManager
+    @Environment(\.dismiss) private var dismiss
+
+    enum SetupStep { case enter, confirm }
+
+    @State private var step: SetupStep = .enter
+    @State private var firstPasscode: [Int] = []
+    @State private var enteredDigits: [Int] = []
+    @State private var shakeOffset: CGFloat = 0
+    @State private var dotsRed: Bool = false
+    @State private var mismatchError: Bool = false
+
+    var onComplete: (() -> Void)? = nil
+
+    private let passcodeLength = 4
+
+    var body: some View {
+        ZStack {
+            TreeholeTheme.warmBackground.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                VStack(spacing: TreeholeTheme.spacingSmall) {
+                    Image(systemName: "lock.badge.plus")
+                        .font(.system(size: 48, weight: .light))
+                        .foregroundStyle(TreeholeTheme.softPurple)
+
+                    Text(step == .enter
+                         ? L10n.t("Set Passcode", "设置密码")
+                         : L10n.t("Confirm Passcode", "确认密码"))
+                        .font(.title3.bold())
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+
+                    Text(step == .enter
+                         ? L10n.t("Enter a 4-digit passcode", "输入4位密码")
+                         : L10n.t("Re-enter your passcode", "再次输入密码"))
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textSecondary)
+
+                    if mismatchError {
+                        Text(L10n.t("Passcodes do not match. Try again.", "密码不匹配，请重试。"))
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .transition(.opacity)
+                    }
+                }
+
+                Spacer().frame(height: TreeholeTheme.spacingXL)
+
+                dotsRow
+                    .offset(x: shakeOffset)
+
+                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
+
+                numberPad
+
+                Spacer()
+            }
+            .padding(.horizontal, TreeholeTheme.spacingLarge)
+        }
+        .navigationTitle(L10n.t("Set Passcode", "设置密码"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var dotsRow: some View {
+        HStack(spacing: 20) {
+            ForEach(0..<passcodeLength, id: \.self) { index in
+                Circle()
+                    .fill(index < enteredDigits.count
+                          ? (dotsRed ? Color.red : TreeholeTheme.softPurple)
+                          : Color(.systemGray4))
+                    .frame(width: 16, height: 16)
+                    .animation(.easeInOut(duration: 0.15), value: enteredDigits.count)
+                    .animation(.easeInOut(duration: 0.15), value: dotsRed)
+            }
+        }
+    }
+
+    private var numberPad: some View {
+        VStack(spacing: TreeholeTheme.spacingMedium) {
+            ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { row in
+                HStack(spacing: TreeholeTheme.spacingLarge) {
+                    ForEach(row, id: \.self) { digit in
+                        DigitButton(label: "\(digit)") { appendDigit(digit) }
+                    }
+                }
+            }
+            HStack(spacing: TreeholeTheme.spacingLarge) {
+                Color.clear.frame(width: 60, height: 60)
+                DigitButton(label: "0") { appendDigit(0) }
+                DigitButton(icon: "delete.left") { deleteDigit() }
+            }
+        }
+    }
+
+    private func appendDigit(_ digit: Int) {
+        guard enteredDigits.count < passcodeLength else { return }
+        enteredDigits.append(digit)
+        if enteredDigits.count == passcodeLength {
+            handleComplete()
+        }
+    }
+
+    private func deleteDigit() {
+        guard !enteredDigits.isEmpty else { return }
+        enteredDigits.removeLast()
+    }
+
+    private func handleComplete() {
+        switch step {
+        case .enter:
+            firstPasscode = enteredDigits
+            enteredDigits = []
+            withAnimation { step = .confirm }
+            mismatchError = false
+
+        case .confirm:
+            if enteredDigits == firstPasscode {
+                let passcode = firstPasscode.map { String($0) }.joined()
+                lockManager.setPasscode(passcode)
+                onComplete?()
+                dismiss()
+            } else {
+                shakeDots()
+            }
+        }
+    }
+
+    private func shakeDots() {
+        dotsRed = true
+        withAnimation(.easeOut(duration: 0.08)) { shakeOffset = 10 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = -10 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = 8 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = -8 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+            withAnimation(.easeOut(duration: 0.08)) { shakeOffset = 0 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            dotsRed = false
+            enteredDigits = []
+            firstPasscode = []
+            withAnimation { step = .enter }
+            withAnimation { mismatchError = true }
         }
     }
 }
 
-// MARK: - PIN Settings View
+// MARK: - Passcode Change View
 
-struct PINSettingsView: View {
-    let lockManager: PrivacyLockManager
+struct PasscodeChangeView: View {
+    @Environment(PrivacyLockManager.self) private var lockManager
     @Environment(\.dismiss) private var dismiss
-    @State private var newPIN: String = ""
-    @State private var confirmPIN: String = ""
-    @State private var errorMessage: String?
-    @State private var successMessage: String?
+
+    enum ChangeStep { case verifyOld, enterNew, confirmNew }
+
+    @State private var changeStep: ChangeStep = .verifyOld
+    @State private var enteredDigits: [Int] = []
+    @State private var newPasscode: [Int] = []
+    @State private var shakeOffset: CGFloat = 0
+    @State private var dotsRed: Bool = false
+    @State private var errorText: String = ""
+
+    private let passcodeLength = 4
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                TreeholeTheme.warmBackground.ignoresSafeArea()
-                Form {
-                    Section {
-                        SecureField(L10n.t("New PIN (4–6 digits)", "新 PIN（4–6 位数字）"), text: $newPIN)
-                            .keyboardType(.numberPad)
-                        SecureField(L10n.t("Confirm PIN", "确认 PIN"), text: $confirmPIN)
-                            .keyboardType(.numberPad)
-                    } header: {
-                        Text(L10n.t("Set PIN Code", "设置 PIN 码"))
-                    } footer: {
-                        Text(L10n.t(
-                            "PIN is used as a fallback when biometrics are unavailable.",
-                            "PIN 用于生物识别不可用时的备用方案。"
-                        ))
-                    }
+        ZStack {
+            TreeholeTheme.warmBackground.ignoresSafeArea()
 
-                    if let error = errorMessage {
-                        Section {
-                            Text(error).foregroundStyle(.red).font(.caption)
-                        }
-                    }
-                    if let success = successMessage {
-                        Section {
-                            Text(success).foregroundStyle(.green).font(.caption)
-                        }
-                    }
+            VStack(spacing: 0) {
+                Spacer()
 
-                    Section {
-                        Button(L10n.t("Save PIN", "保存 PIN")) {
-                            savePIN()
-                        }
-                        .disabled(newPIN.isEmpty)
+                VStack(spacing: TreeholeTheme.spacingSmall) {
+                    Image(systemName: "lock.rotation")
+                        .font(.system(size: 48, weight: .light))
+                        .foregroundStyle(TreeholeTheme.softPurple)
 
-                        if lockManager.lockPIN != nil {
-                            Button(L10n.t("Remove PIN", "删除 PIN"), role: .destructive) {
-                                lockManager.lockPIN = nil
-                                successMessage = L10n.t("PIN removed.", "PIN 已删除。")
-                                newPIN = ""
-                                confirmPIN = ""
-                            }
-                        }
+                    Text(stepTitle)
+                        .font(.title3.bold())
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+
+                    Text(stepSubtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textSecondary)
+
+                    if !errorText.isEmpty {
+                        Text(errorText)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .transition(.opacity)
+                    }
+                }
+
+                Spacer().frame(height: TreeholeTheme.spacingXL)
+
+                dotsRow
+                    .offset(x: shakeOffset)
+
+                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
+
+                numberPad
+
+                Spacer()
+            }
+            .padding(.horizontal, TreeholeTheme.spacingLarge)
+        }
+        .navigationTitle(L10n.t("Change Passcode", "更改密码"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var stepTitle: String {
+        switch changeStep {
+        case .verifyOld: return L10n.t("Enter Current Passcode", "输入当前密码")
+        case .enterNew: return L10n.t("Enter New Passcode", "输入新密码")
+        case .confirmNew: return L10n.t("Confirm New Passcode", "确认新密码")
+        }
+    }
+
+    private var stepSubtitle: String {
+        switch changeStep {
+        case .verifyOld: return L10n.t("Verify your identity first", "先验证您的身份")
+        case .enterNew: return L10n.t("Enter a 4-digit passcode", "输入4位密码")
+        case .confirmNew: return L10n.t("Re-enter your new passcode", "再次输入新密码")
+        }
+    }
+
+    private var dotsRow: some View {
+        HStack(spacing: 20) {
+            ForEach(0..<passcodeLength, id: \.self) { index in
+                Circle()
+                    .fill(index < enteredDigits.count
+                          ? (dotsRed ? Color.red : TreeholeTheme.softPurple)
+                          : Color(.systemGray4))
+                    .frame(width: 16, height: 16)
+                    .animation(.easeInOut(duration: 0.15), value: enteredDigits.count)
+                    .animation(.easeInOut(duration: 0.15), value: dotsRed)
+            }
+        }
+    }
+
+    private var numberPad: some View {
+        VStack(spacing: TreeholeTheme.spacingMedium) {
+            ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { row in
+                HStack(spacing: TreeholeTheme.spacingLarge) {
+                    ForEach(row, id: \.self) { digit in
+                        DigitButton(label: "\(digit)") { appendDigit(digit) }
                     }
                 }
             }
-            .navigationTitle(L10n.t("PIN Code", "PIN 码"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.t("Done", "完成")) { dismiss() }
+            HStack(spacing: TreeholeTheme.spacingLarge) {
+                Color.clear.frame(width: 60, height: 60)
+                DigitButton(label: "0") { appendDigit(0) }
+                DigitButton(icon: "delete.left") { deleteDigit() }
+            }
+        }
+    }
+
+    private func appendDigit(_ digit: Int) {
+        guard enteredDigits.count < passcodeLength else { return }
+        enteredDigits.append(digit)
+        if enteredDigits.count == passcodeLength {
+            handleComplete()
+        }
+    }
+
+    private func deleteDigit() {
+        guard !enteredDigits.isEmpty else { return }
+        enteredDigits.removeLast()
+    }
+
+    private func handleComplete() {
+        let input = enteredDigits.map { String($0) }.joined()
+
+        switch changeStep {
+        case .verifyOld:
+            if lockManager.verifyPasscode(input) {
+                enteredDigits = []
+                errorText = ""
+                withAnimation { changeStep = .enterNew }
+            } else {
+                shakeDots(message: L10n.t("Incorrect passcode. Try again.", "密码不正确，请重试。"))
+            }
+
+        case .enterNew:
+            newPasscode = enteredDigits
+            enteredDigits = []
+            errorText = ""
+            withAnimation { changeStep = .confirmNew }
+
+        case .confirmNew:
+            if enteredDigits == newPasscode {
+                let newCode = newPasscode.map { String($0) }.joined()
+                lockManager.setPasscode(newCode)
+                dismiss()
+            } else {
+                shakeDots(message: L10n.t("Passcodes do not match. Try again.", "密码不匹配，请重试。"))
+                newPasscode = []
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation { changeStep = .enterNew }
                 }
             }
         }
     }
 
-    private func savePIN() {
-        errorMessage = nil
-        successMessage = nil
-        let trimmed = newPIN.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 4, trimmed.count <= 6, trimmed.allSatisfy(\.isNumber) else {
-            errorMessage = L10n.t("PIN must be 4–6 digits.", "PIN 必须是 4–6 位数字。")
-            return
+    private func shakeDots(message: String) {
+        dotsRed = true
+        withAnimation(.easeOut(duration: 0.08)) { shakeOffset = 10 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = -10 }
         }
-        guard trimmed == confirmPIN else {
-            errorMessage = L10n.t("PINs do not match.", "两次输入的 PIN 不匹配。")
-            return
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = 8 }
         }
-        lockManager.lockPIN = trimmed
-        successMessage = L10n.t("PIN saved.", "PIN 已保存。")
-        newPIN = ""
-        confirmPIN = ""
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+            withAnimation(.easeInOut(duration: 0.08)) { shakeOffset = -8 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+            withAnimation(.easeOut(duration: 0.08)) { shakeOffset = 0 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            dotsRed = false
+            enteredDigits = []
+            withAnimation { errorText = message }
+        }
     }
 }

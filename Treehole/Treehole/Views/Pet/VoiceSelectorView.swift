@@ -133,15 +133,11 @@ struct VoiceSelectorView: View {
         let lang = appState.preferredLanguage
         let previewText = lang == "zh-Hans" ? voice.previewTextZH : voice.previewTextEN
 
-        if voice.id == "apple_default" {
-            // Play with Apple TTS
+        if voice.sampleFileName == nil {
+            // Apple TTS trial
             playingVoiceId = voice.id
-            let utterance = AVSpeechUtterance(string: previewText)
-            utterance.voice = AVSpeechSynthesisVoice(language: lang == "zh-Hans" ? "zh-CN" : "en-US")
-            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9
-            utterance.pitchMultiplier = 1.2
-            let synthesizer = AVSpeechSynthesizer()
-            synthesizer.speak(utterance)
+            let demoText = lang == "zh-Hans" ? "你好，我一直在这里陪着你！" : "Hello, I'm always here for you!"
+            PetVoiceService.speakTrial(demoText, language: lang)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 playingVoiceId = nil
             }

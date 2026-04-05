@@ -197,7 +197,9 @@ struct CloudPostListView: View {
             .navigationDestination(isPresented: $showMyClouds) {
                 MyCloudsView()
             }
-            .sheet(isPresented: $showGrabbedCloud) {
+            .sheet(isPresented: $showGrabbedCloud, onDismiss: {
+                grabbedPost = nil
+            }) {
                 if let post = grabbedPost {
                     GrabbedCloudView(post: post, appState: appState) {
                         Task { await grabCloud() }

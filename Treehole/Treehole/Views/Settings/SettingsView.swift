@@ -166,7 +166,11 @@ struct SettingsView: View {
                         Text("中文").tag("zh-Hans")
                     }
 
-                    Toggle(L10n.t("Dark Mode", "深色模式"), isOn: $state.isDarkMode)
+                    Picker(L10n.t("Appearance", "外观"), selection: $state.colorSchemePreference) {
+                        Text(L10n.t("System", "跟随系统")).tag("system")
+                        Text(L10n.t("Light", "浅色")).tag("light")
+                        Text(L10n.t("Dark", "深色")).tag("dark")
+                    }
                 }
 
                 // Subscription section (mock)

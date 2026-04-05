@@ -166,6 +166,19 @@ enum PetVoiceService {
         }
     }
 
+    // MARK: - Apple TTS Trial (for voice selector preview)
+
+    static func speakTrial(_ text: String, language: String) {
+        Task { @MainActor in
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default, options: .duckOthers)
+                try session.setActive(true)
+            } catch {}
+            speakWithApple(text, language: language)
+        }
+    }
+
     // MARK: - Apple TTS Fallback
 
     private static func speakWithApple(_ text: String, language: String) {

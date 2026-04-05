@@ -6,10 +6,12 @@ import Observation
 @Observable
 final class PrivacyLockManager {
     // Settings (persisted)
-    var isCloudLockEnabled: Bool = false
-    var isJournalLockEnabled: Bool = false
-    var isBiometricEnabled: Bool = false
+    var isCloudLockEnabled: Bool = false { didSet { save() } }
+    var isJournalLockEnabled: Bool = false { didSet { save() } }
+    var isBiometricEnabled: Bool = false { didSet { save() } }
     private(set) var hasPasscode: Bool = false
+
+    private var isLoading = false
 
     // Runtime state (not persisted)
     var isCloudUnlocked: Bool = false
@@ -164,6 +166,7 @@ final class PrivacyLockManager {
     // MARK: - Persistence
 
     private func save() {
+        guard !isLoading else { return }
         let d = UserDefaults.standard
         d.set(isCloudLockEnabled, forKey: "pl_cloudLock")
         d.set(isJournalLockEnabled, forKey: "pl_journalLock")
@@ -171,11 +174,13 @@ final class PrivacyLockManager {
     }
 
     private func load() {
+        isLoading = true
         let d = UserDefaults.standard
         isCloudLockEnabled = d.bool(forKey: "pl_cloudLock")
         isJournalLockEnabled = d.bool(forKey: "pl_journalLock")
         isBiometricEnabled = d.bool(forKey: "pl_biometric")
         hasPasscode = KeychainHelper.load(forKey: "privacyPasscode") != nil
+        isLoading = false
     }
 }
 

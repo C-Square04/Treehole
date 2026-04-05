@@ -68,7 +68,10 @@ struct TreeholeApp: App {
             ContentView()
                 .environment(appState)
                 .environment(lockManager)
-                .preferredColorScheme(appState.isDarkMode ? .dark : .light)
+                .preferredColorScheme(
+                    appState.colorSchemePreference == "dark" ? .dark :
+                    appState.colorSchemePreference == "light" ? .light : nil
+                )
                 .onAppear {
                     appState.requestNotificationPermission()
                     NotificationService.scheduleDailyCheckIn()

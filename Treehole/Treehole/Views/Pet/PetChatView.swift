@@ -17,6 +17,7 @@ struct PetChatView: View {
     @State private var ttsEnabled = true
     @State private var errorMessage: String?
     @State private var chatMode: ChatMode = .basic
+    @State private var showClearConfirm = false
 
     private var messages: [ChatMessage] {
         Array(allMessages.suffix(20))
@@ -60,12 +61,24 @@ struct PetChatView: View {
                             Image(systemName: "waveform.circle")
                                 .foregroundStyle(TreeholeTheme.softPurple)
                         }
-                        Button {
-                            ttsEnabled.toggle()
-                            if !ttsEnabled { PetVoiceService.stopSpeaking() }
+                        Menu {
+                            Button {
+                                ttsEnabled.toggle()
+                                if !ttsEnabled { PetVoiceService.stopSpeaking() }
+                            } label: {
+                                Label(
+                                    ttsEnabled ? L10n.t("Mute Voice", "关闭语音") : L10n.t("Enable Voice", "开启语音"),
+                                    systemImage: ttsEnabled ? "speaker.slash.fill" : "speaker.wave.2.fill"
+                                )
+                            }
+                            Button(role: .destructive) {
+                                showClearConfirm = true
+                            } label: {
+                                Label(L10n.t("Clear Chat", "清除聊天"), systemImage: "trash")
+                            }
                         } label: {
-                            Image(systemName: ttsEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                .foregroundStyle(ttsEnabled ? TreeholeTheme.softPurple : TreeholeTheme.textSecondary)
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(TreeholeTheme.softPurple)
                         }
                     }
                 }
@@ -77,6 +90,14 @@ struct PetChatView: View {
             .onDisappear {
                 PetVoiceService.stopSpeaking()
                 if isListening { PetVoiceService.stopListening() }
+            }
+            .confirmationDialog(L10n.t("Clear all chat history?", "清除所有聊天记录？"), isPresented: $showClearConfirm, titleVisibility: .visible) {
+                Button(L10n.t("Clear", "清除"), role: .destructive) {
+                    for msg in allMessages {
+                        modelContext.delete(msg)
+                    }
+                    try? modelContext.save()
+                }
             }
         }
     }

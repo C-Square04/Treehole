@@ -4,6 +4,8 @@ import UserNotifications
 
 @Observable
 final class AppState {
+    private var isLoading = false
+
     var isGuest: Bool = true
     var hasCompletedOnboarding: Bool = false
     var currentAlias: String = "Anonymous"
@@ -49,7 +51,9 @@ final class AppState {
     ]
 
     init() {
+        isLoading = true
         loadState()
+        isLoading = false
         L10n.lang = preferredLanguage
         checkAliasExpiry()
     }
@@ -131,6 +135,7 @@ final class AppState {
     // MARK: - Persistence (UserDefaults for preferences)
 
     private func saveState() {
+        guard !isLoading else { return }
         let defaults = UserDefaults.standard
         defaults.set(isGuest, forKey: "isGuest")
         defaults.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding")
@@ -161,11 +166,7 @@ final class AppState {
         appleUserEmail = defaults.string(forKey: "appleUserEmail")
         isSubscribed = defaults.bool(forKey: "isSubscribed")
         selectedVoiceId = defaults.string(forKey: "selectedVoiceId") ?? "apple_default"
-        // Load colorSchemePreference last, and only if a value was previously saved,
-        // to avoid didSet firing and re-saving "system" before the real value is loaded.
-        if let saved = defaults.string(forKey: "colorSchemePreference") {
-            colorSchemePreference = saved
-        }
+        colorSchemePreference = defaults.string(forKey: "colorSchemePreference") ?? "system"
     }
 
     // MARK: - Subscriber Bonus

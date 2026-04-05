@@ -97,8 +97,8 @@ enum SupabaseService {
 
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 30
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
         return URLSession(configuration: config)
     }()
 
@@ -114,7 +114,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         let decoder = JSONDecoder()
@@ -147,7 +147,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         let posts = try JSONDecoder().decode([RemoteCloudPost].self, from: data)
@@ -167,9 +167,9 @@ enum SupabaseService {
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
 
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
     }
 
@@ -191,9 +191,9 @@ enum SupabaseService {
         }
         request.httpBody = try JSONEncoder().encode(UpdateBody(npcReplyText: npcReply))
 
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
     }
 
@@ -295,7 +295,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         // The RPC may return a single object or an array with one element
@@ -318,7 +318,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         return try JSONDecoder().decode([RemoteComment].self, from: data)
@@ -363,7 +363,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         let comments = try JSONDecoder().decode([RemoteComment].self, from: data)
@@ -383,9 +383,9 @@ enum SupabaseService {
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
 
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
     }
 
@@ -416,7 +416,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         return try JSONDecoder().decode([RemoteCloudPost].self, from: data)
@@ -444,9 +444,9 @@ enum SupabaseService {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(MigrateRequest(pDeviceId: deviceId, pAppleUserId: appleUserId))
 
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
     }
 
@@ -481,9 +481,9 @@ enum SupabaseService {
         request.addValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
     }
 
@@ -499,9 +499,9 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
     }
 
@@ -517,7 +517,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         let counts = try JSONDecoder().decode([ReactionCounts].self, from: data)
@@ -542,7 +542,7 @@ enum SupabaseService {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw SupabaseError.serverError
+            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
 
         struct ReactionTypeRow: Codable {
@@ -667,14 +667,16 @@ enum ContentModerator {
 
 enum SupabaseError: Error, LocalizedError {
     case invalidURL
-    case serverError
+    case serverError(Int? = nil, String? = nil)
     case noData
     case moderation(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL: "Invalid URL"
-        case .serverError: "Server error"
+        case .serverError(let code, let detail):
+            if let code { "Server error (\(code))\(detail.map { ": \($0)" } ?? "")" }
+            else { "Server error" }
         case .noData: "No data returned"
         case .moderation(let reason): reason
         }

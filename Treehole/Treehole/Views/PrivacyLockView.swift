@@ -1,9 +1,66 @@
 import SwiftUI
 import LocalAuthentication
 
-// MARK: - Main Lock Screen (passcode entry)
+// MARK: - Lock Gate (pre-unlock confirmation page)
 
 struct PrivacyLockView: View {
+    let lockType: PrivacyLockManager.LockType
+    let title: String
+    @Environment(PrivacyLockManager.self) private var lockManager
+    @State private var showPasscodeEntry = false
+
+    var body: some View {
+        ZStack {
+            TreeholeTheme.warmBackground.ignoresSafeArea()
+
+            if showPasscodeEntry {
+                PasscodeEntryView(lockType: lockType, title: title)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                // Gate page — user must tap to proceed
+                VStack(spacing: TreeholeTheme.spacingXL) {
+                    Spacer()
+
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 72))
+                        .foregroundStyle(TreeholeTheme.softPurple)
+                        .symbolEffect(.pulse, options: .repeating)
+
+                    VStack(spacing: TreeholeTheme.spacingTight) {
+                        Text(title)
+                            .font(.title2.bold())
+                            .foregroundStyle(TreeholeTheme.textPrimary)
+
+                        Text(L10n.t("This content is protected", "此内容已加密保护"))
+                            .font(.subheadline)
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                    }
+
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            showPasscodeEntry = true
+                        }
+                    } label: {
+                        Label(L10n.t("Tap to Unlock", "点击解锁"), systemImage: "lock.open.fill")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, TreeholeTheme.spacingMedium)
+                            .background(TreeholeTheme.softPurple, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
+                    }
+                    .padding(.horizontal, 40)
+
+                    Spacer()
+                    Spacer()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Passcode Entry Screen
+
+private struct PasscodeEntryView: View {
     let lockType: PrivacyLockManager.LockType
     let title: String
     @Environment(PrivacyLockManager.self) private var lockManager

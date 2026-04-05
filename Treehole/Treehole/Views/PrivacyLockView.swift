@@ -12,6 +12,7 @@ struct PrivacyLockView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var dotsRed: Bool = false
     @State private var isAuthenticating: Bool = false
+    @State private var dotScales: [CGFloat] = [1.0, 1.0, 1.0, 1.0]
 
     private let passcodeLength = 4
 
@@ -23,27 +24,29 @@ struct PrivacyLockView: View {
                 Spacer()
 
                 // Icon + title
-                VStack(spacing: TreeholeTheme.spacingSmall) {
+                VStack(spacing: TreeholeTheme.spacingMedium) {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 48, weight: .light))
+                        .font(.system(size: 80, weight: .regular))
                         .foregroundStyle(TreeholeTheme.softPurple)
 
-                    Text(L10n.t("Enter Passcode", "输入密码"))
-                        .font(.title3.bold())
-                        .foregroundStyle(TreeholeTheme.textPrimary)
+                    VStack(spacing: 6) {
+                        Text(L10n.t("Enter Passcode", "输入密码"))
+                            .font(.title2.bold())
+                            .foregroundStyle(TreeholeTheme.textPrimary)
 
-                    Text(title)
-                        .font(.subheadline)
-                        .foregroundStyle(TreeholeTheme.textSecondary)
+                        Text(L10n.t("Enter your 4-digit passcode", "输入4位密码"))
+                            .font(.subheadline)
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                    }
                 }
 
-                Spacer().frame(height: TreeholeTheme.spacingXL)
+                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
 
                 // 4 dots
                 dotsRow
                     .offset(x: shakeOffset)
 
-                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
+                Spacer().frame(height: TreeholeTheme.spacingXL + 16)
 
                 // Number pad
                 numberPad
@@ -64,12 +67,21 @@ struct PrivacyLockView: View {
     private var dotsRow: some View {
         HStack(spacing: 20) {
             ForEach(0..<passcodeLength, id: \.self) { index in
+                let isFilled = index < enteredDigits.count
                 Circle()
-                    .fill(index < enteredDigits.count
+                    .fill(isFilled
                           ? (dotsRed ? Color.red : TreeholeTheme.softPurple)
-                          : Color(.systemGray4))
-                    .frame(width: 16, height: 16)
-                    .animation(.easeInOut(duration: 0.15), value: enteredDigits.count)
+                          : TreeholeTheme.gentleLavender.opacity(0.5))
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                isFilled ? (dotsRed ? Color.red : TreeholeTheme.softPurple) : TreeholeTheme.gentleLavender,
+                                lineWidth: 2
+                            )
+                    )
+                    .frame(width: 18, height: 18)
+                    .scaleEffect(dotScales[index])
+                    .animation(.easeInOut(duration: 0.15), value: isFilled)
                     .animation(.easeInOut(duration: 0.15), value: dotsRed)
             }
         }
@@ -93,19 +105,19 @@ struct PrivacyLockView: View {
             HStack(spacing: TreeholeTheme.spacingLarge) {
                 // Left: biometric or empty
                 if lockManager.isBiometricEnabled && lockManager.biometricType != .none {
-                    DigitButton(icon: lockManager.biometricType.icon) {
+                    DigitButton(icon: lockManager.biometricType.icon, iconColor: TreeholeTheme.softPurple) {
                         Task { await triggerBiometric() }
                     }
                     .opacity(isAuthenticating ? 0.5 : 1)
                 } else {
-                    Color.clear.frame(width: 60, height: 60)
+                    Color.clear.frame(width: 72, height: 72)
                 }
 
                 DigitButton(label: "0") {
                     appendDigit(0)
                 }
 
-                DigitButton(icon: "delete.left") {
+                DigitButton(icon: "delete.left", iconColor: TreeholeTheme.coral) {
                     deleteDigit()
                 }
             }
@@ -116,7 +128,17 @@ struct PrivacyLockView: View {
 
     private func appendDigit(_ digit: Int) {
         guard enteredDigits.count < passcodeLength else { return }
+        let index = enteredDigits.count
         enteredDigits.append(digit)
+        // Bounce animation
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+            dotScales[index] = 1.3
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                dotScales[index] = 1.0
+            }
+        }
         if enteredDigits.count == passcodeLength {
             checkPasscode()
         }
@@ -153,6 +175,7 @@ struct PrivacyLockView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             dotsRed = false
             enteredDigits = []
+            dotScales = [1.0, 1.0, 1.0, 1.0]
         }
     }
 
@@ -168,9 +191,8 @@ struct PrivacyLockView: View {
 private struct DigitButton: View {
     var label: String? = nil
     var icon: String? = nil
+    var iconColor: Color = TreeholeTheme.textPrimary
     let action: () -> Void
-
-    @State private var isPressed: Bool = false
 
     var body: some View {
         Button {
@@ -178,20 +200,20 @@ private struct DigitButton: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(.ultraThinMaterial)
+                    .fill(TreeholeTheme.warmPeach.opacity(0.3))
                     .overlay(
-                        Circle().stroke(Color(.systemGray5), lineWidth: 0.5)
+                        Circle().stroke(TreeholeTheme.warmPeach.opacity(0.5), lineWidth: 0.8)
                     )
-                    .frame(width: 60, height: 60)
+                    .frame(width: 72, height: 72)
 
                 if let label = label {
                     Text(label)
-                        .font(.title2.weight(.regular))
+                        .font(.title.weight(.regular))
                         .foregroundStyle(TreeholeTheme.textPrimary)
                 } else if let icon = icon {
                     Image(systemName: icon)
                         .font(.title3)
-                        .foregroundStyle(TreeholeTheme.textPrimary)
+                        .foregroundStyle(iconColor)
                 }
             }
         }
@@ -221,6 +243,7 @@ struct PasscodeSetupView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var dotsRed: Bool = false
     @State private var mismatchError: Bool = false
+    @State private var dotScales: [CGFloat] = [1.0, 1.0, 1.0, 1.0]
 
     var onComplete: (() -> Void)? = nil
 
@@ -233,22 +256,24 @@ struct PasscodeSetupView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                VStack(spacing: TreeholeTheme.spacingSmall) {
+                VStack(spacing: TreeholeTheme.spacingMedium) {
                     Image(systemName: "lock.badge.plus")
-                        .font(.system(size: 48, weight: .light))
+                        .font(.system(size: 80, weight: .regular))
                         .foregroundStyle(TreeholeTheme.softPurple)
 
-                    Text(step == .enter
-                         ? L10n.t("Set Passcode", "设置密码")
-                         : L10n.t("Confirm Passcode", "确认密码"))
-                        .font(.title3.bold())
-                        .foregroundStyle(TreeholeTheme.textPrimary)
+                    VStack(spacing: 6) {
+                        Text(step == .enter
+                             ? L10n.t("Create a Passcode", "创建密码")
+                             : L10n.t("Confirm Passcode", "确认密码"))
+                            .font(.title2.bold())
+                            .foregroundStyle(TreeholeTheme.textPrimary)
 
-                    Text(step == .enter
-                         ? L10n.t("Enter a 4-digit passcode", "输入4位密码")
-                         : L10n.t("Re-enter your passcode", "再次输入密码"))
-                        .font(.subheadline)
-                        .foregroundStyle(TreeholeTheme.textSecondary)
+                        Text(step == .enter
+                             ? L10n.t("Enter your 4-digit passcode", "输入4位密码")
+                             : L10n.t("Re-enter your passcode", "再次输入密码"))
+                            .font(.subheadline)
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                    }
 
                     if mismatchError {
                         Text(L10n.t("Passcodes do not match. Try again.", "密码不匹配，请重试。"))
@@ -258,12 +283,12 @@ struct PasscodeSetupView: View {
                     }
                 }
 
-                Spacer().frame(height: TreeholeTheme.spacingXL)
+                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
 
                 dotsRow
                     .offset(x: shakeOffset)
 
-                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
+                Spacer().frame(height: TreeholeTheme.spacingXL + 16)
 
                 numberPad
 
@@ -278,12 +303,21 @@ struct PasscodeSetupView: View {
     private var dotsRow: some View {
         HStack(spacing: 20) {
             ForEach(0..<passcodeLength, id: \.self) { index in
+                let isFilled = index < enteredDigits.count
                 Circle()
-                    .fill(index < enteredDigits.count
+                    .fill(isFilled
                           ? (dotsRed ? Color.red : TreeholeTheme.softPurple)
-                          : Color(.systemGray4))
-                    .frame(width: 16, height: 16)
-                    .animation(.easeInOut(duration: 0.15), value: enteredDigits.count)
+                          : TreeholeTheme.gentleLavender.opacity(0.5))
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                isFilled ? (dotsRed ? Color.red : TreeholeTheme.softPurple) : TreeholeTheme.gentleLavender,
+                                lineWidth: 2
+                            )
+                    )
+                    .frame(width: 18, height: 18)
+                    .scaleEffect(dotScales[index])
+                    .animation(.easeInOut(duration: 0.15), value: isFilled)
                     .animation(.easeInOut(duration: 0.15), value: dotsRed)
             }
         }
@@ -299,16 +333,25 @@ struct PasscodeSetupView: View {
                 }
             }
             HStack(spacing: TreeholeTheme.spacingLarge) {
-                Color.clear.frame(width: 60, height: 60)
+                Color.clear.frame(width: 72, height: 72)
                 DigitButton(label: "0") { appendDigit(0) }
-                DigitButton(icon: "delete.left") { deleteDigit() }
+                DigitButton(icon: "delete.left", iconColor: TreeholeTheme.coral) { deleteDigit() }
             }
         }
     }
 
     private func appendDigit(_ digit: Int) {
         guard enteredDigits.count < passcodeLength else { return }
+        let index = enteredDigits.count
         enteredDigits.append(digit)
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+            dotScales[index] = 1.3
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                dotScales[index] = 1.0
+            }
+        }
         if enteredDigits.count == passcodeLength {
             handleComplete()
         }
@@ -324,6 +367,7 @@ struct PasscodeSetupView: View {
         case .enter:
             firstPasscode = enteredDigits
             enteredDigits = []
+            dotScales = [1.0, 1.0, 1.0, 1.0]
             withAnimation { step = .confirm }
             mismatchError = false
 
@@ -358,6 +402,7 @@ struct PasscodeSetupView: View {
             dotsRed = false
             enteredDigits = []
             firstPasscode = []
+            dotScales = [1.0, 1.0, 1.0, 1.0]
             withAnimation { step = .enter }
             withAnimation { mismatchError = true }
         }
@@ -378,6 +423,7 @@ struct PasscodeChangeView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var dotsRed: Bool = false
     @State private var errorText: String = ""
+    @State private var dotScales: [CGFloat] = [1.0, 1.0, 1.0, 1.0]
 
     private let passcodeLength = 4
 
@@ -388,18 +434,20 @@ struct PasscodeChangeView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                VStack(spacing: TreeholeTheme.spacingSmall) {
+                VStack(spacing: TreeholeTheme.spacingMedium) {
                     Image(systemName: "lock.rotation")
-                        .font(.system(size: 48, weight: .light))
+                        .font(.system(size: 80, weight: .regular))
                         .foregroundStyle(TreeholeTheme.softPurple)
 
-                    Text(stepTitle)
-                        .font(.title3.bold())
-                        .foregroundStyle(TreeholeTheme.textPrimary)
+                    VStack(spacing: 6) {
+                        Text(stepTitle)
+                            .font(.title2.bold())
+                            .foregroundStyle(TreeholeTheme.textPrimary)
 
-                    Text(stepSubtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(TreeholeTheme.textSecondary)
+                        Text(stepSubtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                    }
 
                     if !errorText.isEmpty {
                         Text(errorText)
@@ -409,12 +457,12 @@ struct PasscodeChangeView: View {
                     }
                 }
 
-                Spacer().frame(height: TreeholeTheme.spacingXL)
+                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
 
                 dotsRow
                     .offset(x: shakeOffset)
 
-                Spacer().frame(height: TreeholeTheme.spacingXL + 8)
+                Spacer().frame(height: TreeholeTheme.spacingXL + 16)
 
                 numberPad
 
@@ -436,8 +484,8 @@ struct PasscodeChangeView: View {
 
     private var stepSubtitle: String {
         switch changeStep {
-        case .verifyOld: return L10n.t("Verify your identity first", "先验证您的身份")
-        case .enterNew: return L10n.t("Enter a 4-digit passcode", "输入4位密码")
+        case .verifyOld: return L10n.t("Enter your 4-digit passcode", "输入4位密码")
+        case .enterNew: return L10n.t("Enter your 4-digit passcode", "输入4位密码")
         case .confirmNew: return L10n.t("Re-enter your new passcode", "再次输入新密码")
         }
     }
@@ -445,12 +493,21 @@ struct PasscodeChangeView: View {
     private var dotsRow: some View {
         HStack(spacing: 20) {
             ForEach(0..<passcodeLength, id: \.self) { index in
+                let isFilled = index < enteredDigits.count
                 Circle()
-                    .fill(index < enteredDigits.count
+                    .fill(isFilled
                           ? (dotsRed ? Color.red : TreeholeTheme.softPurple)
-                          : Color(.systemGray4))
-                    .frame(width: 16, height: 16)
-                    .animation(.easeInOut(duration: 0.15), value: enteredDigits.count)
+                          : TreeholeTheme.gentleLavender.opacity(0.5))
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                isFilled ? (dotsRed ? Color.red : TreeholeTheme.softPurple) : TreeholeTheme.gentleLavender,
+                                lineWidth: 2
+                            )
+                    )
+                    .frame(width: 18, height: 18)
+                    .scaleEffect(dotScales[index])
+                    .animation(.easeInOut(duration: 0.15), value: isFilled)
                     .animation(.easeInOut(duration: 0.15), value: dotsRed)
             }
         }
@@ -466,16 +523,25 @@ struct PasscodeChangeView: View {
                 }
             }
             HStack(spacing: TreeholeTheme.spacingLarge) {
-                Color.clear.frame(width: 60, height: 60)
+                Color.clear.frame(width: 72, height: 72)
                 DigitButton(label: "0") { appendDigit(0) }
-                DigitButton(icon: "delete.left") { deleteDigit() }
+                DigitButton(icon: "delete.left", iconColor: TreeholeTheme.coral) { deleteDigit() }
             }
         }
     }
 
     private func appendDigit(_ digit: Int) {
         guard enteredDigits.count < passcodeLength else { return }
+        let index = enteredDigits.count
         enteredDigits.append(digit)
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+            dotScales[index] = 1.3
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                dotScales[index] = 1.0
+            }
+        }
         if enteredDigits.count == passcodeLength {
             handleComplete()
         }
@@ -493,6 +559,7 @@ struct PasscodeChangeView: View {
         case .verifyOld:
             if lockManager.verifyPasscode(input) {
                 enteredDigits = []
+                dotScales = [1.0, 1.0, 1.0, 1.0]
                 errorText = ""
                 withAnimation { changeStep = .enterNew }
             } else {
@@ -502,6 +569,7 @@ struct PasscodeChangeView: View {
         case .enterNew:
             newPasscode = enteredDigits
             enteredDigits = []
+            dotScales = [1.0, 1.0, 1.0, 1.0]
             errorText = ""
             withAnimation { changeStep = .confirmNew }
 
@@ -538,6 +606,7 @@ struct PasscodeChangeView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             dotsRed = false
             enteredDigits = []
+            dotScales = [1.0, 1.0, 1.0, 1.0]
             withAnimation { errorText = message }
         }
     }

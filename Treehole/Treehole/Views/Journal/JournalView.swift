@@ -123,6 +123,16 @@ struct JournalView: View {
                             .foregroundStyle(TreeholeTheme.coral)
                     }
                 }
+                if lockManager.isJournalLockEnabled {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            lockManager.lockAll()
+                        } label: {
+                            Image(systemName: "lock.fill")
+                                .foregroundStyle(TreeholeTheme.softPurple)
+                        }
+                    }
+                }
             }
             .sheet(isPresented: $showNewEntry) {
                 JournalEntryEditor(

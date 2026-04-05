@@ -180,9 +180,17 @@ struct CloudPostListView: View {
                     Button {
                         showMyClouds = true
                     } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.title3)
-                            .foregroundStyle(TreeholeTheme.softPurple)
+                        ZStack(alignment: .bottomTrailing) {
+                            Image(systemName: "person.crop.circle")
+                                .font(.title3)
+                                .foregroundStyle(TreeholeTheme.softPurple)
+                            if lockManager.isCloudLockEnabled {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(TreeholeTheme.softPurple)
+                                    .offset(x: 2, y: 2)
+                            }
+                        }
                     }
                 }
             }

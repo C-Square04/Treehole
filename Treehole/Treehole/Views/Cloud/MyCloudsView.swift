@@ -22,6 +22,18 @@ struct MyCloudsView: View {
         }
         .navigationTitle(L10n.t("My Clouds", "我的云朵"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if lockManager.isCloudLockEnabled {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        lockManager.lockAll()
+                    } label: {
+                        Image(systemName: "lock.fill")
+                            .foregroundStyle(TreeholeTheme.softPurple)
+                    }
+                }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             lockManager.lock()
         }

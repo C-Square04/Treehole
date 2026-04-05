@@ -250,7 +250,7 @@ private struct GetStartedPage: View {
                 }
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 50)
-                .cornerRadius(TreeholeTheme.cornerMedium)
+                .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
             }
             .padding(.horizontal)
 

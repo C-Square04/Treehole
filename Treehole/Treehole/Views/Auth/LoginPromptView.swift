@@ -58,7 +58,7 @@ struct LoginPromptView: View {
                         }
                         .signInWithAppleButtonStyle(.black)
                         .frame(height: 50)
-                        .cornerRadius(TreeholeTheme.cornerMedium)
+                        .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
 
                         // Guest
                         Button {
@@ -68,10 +68,10 @@ struct LoginPromptView: View {
                             Text(L10n.t("Continue as Guest", "以访客身份继续"))
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, TreeholeTheme.spacingSmall)
+                                .frame(height: 50)
                         }
-                        .buttonStyle(.bordered)
-                        .tint(TreeholeTheme.textSecondary)
+                        .background(TreeholeTheme.textSecondary.opacity(0.12), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
+                        .foregroundStyle(TreeholeTheme.textSecondary)
                     }
                     .padding(.horizontal)
 

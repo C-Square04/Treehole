@@ -69,17 +69,20 @@ struct SettingsView: View {
                         }
                     }
 
-                    if appState.isCloudSyncAvailable {
+                    NavigationLink {
+                        ICloudSyncStatusView()
+                    } label: {
                         HStack {
-                            Image(systemName: "icloud.fill")
-                                .foregroundStyle(.green)
-                            Text(L10n.t("iCloud Sync Active", "iCloud 同步已开启"))
-                        }
-                    } else {
-                        HStack {
-                            Image(systemName: "icloud.slash")
-                                .foregroundStyle(.secondary)
-                            Text(L10n.t("iCloud Not Available", "iCloud 不可用"))
+                            Image(systemName: appState.isCloudSyncAvailable ? "icloud.fill" : "icloud.slash")
+                                .foregroundStyle(appState.isCloudSyncAvailable ? .green : .secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(appState.isCloudSyncAvailable
+                                    ? L10n.t("iCloud Sync Active", "iCloud 同步已开启")
+                                    : L10n.t("iCloud Not Available", "iCloud 不可用"))
+                                Text(L10n.t("Tap for details", "点击查看详情"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
 
@@ -496,6 +499,65 @@ private struct ExplanationRow: View {
                     .font(.subheadline)
                     .foregroundStyle(TreeholeTheme.textSecondary)
             }
+        }
+    }
+}
+
+// MARK: - iCloud Sync Status View
+
+struct ICloudSyncStatusView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        List {
+            Section(L10n.t("Status", "状态")) {
+                HStack {
+                    Image(systemName: appState.isCloudSyncAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundStyle(appState.isCloudSyncAvailable ? .green : .red)
+                    Text(appState.isCloudSyncAvailable
+                        ? L10n.t("Connected", "已连接")
+                        : L10n.t("Not Connected", "未连接"))
+                }
+                HStack {
+                    Image(systemName: "clock")
+                        .foregroundStyle(TreeholeTheme.skyBlue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t("Last Sync", "最近同步"))
+                        Text(Date(), style: .relative)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Section(L10n.t("Synced Data", "同步数据")) {
+                SyncDataRow(icon: "cat.fill", color: TreeholeTheme.coral, title: L10n.t("Pet", "宠物"), detail: L10n.t("Hunger, energy, level, theme", "饥饿、能量、等级、主题"))
+                SyncDataRow(icon: "leaf.fill", color: TreeholeTheme.mintCream, title: L10n.t("Plants", "植物"), detail: L10n.t("Growth, hydration, species", "成长、水分、品种"))
+                SyncDataRow(icon: "book.fill", color: TreeholeTheme.warmGold, title: L10n.t("Journal", "日记"), detail: L10n.t("Entries, moods, photos", "日记、情绪、照片"))
+                SyncDataRow(icon: "bag.fill", color: TreeholeTheme.softPurple, title: L10n.t("Economy", "经济"), detail: L10n.t("Food, tokens, tasks", "食物、装饰币、任务"))
+            }
+            Section {
+                SyncDataRow(icon: "cloud.fill", color: TreeholeTheme.skyBlue, title: L10n.t("Cloud Posts", "云朵帖子"), detail: L10n.t("Synced via server", "通过服务器同步"))
+            } header: {
+                Text(L10n.t("Server Data", "服务器数据"))
+            } footer: {
+                Text(L10n.t("Cloud posts sync via Apple ID across all devices.", "云朵帖子通过 Apple ID 在所有设备间同步。"))
+            }
+            Section(L10n.t("Info", "说明")) {
+                Text(L10n.t("iCloud sync happens automatically. Changes appear on other devices within minutes.", "iCloud 自动同步，更改会在几分钟内出现在其他设备上。"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(L10n.t("iCloud Sync", "iCloud 同步"))
+    }
+}
+
+private struct SyncDataRow: View {
+    let icon: String; let color: Color; let title: String; let detail: String
+    var body: some View {
+        HStack(spacing: TreeholeTheme.spacingSmall) {
+            Image(systemName: icon).foregroundStyle(color).frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) { Text(title); Text(detail).font(.caption).foregroundStyle(.secondary) }
+            Spacer()
+            Image(systemName: "checkmark.icloud.fill").foregroundStyle(.green).font(.caption)
         }
     }
 }

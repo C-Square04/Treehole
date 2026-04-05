@@ -268,7 +268,7 @@ struct PetChatView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
 
                 // Send button
                 Button {
@@ -372,10 +372,11 @@ struct PetChatView: View {
         modelContext.insert(petMsg)
         try? modelContext.save()
 
-        // TTS with mode
+        // TTS with mode — subscribers always get premium voice regardless of chat mode
         if ttsEnabled {
             isSpeaking = true
-            PetVoiceService.speak(reply, language: appState.preferredLanguage, mode: chatMode, messageId: petMsg.id)
+            let voiceMode: ChatMode = appState.isSubscribed ? .premium : chatMode
+            PetVoiceService.speak(reply, language: appState.preferredLanguage, mode: voiceMode, messageId: petMsg.id)
             let estimatedDuration = Double(reply.count) * 0.08 + 1.0
             DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
                 isSpeaking = false

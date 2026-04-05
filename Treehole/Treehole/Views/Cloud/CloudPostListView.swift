@@ -200,11 +200,7 @@ struct CloudPostListView: View {
             .sheet(isPresented: $showGrabbedCloud, onDismiss: {
                 grabbedPost = nil
             }) {
-                if let post = grabbedPost {
-                    GrabbedCloudView(post: post, appState: appState) {
-                        Task { await grabCloud() }
-                    }
-                }
+                GrabbedCloudView(post: $grabbedPost, appState: appState, showGrabAnother: true)
             }
             .sheet(isPresented: $viewModel.showCreation, onDismiss: {
                 if viewModel.didCreatePost {
@@ -343,9 +339,9 @@ private struct OwnCloudCard: View {
 
 struct GrabbedCloudView: View {
     @Environment(\.dismiss) private var dismiss
-    let post: RemoteCloudPost
+    @Binding var post: RemoteCloudPost?
     let appState: AppState
-    let onGrabAnother: () -> Void
+    var showGrabAnother: Bool = true
 
     @State private var comments: [RemoteComment] = []
     @State private var commentText: String = ""
@@ -376,169 +372,173 @@ struct GrabbedCloudView: View {
                 )
                 .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: TreeholeTheme.spacingLarge) {
+                if let currentPost = post {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingLarge) {
 
-                        // Post header: mood + alias
-                        HStack(spacing: TreeholeTheme.spacingSmall) {
-                            Text(post.mood.emoji)
-                                .font(.largeTitle)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(post.authorAlias)
-                                    .font(.headline)
-                                    .foregroundStyle(TreeholeTheme.textPrimary)
-                                Text(post.date, style: .relative)
-                                    .font(.caption)
-                                    .foregroundStyle(TreeholeTheme.textLight)
-                            }
-                            Spacer()
-                            Text(appState.preferredLanguage == "zh-Hans" ? post.mood.labelZH : post.mood.labelEN)
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(TreeholeTheme.softPurple.opacity(0.2), in: Capsule())
-                                .foregroundStyle(TreeholeTheme.softPurple)
-                        }
-                        .glassCard()
-
-                        // Post text
-                        Text(post.text)
-                            .font(.body)
-                            .foregroundStyle(TreeholeTheme.textPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .glassCard()
-
-                        // NPC Reply
-                        if let npcReply = post.npcReplyText {
-                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                                HStack {
-                                    Image(systemName: "bubble.left.fill")
-                                        .foregroundStyle(TreeholeTheme.warmGold)
-                                    Text(L10n.t("Treehole Spirit", "树洞精灵"))
+                            // Post header: mood + alias
+                            HStack(spacing: TreeholeTheme.spacingSmall) {
+                                Text(currentPost.mood.emoji)
+                                    .font(.largeTitle)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(currentPost.authorAlias)
                                         .font(.headline)
                                         .foregroundStyle(TreeholeTheme.textPrimary)
+                                    Text(currentPost.date, style: .relative)
+                                        .font(.caption)
+                                        .foregroundStyle(TreeholeTheme.textLight)
                                 }
-                                Text(npcReply)
-                                    .font(.body)
-                                    .foregroundStyle(TreeholeTheme.textSecondary)
+                                Spacer()
+                                Text(appState.preferredLanguage == "zh-Hans" ? currentPost.mood.labelZH : currentPost.mood.labelEN)
+                                    .font(.caption)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(TreeholeTheme.softPurple.opacity(0.2), in: Capsule())
+                                    .foregroundStyle(TreeholeTheme.softPurple)
                             }
-                            .accentCard(TreeholeTheme.warmGold)
-                        }
+                            .glassCard()
 
-                        // Reaction bar
-                        ReactionBar(
-                            postId: post.id,
-                            reactionCounts: reactionCounts,
-                            myReactions: $myReactions,
-                            showBreezeEffect: $showBreezeEffect,
-                            showHugEffect: $showHugEffect,
-                            showStarlightEffect: $showStarlightEffect,
-                            onCountsUpdated: { updated in
-                                reactionCounts = updated
-                            }
-                        )
+                            // Post text
+                            Text(currentPost.text)
+                                .font(.body)
+                                .foregroundStyle(TreeholeTheme.textPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .glassCard()
 
-                        // Comments section
-                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                            HStack {
-                                Rectangle()
-                                    .frame(height: 1)
-                                    .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
-                                Text(
-                                    comments.isEmpty
-                                        ? L10n.t("Comments", "评论")
-                                        : L10n.t("Comments (\(comments.count))", "评论 (\(comments.count))")
-                                )
-                                .font(.caption)
-                                .foregroundStyle(TreeholeTheme.textLight)
-                                .fixedSize()
-                                Rectangle()
-                                    .frame(height: 1)
-                                    .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
+                            // NPC Reply
+                            if let npcReply = currentPost.npcReplyText {
+                                VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+                                    HStack {
+                                        Image(systemName: "bubble.left.fill")
+                                            .foregroundStyle(TreeholeTheme.warmGold)
+                                        Text(L10n.t("Treehole Spirit", "树洞精灵"))
+                                            .font(.headline)
+                                            .foregroundStyle(TreeholeTheme.textPrimary)
+                                    }
+                                    Text(npcReply)
+                                        .font(.body)
+                                        .foregroundStyle(TreeholeTheme.textSecondary)
+                                }
+                                .accentCard(TreeholeTheme.warmGold)
                             }
 
-                            if isLoadingComments {
+                            // Reaction bar
+                            ReactionBar(
+                                postId: currentPost.id,
+                                reactionCounts: reactionCounts,
+                                myReactions: $myReactions,
+                                showBreezeEffect: $showBreezeEffect,
+                                showHugEffect: $showHugEffect,
+                                showStarlightEffect: $showStarlightEffect,
+                                onCountsUpdated: { updated in
+                                    reactionCounts = updated
+                                }
+                            )
+
+                            // Comments section
+                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
                                 HStack {
-                                    Spacer()
-                                    ProgressView()
-                                    Spacer()
-                                }
-                                .padding(.vertical, TreeholeTheme.spacingSmall)
-                            } else if comments.isEmpty {
-                                Text(L10n.t("Be the first to leave a message 🌿", "第一个留言吧 🌿"))
+                                    Rectangle()
+                                        .frame(height: 1)
+                                        .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
+                                    Text(
+                                        comments.isEmpty
+                                            ? L10n.t("Comments", "评论")
+                                            : L10n.t("Comments (\(comments.count))", "评论 (\(comments.count))")
+                                    )
                                     .font(.caption)
                                     .foregroundStyle(TreeholeTheme.textLight)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, TreeholeTheme.spacingSmall)
-                            } else {
-                                ForEach(comments) { comment in
-                                    CommentBubble(comment: comment)
+                                    .fixedSize()
+                                    Rectangle()
+                                        .frame(height: 1)
+                                        .foregroundStyle(TreeholeTheme.textLight.opacity(0.4))
                                 }
-                            }
 
-                            // Comment error
-                            if let error = commentError {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                            }
-
-                            // Comment input
-                            HStack(spacing: TreeholeTheme.spacingSmall) {
-                                TextField(
-                                    L10n.t("Leave a kind word...", "留下暖心的话..."),
-                                    text: $commentText,
-                                    axis: .vertical
-                                )
-                                .font(.subheadline)
-                                .lineLimit(1...4)
-                                .submitLabel(.send)
-                                .onSubmit { Task { await postComment() } }
-
-                                Button {
-                                    Task { await postComment() }
-                                } label: {
-                                    if isPostingComment {
+                                if isLoadingComments {
+                                    HStack {
+                                        Spacer()
                                         ProgressView()
-                                            .scaleEffect(0.8)
-                                    } else {
-                                        Image(systemName: "paperplane.fill")
-                                            .foregroundStyle(TreeholeTheme.softPurple)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, TreeholeTheme.spacingSmall)
+                                } else if comments.isEmpty {
+                                    Text(L10n.t("Be the first to leave a message 🌿", "第一个留言吧 🌿"))
+                                        .font(.caption)
+                                        .foregroundStyle(TreeholeTheme.textLight)
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, TreeholeTheme.spacingSmall)
+                                } else {
+                                    ForEach(comments) { comment in
+                                        CommentBubble(comment: comment)
                                     }
                                 }
-                                .disabled(commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPostingComment)
-                            }
-                            .padding(TreeholeTheme.spacingSmall)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-                        }
 
-                        // Grab Another button
-                        Button {
-                            isGrabbingAnother = true
-                            dismiss()
-                            onGrabAnother()
-                        } label: {
-                            HStack(spacing: TreeholeTheme.spacingSmall) {
-                                Text("🫧")
-                                    .font(.title2)
-                                Text(L10n.t("Grab Another Cloud", "再抓一朵云"))
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                if isGrabbingAnother {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .tint(TreeholeTheme.textPrimary)
+                                // Comment error
+                                if let error = commentError {
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
                                 }
-                            }
-                            .foregroundStyle(TreeholeTheme.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, TreeholeTheme.spacingMedium)
-                        }
-                        .glassCard()
 
-                        Spacer(minLength: TreeholeTheme.spacingXL)
+                                // Comment input
+                                HStack(spacing: TreeholeTheme.spacingSmall) {
+                                    TextField(
+                                        L10n.t("Leave a kind word...", "留下暖心的话..."),
+                                        text: $commentText,
+                                        axis: .vertical
+                                    )
+                                    .font(.subheadline)
+                                    .lineLimit(1...4)
+                                    .submitLabel(.send)
+                                    .onSubmit { Task { await postComment(postId: currentPost.id) } }
+
+                                    Button {
+                                        Task { await postComment(postId: currentPost.id) }
+                                    } label: {
+                                        if isPostingComment {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        } else {
+                                            Image(systemName: "paperplane.fill")
+                                                .foregroundStyle(TreeholeTheme.softPurple)
+                                        }
+                                    }
+                                    .disabled(commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPostingComment)
+                                }
+                                .padding(TreeholeTheme.spacingSmall)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+                            }
+
+                            // Grab Another button — only when not viewing own cloud
+                            if showGrabAnother {
+                                Button {
+                                    Task { await grabAnother() }
+                                } label: {
+                                    HStack(spacing: TreeholeTheme.spacingSmall) {
+                                        Text("🫧")
+                                            .font(.title2)
+                                        Text(L10n.t("Grab Another Cloud", "再抓一朵云"))
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                        if isGrabbingAnother {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .tint(TreeholeTheme.textPrimary)
+                                        }
+                                    }
+                                    .foregroundStyle(TreeholeTheme.textPrimary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, TreeholeTheme.spacingMedium)
+                                }
+                                .disabled(isGrabbingAnother)
+                                .glassCard()
+                            }
+
+                            Spacer(minLength: TreeholeTheme.spacingXL)
+                        }
+                        .padding()
                     }
-                    .padding()
+                    .id(currentPost.id) // Force scroll view refresh when post changes
                 }
 
                 // Reaction visual effects overlay
@@ -560,7 +560,8 @@ struct GrabbedCloudView: View {
                     }
                 }
             }
-            .task {
+            .task(id: post?.id) {
+                guard post != nil else { return }
                 await loadComments()
                 await loadReactions()
             }
@@ -569,10 +570,28 @@ struct GrabbedCloudView: View {
 
     // MARK: - Actions
 
+    private func grabAnother() async {
+        isGrabbingAnother = true
+        do {
+            if let newPost = try await SupabaseService.fetchRandomPost() {
+                // Reset state before updating post so .task(id:) fires fresh
+                comments = []
+                commentText = ""
+                reactionCounts = nil
+                myReactions = []
+                post = newPost
+            }
+        } catch {
+            // Silently ignore — user can try again
+        }
+        isGrabbingAnother = false
+    }
+
     private func loadComments() async {
+        guard let postId = post?.id else { return }
         isLoadingComments = true
         do {
-            comments = try await SupabaseService.fetchComments(postId: post.id)
+            comments = try await SupabaseService.fetchComments(postId: postId)
         } catch {
             // Silently fail — comments are supplementary
         }
@@ -580,20 +599,21 @@ struct GrabbedCloudView: View {
     }
 
     private func loadReactions() async {
-        async let countsTask = SupabaseService.fetchReactionCounts(postId: post.id)
-        async let myReactionsTask = SupabaseService.fetchMyReactions(postId: post.id)
+        guard let postId = post?.id else { return }
+        async let countsTask = SupabaseService.fetchReactionCounts(postId: postId)
+        async let myReactionsTask = SupabaseService.fetchMyReactions(postId: postId)
         reactionCounts = try? await countsTask
         myReactions = (try? await myReactionsTask) ?? []
     }
 
-    private func postComment() async {
+    private func postComment(postId: String) async {
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         isPostingComment = true
         commentError = nil
         do {
             let newComment = try await SupabaseService.addComment(
-                postId: post.id,
+                postId: postId,
                 authorAlias: appState.currentAlias,
                 text: text
             )

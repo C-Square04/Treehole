@@ -164,8 +164,8 @@ struct MyCloudsView: View {
 
     @ViewBuilder
     private func cloudDetail(for post: RemoteCloudPost) -> some View {
-        // Reuse the grabbed-cloud detail sheet as a pushed view
-        GrabbedCloudView(post: post, appState: appState) { }
+        // Reuse the grabbed-cloud detail as a pushed view; hide "Grab Another" for own clouds
+        GrabbedCloudView(post: .constant(post), appState: appState, showGrabAnother: false)
     }
 
     // MARK: - Empty State

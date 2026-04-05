@@ -67,7 +67,9 @@ enum PetVoiceService {
         guard !cleanText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
         if mode == .premium {
-            // Premium: MiniMax natural voice
+            // Premium: MiniMax natural voice, using user's selected voice if set
+            let selectedVoice = UserDefaults.standard.string(forKey: "selectedVoiceId") ?? "apple_default"
+            let voiceId: String? = selectedVoice != "apple_default" ? selectedVoice : nil
             Task {
                 do {
                     let session = AVAudioSession.sharedInstance()
@@ -76,7 +78,7 @@ enum PetVoiceService {
                 } catch {
                     print("[TTS] Audio session error: \(error)")
                 }
-                if let audioData = await fetchMiniMaxTTS(text: cleanText, language: language, emotion: emotion) {
+                if let audioData = await fetchMiniMaxTTS(text: cleanText, language: language, emotion: emotion, voiceId: voiceId) {
                     if let mid = messageId { cacheAudio(key: mid, data: audioData) }
                     await MainActor.run { playAudio(audioData) }
                 } else {

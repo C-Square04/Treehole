@@ -1,9 +1,11 @@
 import SwiftUI
+import SwiftData
 import LocalAuthentication
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(PrivacyLockManager.self) private var lockManager
+    @Environment(\.modelContext) private var modelContext
 
     @State private var versionTapCount: Int = 0
     @State private var versionTapTimer: Timer? = nil
@@ -12,6 +14,12 @@ struct SettingsView: View {
     @State private var showCloudLockSetup: Bool = false
     @State private var showJournalLockSetup: Bool = false
     @State private var removePasscodeDigits: [Int] = []
+
+    // Danger Zone
+    @State private var showDeleteDataStep1 = false
+    @State private var showDeleteDataStep2 = false
+    @State private var deleteCountdown = 5
+    @State private var deleteTimer: Timer?
 
     // Binding helpers that present setup if no passcode yet
     private var cloudLockBinding: Binding<Bool> {
@@ -280,6 +288,21 @@ struct SettingsView: View {
                     }
                 }
 
+                // Danger Zone
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteDataStep1 = true
+                    } label: {
+                        Label(L10n.t("Delete Account & Data", "删除账户和数据"), systemImage: "trash.fill")
+                    }
+                } header: {
+                    Text(L10n.t("Danger Zone", "危险区域"))
+                } footer: {
+                    Text(L10n.t(
+                        "This will permanently delete all your local data, cloud posts, and account.",
+                        "这将永久删除你的所有本地数据、云朵帖子和账户。"
+                    ))
+                }
 
             }
             .navigationTitle(L10n.t("Settings", "设置"))
@@ -313,7 +336,163 @@ struct SettingsView: View {
             } message: {
                 Text(L10n.t("This will disable all privacy locks.", "这将关闭所有隐私锁。"))
             }
+            .confirmationDialog(
+                L10n.t("Delete All Data?", "删除所有数据？"),
+                isPresented: $showDeleteDataStep1,
+                titleVisibility: .visible
+            ) {
+                Button(L10n.t("Continue", "继续"), role: .destructive) {
+                    deleteCountdown = 5
+                    showDeleteDataStep2 = true
+                    deleteTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+                        DispatchQueue.main.async {
+                            if deleteCountdown > 0 {
+                                deleteCountdown -= 1
+                            } else {
+                                deleteTimer?.invalidate()
+                            }
+                        }
+                    }
+                }
+                Button(L10n.t("Cancel", "取消"), role: .cancel) { }
+            } message: {
+                Text(L10n.t(
+                    "This will permanently delete all your data. This cannot be undone.",
+                    "这将永久删除你的所有数据。此操作不可撤销。"
+                ))
+            }
+            .sheet(isPresented: $showDeleteDataStep2) {
+                DeleteCountdownView(
+                    countdown: $deleteCountdown,
+                    onDelete: {
+                        showDeleteDataStep2 = false
+                        performAccountDeletion()
+                    },
+                    onCancel: {
+                        deleteTimer?.invalidate()
+                        showDeleteDataStep2 = false
+                    }
+                )
+            }
         }
+    }
+
+    // MARK: - Account Deletion
+
+    private func performAccountDeletion() {
+        do {
+            try modelContext.delete(model: Pet.self)
+            try modelContext.delete(model: Plant.self)
+            try modelContext.delete(model: JournalEntry.self)
+            try modelContext.delete(model: Economy.self)
+            try modelContext.delete(model: DailyTask.self)
+            try modelContext.delete(model: WeeklyChallenge.self)
+            try modelContext.delete(model: ChatMessage.self)
+            try modelContext.save()
+        } catch {
+            print("Delete data error: \(error)")
+        }
+
+        Task {
+            if let posts = try? await SupabaseService.fetchMyPosts() {
+                for post in posts {
+                    try? await SupabaseService.deletePost(id: post.id)
+                }
+            }
+        }
+
+        if let domain = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: domain)
+        }
+
+        KeychainHelper.delete(forKey: "privacyPasscode")
+
+        let fm = FileManager.default
+        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let photosDir = docs.appendingPathComponent("journal_photos")
+            try? fm.removeItem(at: photosDir)
+        }
+
+        appState.logout()
+        appState.hasCompletedOnboarding = false
+    }
+}
+
+// MARK: - Delete Countdown View
+
+struct DeleteCountdownView: View {
+    @Binding var countdown: Int
+    let onDelete: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: TreeholeTheme.spacingLarge) {
+            Spacer()
+
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(.red)
+
+            Text(L10n.t("Final Confirmation", "最终确认"))
+                .font(.title2.bold())
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            Text(L10n.t(
+                "This will permanently delete all your data, cloud posts, and account. This action cannot be undone.",
+                "这将永久删除你的所有数据、云朵帖子和账户。此操作不可撤销。"
+            ))
+            .font(.subheadline)
+            .foregroundStyle(TreeholeTheme.textSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
+
+            if countdown > 0 {
+                Text("\(countdown)")
+                    .font(.system(size: 72, weight: .bold, design: .rounded))
+                    .foregroundStyle(.red)
+                    .contentTransition(.numericText())
+                    .animation(.default, value: countdown)
+
+                Text(L10n.t("Please wait before confirming", "请等待后再确认"))
+                    .font(.caption)
+                    .foregroundStyle(TreeholeTheme.textLight)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(.red)
+
+                Text(L10n.t("You may now delete your account", "你现在可以删除你的账户了"))
+                    .font(.caption)
+                    .foregroundStyle(TreeholeTheme.textLight)
+            }
+
+            Spacer()
+
+            VStack(spacing: TreeholeTheme.spacingSmall) {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Text(countdown > 0
+                        ? L10n.t("Wait (\(countdown)s)...", "等待 (\(countdown)s)...")
+                        : L10n.t("Delete Now", "立即删除"))
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(countdown > 0 ? Color.gray.opacity(0.3) : Color.red, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
+                        .foregroundStyle(countdown > 0 ? TreeholeTheme.textLight : .white)
+                }
+                .disabled(countdown > 0)
+
+                Button(L10n.t("Cancel", "取消")) {
+                    onCancel()
+                }
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textSecondary)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, TreeholeTheme.spacingLarge)
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

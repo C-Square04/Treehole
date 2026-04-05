@@ -178,6 +178,14 @@ struct CloudPostDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(TreeholeTheme.textLight)
+                }
+            }
             if post.isOwn {
                 ToolbarItem(placement: .destructiveAction) {
                     Button(role: .destructive) {

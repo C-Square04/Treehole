@@ -114,22 +114,22 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
-        // Retry once on failure
+        var lastError: Error = SupabaseError.serverError(nil, nil)
+
         for attempt in 0..<2 {
+            if attempt > 0 { try? await Task.sleep(for: .seconds(1)) }
             do {
                 let (data, response) = try await session.data(for: request)
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard (200..<300).contains(statusCode) else {
-                    if attempt == 0 { continue }
-                    throw SupabaseError.serverError(statusCode, nil)
+                if (200..<300).contains(statusCode) {
+                    return try JSONDecoder().decode([RemoteCloudPost].self, from: data)
                 }
-                return try JSONDecoder().decode([RemoteCloudPost].self, from: data)
-            } catch where attempt == 0 {
-                try? await Task.sleep(for: .seconds(1))
-                continue
+                lastError = SupabaseError.serverError(statusCode, nil)
+            } catch {
+                lastError = error
             }
         }
-        throw SupabaseError.serverError(nil, nil)
+        throw lastError
     }
 
     // MARK: - Create a new post

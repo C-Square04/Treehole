@@ -10,6 +10,7 @@ struct VoiceOption: Identifiable {
     let isPremium: Bool
     let previewTextEN: String
     let previewTextZH: String
+    let sampleFileName: String?  // nil for apple_default
 }
 
 // MARK: - Voice Options List
@@ -22,7 +23,8 @@ extension VoiceOption {
             nameZH: "系统默认",
             isPremium: false,
             previewTextEN: "Hello, I'm here for you!",
-            previewTextZH: "你好，我一直在这里！"
+            previewTextZH: "你好，我一直在这里！",
+            sampleFileName: nil
         ),
         VoiceOption(
             id: "female-tianmei",
@@ -30,7 +32,8 @@ extension VoiceOption {
             nameZH: "甜美少女",
             isPremium: true,
             previewTextEN: "Hi, I'm your companion!",
-            previewTextZH: "你好，我是你的小伙伴！"
+            previewTextZH: "你好，我是你的小伙伴！",
+            sampleFileName: "sweet_girl"
         ),
         VoiceOption(
             id: "English_Graceful_Lady",
@@ -38,7 +41,8 @@ extension VoiceOption {
             nameZH: "优雅女声",
             isPremium: true,
             previewTextEN: "I'm always here to listen.",
-            previewTextZH: "我一直在这里倾听。"
+            previewTextZH: "我一直在这里倾听。",
+            sampleFileName: "graceful_lady"
         ),
         VoiceOption(
             id: "female-yujie",
@@ -46,7 +50,8 @@ extension VoiceOption {
             nameZH: "温柔知性",
             isPremium: true,
             previewTextEN: "Take a deep breath with me.",
-            previewTextZH: "跟我一起深呼吸吧。"
+            previewTextZH: "跟我一起深呼吸吧。",
+            sampleFileName: "calm_mature"
         ),
         VoiceOption(
             id: "female-chengshu",
@@ -54,7 +59,8 @@ extension VoiceOption {
             nameZH: "沉稳女声",
             isPremium: true,
             previewTextEN: "Everything will be alright.",
-            previewTextZH: "一切都会好起来的。"
+            previewTextZH: "一切都会好起来的。",
+            sampleFileName: "composed"
         ),
     ]
 }
@@ -64,7 +70,6 @@ extension VoiceOption {
 struct VoiceSelectorView: View {
     @Environment(AppState.self) private var appState
     @State private var playingVoiceId: String? = nil
-    @State private var audioCache: [String: Data] = [:]
 
     private var freeVoices: [VoiceOption] {
         VoiceOption.all.filter { !$0.isPremium }
@@ -141,33 +146,19 @@ struct VoiceSelectorView: View {
                 playingVoiceId = nil
             }
         } else {
-            // Check cache first
-            if let cachedData = audioCache[voice.id] {
+            // Play from bundle sample file
+            if let fileName = voice.sampleFileName,
+               let url = Bundle.main.url(forResource: fileName, withExtension: "mp3") {
                 playingVoiceId = voice.id
-                await MainActor.run { PetVoiceService.playAudioPublic(cachedData) }
-                let estimatedDuration = Double(previewText.count) * 0.1 + 1.5
-                DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
+                let data = try? Data(contentsOf: url)
+                if let data {
+                    await MainActor.run { PetVoiceService.playAudioPublic(data) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                        playingVoiceId = nil
+                    }
+                } else {
                     playingVoiceId = nil
                 }
-                return
-            }
-
-            // Fetch from MiniMax
-            playingVoiceId = voice.id
-            if let audioData = await PetVoiceService.fetchMiniMaxTTS(
-                text: previewText,
-                language: lang,
-                emotion: "calm",
-                voiceId: voice.id
-            ) {
-                audioCache[voice.id] = audioData
-                await MainActor.run { PetVoiceService.playAudioPublic(audioData) }
-                let estimatedDuration = Double(previewText.count) * 0.1 + 1.5
-                DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
-                    playingVoiceId = nil
-                }
-            } else {
-                playingVoiceId = nil
             }
         }
     }

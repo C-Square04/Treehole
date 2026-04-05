@@ -404,6 +404,7 @@ struct PetChatView: View {
 
 struct ChatBubbleView: View {
     let message: ChatMessage
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -434,10 +435,14 @@ struct ChatBubbleView: View {
                                 .strokeBorder(TreeholeTheme.softPurple.opacity(0.3), lineWidth: 1)
                         )
                     HStack(spacing: 8) {
-                        // Replay button
-                        if PetVoiceService.hasCachedAudio(messageId: message.id) {
+                        // Replay button - always show on pet messages
+                        if !message.isFromUser {
                             Button {
-                                PetVoiceService.replay(messageId: message.id)
+                                if PetVoiceService.hasCachedAudio(messageId: message.id) {
+                                    PetVoiceService.replay(messageId: message.id)
+                                } else {
+                                    PetVoiceService.speak(message.text, language: appState.preferredLanguage, mode: message.mode, messageId: message.id)
+                                }
                             } label: {
                                 Image(systemName: "speaker.wave.2.fill")
                                     .font(.system(size: 11))

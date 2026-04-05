@@ -9,14 +9,25 @@ enum PetVoiceService {
 
     /// Speak text using Apple TTS (free, offline)
     static func speak(_ text: String, language: String = "en") {
+        // Must activate audio session before speaking
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: .duckOthers)
+            try session.setActive(true)
+        } catch {
+            print("[TTS] Audio session error: \(error)")
+        }
+
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: language == "zh-Hans" ? "zh-CN" : "en-US")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9  // Slightly slower, more cute
-        utterance.pitchMultiplier = 1.2  // Higher pitch for cute pet voice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9
+        utterance.pitchMultiplier = 1.2
         utterance.volume = 1.0
+        utterance.prefersAssistiveTechnologySettings = false
 
         synthesizer.stopSpeaking(at: .immediate)
         synthesizer.speak(utterance)
+        print("[TTS] Speaking: \(text.prefix(30))...")
     }
 
     /// Stop speaking

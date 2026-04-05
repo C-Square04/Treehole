@@ -134,7 +134,7 @@ enum PetChatService {
         let body: [String: Any] = [
             "model": "MiniMax-M2.5-highspeed",
             "messages": messages,
-            "max_tokens": 200,
+            "max_tokens": 500,
             "temperature": 0.8
         ]
 

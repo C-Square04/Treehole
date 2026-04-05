@@ -43,15 +43,17 @@ enum PetVoiceService {
                 }
             }
         } else {
-            // Basic: Apple TTS (free)
-            do {
-                let session = AVAudioSession.sharedInstance()
-                try session.setCategory(.playback, mode: .default, options: .duckOthers)
-                try session.setActive(true)
-            } catch {
-                print("[TTS] Audio session error: \(error)")
+            // Basic: Apple TTS (free) — must run on main thread
+            Task { @MainActor in
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(.playback, mode: .default, options: .duckOthers)
+                    try session.setActive(true)
+                } catch {
+                    print("[TTS] Audio session error: \(error)")
+                }
+                speakWithApple(cleanText, language: language)
             }
-            speakWithApple(cleanText, language: language)
         }
     }
 

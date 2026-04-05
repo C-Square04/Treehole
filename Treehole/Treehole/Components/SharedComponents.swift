@@ -15,7 +15,7 @@ struct MoodPicker: View {
                         VStack(spacing: 4) {
                             Text(mood.emoji)
                                 .font(.title2)
-                            Text(mood.labelEN)
+                            Text(L10n.t(mood.labelEN, mood.labelZH))
                                 .font(.caption2)
                                 .foregroundStyle(selectedMood == mood ? .primary : .secondary)
                         }

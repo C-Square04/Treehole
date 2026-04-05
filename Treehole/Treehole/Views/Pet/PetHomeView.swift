@@ -18,7 +18,7 @@ struct PetHomeView: View {
             if let pet = pets.first {
                 petContentView(pet: pet)
             } else {
-                ProgressView("Loading...")
+                ProgressView(L10n.t("Loading...", "加载中..."))
                     .onAppear { createPetIfNeeded() }
             }
         }

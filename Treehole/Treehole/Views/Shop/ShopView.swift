@@ -14,6 +14,13 @@ struct ShopView: View {
     enum ShopTab: String, CaseIterable {
         case tasks = "Tasks"
         case shop  = "Shop"
+
+        var localizedLabel: String {
+            switch self {
+            case .tasks: return L10n.t("Tasks", "任务")
+            case .shop:  return L10n.t("Shop", "商店")
+            }
+        }
     }
 
     private var economy: Economy? {
@@ -35,9 +42,9 @@ struct ShopView: View {
                     }
 
                     // Segmented tab picker
-                    Picker("Section", selection: $selectedTab) {
+                    Picker(L10n.t("Section", "分类"), selection: $selectedTab) {
                         ForEach(ShopTab.allCases, id: \.self) { tab in
-                            Text(tab.rawValue).tag(tab)
+                            Text(tab.localizedLabel).tag(tab)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -81,11 +88,11 @@ private struct CurrencyBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            CurrencyItem(emoji: "🍖", label: "Food", value: economy.food)
+            CurrencyItem(emoji: "🍖", label: L10n.t("Food", "食物"), value: economy.food)
             Divider().frame(height: 30)
-            CurrencyItem(emoji: "🎫", label: "Tokens", value: economy.decorationTokens)
+            CurrencyItem(emoji: "🎫", label: L10n.t("Tokens", "装饰币"), value: economy.decorationTokens)
             Divider().frame(height: 30)
-            CurrencyItem(emoji: "💎", label: "Gems", value: economy.gems)
+            CurrencyItem(emoji: "💎", label: L10n.t("Gems", "宝石"), value: economy.gems)
         }
         .glassCard()
     }
@@ -164,8 +171,8 @@ private struct TasksPanel: View {
                 if todayTasks.isEmpty {
                     EmptyStateView(
                         icon: "checkmark.circle",
-                        title: "No Tasks Yet",
-                        message: "Tasks will appear here each day"
+                        title: L10n.t("No Tasks Yet", "暂无任务"),
+                        message: L10n.t("Tasks will appear here each day", "每日任务将在这里显示")
                     )
                     .glassCard()
                 }
@@ -345,11 +352,11 @@ private struct LoginStreakCard: View {
                 HStack(spacing: 6) {
                     Text("🔥")
                         .font(.title2)
-                    Text("Day \(economy.loginStreak)")
+                    Text(L10n.t("Day \(economy.loginStreak)", "第 \(economy.loginStreak) 天"))
                         .font(.title3.bold())
                         .foregroundStyle(TreeholeTheme.textPrimary)
                 }
-                Text("Login Streak")
+                Text(L10n.t("Login Streak", "连续登录"))
                     .font(.caption)
                     .foregroundStyle(TreeholeTheme.textSecondary)
             }
@@ -357,7 +364,7 @@ private struct LoginStreakCard: View {
             Spacer()
 
             if alreadyClaimed {
-                Label("Claimed", systemImage: "checkmark.circle.fill")
+                Label(L10n.t("Claimed", "已领取"), systemImage: "checkmark.circle.fill")
                     .font(.subheadline)
                     .foregroundStyle(TreeholeTheme.mintCream)
                     .padding(.horizontal, 12)
@@ -443,7 +450,7 @@ private struct TaskCard: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(Color.green.opacity(0.7))
-                    Text("Done")
+                    Text(L10n.t("Done", "完成"))
                         .font(.caption2)
                         .foregroundStyle(TreeholeTheme.textLight)
                 }
@@ -467,7 +474,7 @@ private struct ShopPanel: View {
             HStack {
                 Image(systemName: "bag.fill")
                     .foregroundStyle(TreeholeTheme.warmGold)
-                Text("Food Packs")
+                Text(L10n.t("Food Packs", "食物礼包"))
                     .font(.headline)
                     .foregroundStyle(TreeholeTheme.textPrimary)
                 Spacer()
@@ -477,7 +484,7 @@ private struct ShopPanel: View {
             // Food pack cards
             VStack(spacing: TreeholeTheme.spacingSmall) {
                 FoodPackCard(
-                    name: "Small Pack",
+                    name: L10n.t("Small Pack", "小礼包"),
                     emoji: "🍖",
                     foodAmount: 10,
                     tokenCost: 1,
@@ -485,7 +492,7 @@ private struct ShopPanel: View {
                     modelContext: modelContext
                 )
                 FoodPackCard(
-                    name: "Medium Pack",
+                    name: L10n.t("Medium Pack", "中礼包"),
                     emoji: "🍗",
                     foodAmount: 25,
                     tokenCost: 2,
@@ -493,7 +500,7 @@ private struct ShopPanel: View {
                     modelContext: modelContext
                 )
                 FoodPackCard(
-                    name: "Large Pack",
+                    name: L10n.t("Large Pack", "大礼包"),
                     emoji: "🥩",
                     foodAmount: 50,
                     tokenCost: 4,
@@ -507,7 +514,7 @@ private struct ShopPanel: View {
                 HStack {
                     Image(systemName: "sparkles")
                         .foregroundStyle(TreeholeTheme.softPurple)
-                    Text("More Items")
+                    Text(L10n.t("More Items", "更多商品"))
                         .font(.headline)
                         .foregroundStyle(TreeholeTheme.textPrimary)
                     Spacer()
@@ -518,10 +525,10 @@ private struct ShopPanel: View {
                         .font(.title2)
                         .foregroundStyle(TreeholeTheme.softPurple.opacity(0.6))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("More items coming soon!")
+                        Text(L10n.t("More items coming soon!", "更多商品即将推出！"))
                             .font(.subheadline.bold())
                             .foregroundStyle(TreeholeTheme.textSecondary)
-                        Text("Decorations, accessories, and more")
+                        Text(L10n.t("Decorations, accessories, and more", "装饰品、配件等"))
                             .font(.caption)
                             .foregroundStyle(TreeholeTheme.textLight)
                     }

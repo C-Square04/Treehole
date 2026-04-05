@@ -12,6 +12,7 @@ struct PetHomeView: View {
     @State private var economyVM = EconomyViewModel()
     @State private var feedbackText: String?
     @State private var showInsufficientFood = false
+    @State private var showChat = false
 
     var body: some View {
         NavigationStack {
@@ -74,6 +75,19 @@ struct PetHomeView: View {
                         ProgressBar(value: pet.experience, maxValue: pet.nextLevelExp, color: TreeholeTheme.warmGold)
                     }
                     .glassCard()
+
+                    // Chat button
+                    Button {
+                        showChat = true
+                    } label: {
+                        Label(L10n.t("Chat", "聊天"), systemImage: "bubble.left.and.bubble.right.fill")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, TreeholeTheme.spacingSmall)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(TreeholeTheme.warmGold)
+                    .padding(.horizontal)
 
                     // Action buttons
                     HStack(spacing: TreeholeTheme.spacingSmall) {
@@ -181,6 +195,9 @@ struct PetHomeView: View {
             }
         }
         .navigationTitle(L10n.t("Pet", "宠物"))
+        .sheet(isPresented: $showChat) {
+            PetChatView()
+        }
         .onAppear {
             pet.updateHunger()
             _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)

@@ -16,7 +16,8 @@ struct TreeholeApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Pet.self, Plant.self, JournalEntry.self,
-            Economy.self, DailyTask.self, WeeklyChallenge.self
+            Economy.self, DailyTask.self, WeeklyChallenge.self,
+            ChatMessage.self
         ])
 
         // Helper to delete all SwiftData stores

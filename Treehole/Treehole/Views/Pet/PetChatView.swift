@@ -1,0 +1,374 @@
+import SwiftUI
+import SwiftData
+
+struct PetChatView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    @Query(sort: \ChatMessage.createdAt, order: .forward) private var allMessages: [ChatMessage]
+    @Query private var pets: [Pet]
+
+    @State private var inputText = ""
+    @State private var isThinking = false
+    @State private var isSpeaking = false
+    @State private var isListening = false
+    @State private var micPermissionGranted = false
+    @State private var voiceTranscript = ""
+    @State private var ttsEnabled = true
+    @State private var errorMessage: String?
+
+    private var messages: [ChatMessage] {
+        Array(allMessages.suffix(20))
+    }
+
+    private var pet: Pet? {
+        pets.first
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TreeholeTheme.cloudyBackground
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    hungerBanner
+
+                    chatScrollView
+
+                    if isThinking {
+                        typingIndicator
+                    }
+
+                    inputBar
+                }
+            }
+            .navigationTitle(L10n.t("Chat with Companion 🐱", "与伴侣聊天 🐱"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(L10n.t("Done", "完成")) { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        ttsEnabled.toggle()
+                        if !ttsEnabled { PetVoiceService.stopSpeaking() }
+                    } label: {
+                        Image(systemName: ttsEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                            .foregroundStyle(ttsEnabled ? TreeholeTheme.softPurple : TreeholeTheme.textSecondary)
+                    }
+                }
+            }
+            .onAppear {
+                Task { await requestPermissions() }
+                sendWelcomeIfNeeded()
+            }
+            .onDisappear {
+                PetVoiceService.stopSpeaking()
+                if isListening { PetVoiceService.stopListening() }
+            }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var hungerBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "fork.knife")
+                .foregroundStyle(TreeholeTheme.coral)
+            let hunger = pet?.hungerLevel ?? 0
+            Text(L10n.t("Hunger: \(hunger)/100", "饥饿度: \(hunger)/100"))
+                .font(.caption.bold())
+                .foregroundStyle(hunger == 0 ? TreeholeTheme.coral : TreeholeTheme.textSecondary)
+            Spacer()
+            if hunger == 0 {
+                Text(L10n.t("Feed me to chat!", "喂我才能聊天！"))
+                    .font(.caption)
+                    .foregroundStyle(TreeholeTheme.coral)
+            }
+        }
+        .padding(.horizontal, TreeholeTheme.spacingMedium)
+        .padding(.vertical, TreeholeTheme.spacingTight)
+        .background(.ultraThinMaterial)
+    }
+
+    private var chatScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: TreeholeTheme.spacingSmall) {
+                    ForEach(messages) { message in
+                        ChatBubbleView(message: message)
+                            .id(message.id)
+                    }
+
+                    if isSpeaking {
+                        speakingIndicator
+                            .id("speaking")
+                    }
+
+                    // Spacer anchor for scroll-to-bottom
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom")
+                }
+                .padding(TreeholeTheme.spacingMedium)
+            }
+            .onChange(of: allMessages.count) { _, _ in
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            .onChange(of: isSpeaking) { _, _ in
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            .onAppear {
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
+        }
+    }
+
+    private var typingIndicator: some View {
+        HStack(spacing: TreeholeTheme.spacingTight) {
+            Text("🐱")
+                .font(.title3)
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(TreeholeTheme.softPurple)
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(isThinking ? 1.2 : 0.8)
+                        .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15), value: isThinking)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(TreeholeTheme.softPurple.opacity(0.15), in: RoundedRectangle(cornerRadius: 18))
+            Spacer()
+        }
+        .padding(.horizontal, TreeholeTheme.spacingMedium)
+        .padding(.bottom, 4)
+    }
+
+    private var speakingIndicator: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "speaker.wave.2.fill")
+                .foregroundStyle(TreeholeTheme.softPurple)
+                .symbolEffect(.variableColor.iterative)
+            Text(L10n.t("Pet is speaking...", "宠物正在说话..."))
+                .font(.caption)
+                .foregroundStyle(TreeholeTheme.textSecondary)
+        }
+        .padding(.horizontal, TreeholeTheme.spacingMedium)
+        .padding(.vertical, TreeholeTheme.spacingTight)
+        .background(TreeholeTheme.softPurple.opacity(0.1), in: Capsule())
+    }
+
+    private var inputBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: TreeholeTheme.spacingSmall) {
+                // Microphone button
+                Button {
+                    Task { await toggleListening() }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(isListening ? TreeholeTheme.coral : TreeholeTheme.softPurple.opacity(0.2))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: isListening ? "waveform" : "mic.fill")
+                            .foregroundStyle(isListening ? .white : TreeholeTheme.softPurple)
+                            .font(.system(size: 16))
+                            .symbolEffect(.variableColor.iterative, isActive: isListening)
+                    }
+                }
+                .disabled((pet?.hungerLevel ?? 0) == 0)
+
+                // Text field
+                ZStack(alignment: .leading) {
+                    if inputText.isEmpty && voiceTranscript.isEmpty {
+                        Text(L10n.t("Type a message...", "输入消息..."))
+                            .foregroundStyle(TreeholeTheme.textLight)
+                            .font(.subheadline)
+                    }
+                    TextField("", text: isListening ? $voiceTranscript : $inputText, axis: .vertical)
+                        .font(.subheadline)
+                        .lineLimit(4)
+                        .disabled(isListening)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+
+                // Send button
+                Button {
+                    Task { await sendMessage() }
+                } label: {
+                    Circle()
+                        .fill(canSend ? TreeholeTheme.warmGold : TreeholeTheme.textLight.opacity(0.3))
+                        .frame(width: 40, height: 40)
+                        .overlay {
+                            Image(systemName: "arrow.up")
+                                .foregroundStyle(canSend ? TreeholeTheme.textPrimary : .white)
+                                .font(.system(size: 16, weight: .bold))
+                        }
+                }
+                .disabled(!canSend)
+            }
+            .padding(.horizontal, TreeholeTheme.spacingMedium)
+            .padding(.vertical, TreeholeTheme.spacingSmall)
+            .background(.ultraThinMaterial)
+        }
+    }
+
+    // MARK: - Computed
+
+    private var canSend: Bool {
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !text.isEmpty && !isThinking && (pet?.hungerLevel ?? 0) > 0
+    }
+
+    // MARK: - Actions
+
+    private func requestPermissions() async {
+        micPermissionGranted = await PetVoiceService.requestSTTPermission()
+    }
+
+    private func sendWelcomeIfNeeded() {
+        guard allMessages.isEmpty, let pet = pets.first else { return }
+        let lang = appState.preferredLanguage
+        let welcome = lang == "zh-Hans"
+            ? "喵~ 你好！我是\(pet.name)，很高兴见到你 😊 今天心情怎么样？"
+            : "Meow~ Hi there! I'm \(pet.name), so glad to see you 😊 How are you feeling today?"
+        let msg = ChatMessage(text: welcome, isFromUser: false)
+        modelContext.insert(msg)
+        try? modelContext.save()
+        if ttsEnabled {
+            PetVoiceService.speak(welcome, language: lang)
+            isSpeaking = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { isSpeaking = false }
+        }
+    }
+
+    private func sendMessage() async {
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let pet = pets.first else { return }
+        guard pet.hungerLevel > 0 else { return }
+
+        inputText = ""
+
+        // Save user message
+        let userMsg = ChatMessage(text: text, isFromUser: true)
+        modelContext.insert(userMsg)
+
+        // Decrease hunger by 1
+        pet.hungerLevel = max(0, pet.hungerLevel - 1)
+        try? modelContext.save()
+
+        // Show typing indicator
+        isThinking = true
+
+        // Build history for context
+        let history = allMessages.suffix(10).map { msg -> (role: String, content: String) in
+            (role: msg.isFromUser ? "user" : "assistant", content: msg.text)
+        }
+
+        // Get AI reply
+        let reply = await PetChatService.generateReply(
+            userMessage: text,
+            recentHistory: history,
+            petMood: pet.mood.labelEN,
+            petHunger: pet.hungerLevel
+        )
+
+        isThinking = false
+
+        // Save pet reply
+        let petMsg = ChatMessage(text: reply, isFromUser: false)
+        modelContext.insert(petMsg)
+        try? modelContext.save()
+
+        // TTS
+        if ttsEnabled {
+            isSpeaking = true
+            PetVoiceService.speak(reply, language: appState.preferredLanguage)
+            let estimatedDuration = Double(reply.count) * 0.08 + 1.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
+                isSpeaking = false
+            }
+        }
+    }
+
+    private func toggleListening() async {
+        if isListening {
+            // Stop listening and send transcribed text
+            PetVoiceService.stopListening()
+            isListening = false
+            let transcript = voiceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+            voiceTranscript = ""
+            if !transcript.isEmpty {
+                inputText = transcript
+                await sendMessage()
+            }
+        } else {
+            guard micPermissionGranted else {
+                micPermissionGranted = await PetVoiceService.requestSTTPermission()
+                return
+            }
+            isListening = true
+            voiceTranscript = ""
+            do {
+                let stream = try await PetVoiceService.startListening(language: appState.preferredLanguage)
+                for await partial in stream {
+                    voiceTranscript = partial
+                }
+                // Stream ended (final result)
+                isListening = false
+                let transcript = voiceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+                voiceTranscript = ""
+                if !transcript.isEmpty {
+                    inputText = transcript
+                    await sendMessage()
+                }
+            } catch {
+                isListening = false
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+// MARK: - Chat Bubble
+
+struct ChatBubbleView: View {
+    let message: ChatMessage
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if message.isFromUser {
+                Spacer(minLength: 60)
+                Text(message.text)
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(TreeholeTheme.coral.opacity(0.2), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(TreeholeTheme.coral.opacity(0.3), lineWidth: 1)
+                    )
+            } else {
+                Text("🐱")
+                    .font(.title3)
+                Text(message.text)
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(TreeholeTheme.softPurple.opacity(0.15), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(TreeholeTheme.softPurple.opacity(0.3), lineWidth: 1)
+                    )
+                Spacer(minLength: 60)
+            }
+        }
+    }
+}

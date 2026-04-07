@@ -316,7 +316,8 @@ struct PetChatView: View {
         modelContext.insert(msg)
         try? modelContext.save()
         if ttsEnabled {
-            PetVoiceService.speak(welcome, language: lang)
+            // Welcome line always uses the premium "sweet girl" voice for warmth.
+            PetVoiceService.speak(welcome, language: lang, mode: .premium, messageId: msg.id)
             isSpeaking = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { isSpeaking = false }
         }

@@ -85,7 +85,7 @@ struct JournalDetailView: View {
                                         .foregroundStyle(TreeholeTheme.textSecondary)
                                 }
                             } else if let s = existingSummary {
-                                Text(s.summary)
+                                Text(renderMarkdown(s.summary))
                                     .font(.subheadline)
                                     .foregroundStyle(TreeholeTheme.textSecondary)
                             } else {

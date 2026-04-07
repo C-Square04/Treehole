@@ -16,6 +16,7 @@ struct JournalView: View {
     @State private var draftText = ""
     @State private var draftMood: MoodTag = .calm
     @State private var draftPhotoData: [Data] = []
+    @State private var draftDate: Date = Date()
     @State private var isGeneratingInsights = false
     @State private var isGeneratingWeekly = false
 
@@ -159,8 +160,18 @@ struct JournalView: View {
                     draftText: $draftText,
                     draftMood: $draftMood,
                     draftPhotoData: $draftPhotoData,
+                    draftDate: $draftDate,
+                    allowAnyDate: appState.isDeveloperMode,
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
+                        // Backdating: keep current time-of-day on the chosen day so sort still feels natural.
+                        let cal = Calendar.current
+                        let timeComps = cal.dateComponents([.hour, .minute, .second], from: Date())
+                        var dayComps = cal.dateComponents([.year, .month, .day], from: draftDate)
+                        dayComps.hour = timeComps.hour
+                        dayComps.minute = timeComps.minute
+                        dayComps.second = timeComps.second
+                        entry.createdAt = cal.date(from: dayComps) ?? draftDate
                         if !draftPhotoData.isEmpty {
                             var filenames: [String] = []
                             for data in draftPhotoData {
@@ -181,6 +192,7 @@ struct JournalView: View {
                         draftText = ""
                         draftMood = .calm
                         draftPhotoData = []
+                        draftDate = Date()
                         showNewEntry = false
                     }
                 )
@@ -416,12 +428,28 @@ private struct JournalEntryEditor: View {
     @Binding var draftText: String
     @Binding var draftMood: MoodTag
     @Binding var draftPhotoData: [Data]
+    @Binding var draftDate: Date
+    let allowAnyDate: Bool
     let onSave: () -> Void
 
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
 
     private let maxPhotos = 3
+
+    private var dateRange: ClosedRange<Date> {
+        let now = Date()
+        if allowAnyDate {
+            // Allow up to 1 year in past to 1 year in future for developer mode.
+            let cal = Calendar.current
+            let lower = cal.date(byAdding: .year, value: -1, to: now) ?? now
+            let upper = cal.date(byAdding: .year, value: 1, to: now) ?? now
+            return lower...upper
+        }
+        let cal = Calendar.current
+        let threeDaysAgo = cal.date(byAdding: .day, value: -3, to: cal.startOfDay(for: now)) ?? now
+        return threeDaysAgo...now
+    }
 
     var body: some View {
         NavigationStack {
@@ -430,6 +458,30 @@ private struct JournalEntryEditor: View {
 
                 ScrollView {
                     VStack(spacing: TreeholeTheme.spacingLarge) {
+                        // Date picker — backdate up to 3 days; developer mode allows any date
+                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+                            Text(L10n.t("Date", "日期"))
+                                .font(.headline)
+                                .foregroundStyle(TreeholeTheme.textPrimary)
+                            DatePicker(
+                                "",
+                                selection: $draftDate,
+                                in: dateRange,
+                                displayedComponents: .date
+                            )
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            if allowAnyDate {
+                                Text(L10n.t("Developer mode: any date allowed", "开发者模式：可选任意日期"))
+                                    .font(.caption2)
+                                    .foregroundStyle(TreeholeTheme.warmGold)
+                            } else {
+                                Text(L10n.t("You can backdate up to 3 days", "可以补写最近 3 天的日记"))
+                                    .font(.caption2)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+                        }
+
                         // Mood picker
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
                             Text(L10n.t("How are you feeling?", "你现在感觉怎么样？"))
@@ -614,7 +666,7 @@ private struct AIInsightsCard: View {
                         .foregroundStyle(TreeholeTheme.textSecondary)
                 }
             } else if let insights = latestInsights {
-                Text(insights.summary)
+                Text(renderMarkdown(insights.summary))
                     .font(.subheadline)
                     .foregroundStyle(TreeholeTheme.textSecondary)
                 Text(L10n.t("Generated \(insights.generatedAt.formatted(.relative(presentation: .named)))", "生成于 \(insights.generatedAt.formatted(date: .abbreviated, time: .omitted))"))
@@ -682,7 +734,7 @@ private struct AIWeeklySummaryCard: View {
                     .foregroundStyle(TreeholeTheme.textPrimary)
                 Spacer()
             }
-            Text(summary.summary)
+            Text(renderMarkdown(summary.summary))
                 .font(.subheadline)
                 .foregroundStyle(TreeholeTheme.textSecondary)
             Text(L10n.t("Week of \(summary.periodStart.formatted(date: .abbreviated, time: .omitted))", "\(summary.periodStart.formatted(date: .abbreviated, time: .omitted)) 这周"))
@@ -695,6 +747,20 @@ private struct AIWeeklySummaryCard: View {
 }
 
 // MARK: - Mini Stat
+
+// MARK: - Markdown helper
+
+/// Render AI-generated markdown text (e.g. **bold**, *italic*, lists) into an AttributedString.
+/// Falls back to plain text if parsing fails.
+func renderMarkdown(_ raw: String) -> AttributedString {
+    let options = AttributedString.MarkdownParsingOptions(
+        interpretedSyntax: .inlineOnlyPreservingWhitespace
+    )
+    if let attributed = try? AttributedString(markdown: raw, options: options) {
+        return attributed
+    }
+    return AttributedString(raw)
+}
 
 private struct MiniStat: View {
     let label: String

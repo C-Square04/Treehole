@@ -203,6 +203,17 @@ struct SettingsView: View {
                     }
                 }
 
+                // AI Insights
+                Section(L10n.t("AI Insights", "AI 洞察")) {
+                    Toggle(L10n.t("Allow AI to analyze my journal", "允许 AI 分析我的日记"), isOn: $state.allowAIJournalAnalysis)
+                    Text(L10n.t(
+                        "When enabled, journal entries are sent to our AI service to generate weekly summaries and gentle insights. Your entries are not stored on our servers.",
+                        "开启后，日记内容会发送给 AI 服务以生成每周摘要和温柔洞察。你的日记不会存储在我们的服务器上。"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(TreeholeTheme.textLight)
+                }
+
                 // Subscription section (mock)
                 Section(L10n.t("Subscription", "订阅")) {
                     HStack {
@@ -398,6 +409,7 @@ struct SettingsView: View {
             try modelContext.delete(model: DailyTask.self)
             try modelContext.delete(model: WeeklyChallenge.self)
             try modelContext.delete(model: ChatMessage.self)
+            try modelContext.delete(model: JournalSummary.self)
             try modelContext.save()
             print("[DELETE] SwiftData cleared")
         } catch {

@@ -5,12 +5,18 @@ struct JournalDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Query(sort: \JournalSummary.generatedAt, order: .reverse) private var allSummaries: [JournalSummary]
     let entry: JournalEntry
 
     @State private var showDeleteConfirm = false
+    @State private var isGeneratingSummary = false
 
     var moodLabel: String {
         appState.preferredLanguage == "zh-Hans" ? entry.moodTag.labelZH : entry.moodTag.labelEN
+    }
+
+    private var existingSummary: JournalSummary? {
+        allSummaries.first { $0.kindRaw == "single" && $0.sourceEntryId == entry.id }
     }
 
     var body: some View {
@@ -43,6 +49,54 @@ struct JournalDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .glassCard()
+
+                    // MARK: - AI Summary Section
+                    if appState.allowAIJournalAnalysis {
+                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+                            HStack {
+                                Image(systemName: "sparkles")
+                                    .foregroundStyle(TreeholeTheme.softPurple)
+                                Text(L10n.t("AI Summary", "AI 摘要"))
+                                    .font(.headline)
+                                    .foregroundStyle(TreeholeTheme.textPrimary)
+                                Spacer()
+                                if existingSummary == nil {
+                                    Button {
+                                        generateEntrySummary()
+                                    } label: {
+                                        if isGeneratingSummary {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        } else {
+                                            Text(L10n.t("Generate", "生成"))
+                                                .font(.subheadline)
+                                                .foregroundStyle(TreeholeTheme.softPurple)
+                                        }
+                                    }
+                                    .disabled(isGeneratingSummary)
+                                }
+                            }
+
+                            if isGeneratingSummary {
+                                HStack {
+                                    ProgressView()
+                                    Text(L10n.t("Analyzing…", "分析中…"))
+                                        .font(.subheadline)
+                                        .foregroundStyle(TreeholeTheme.textSecondary)
+                                }
+                            } else if let s = existingSummary {
+                                Text(s.summary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(TreeholeTheme.textSecondary)
+                            } else {
+                                Text(L10n.t("Tap Generate to create an AI summary of this entry.", "点击生成，为此篇日记创建 AI 摘要。"))
+                                    .font(.caption)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .glassCard()
+                    }
 
                     // MARK: - Photo Gallery
                     if let filenames = entry.photoFilenames, !filenames.isEmpty {
@@ -111,6 +165,37 @@ struct JournalDetailView: View {
             Button(L10n.t("Cancel", "取消"), role: .cancel) {}
         } message: {
             Text(L10n.t("This action cannot be undone.", "此操作无法撤销。"))
+        }
+    }
+
+    private func generateEntrySummary() {
+        guard appState.allowAIJournalAnalysis else { return }
+        guard existingSummary == nil else { return }
+        guard !isGeneratingSummary else { return }
+        isGeneratingSummary = true
+        let language = appState.preferredLanguage
+        let entryId = entry.id
+        let dateStr = entry.createdAt.formatted(.iso8601.year().month().day())
+        let mood = entry.moodTag.rawValue
+        let text = entry.text
+        let entryDate = entry.createdAt
+        Task {
+            defer { isGeneratingSummary = false }
+            guard let result = try? await SupabaseService.summarizeJournal(
+                mode: "single",
+                language: language,
+                entries: [(date: dateStr, mood: mood, text: text)]
+            ) else { return }
+            let summary = JournalSummary(
+                kind: .single,
+                periodStart: entryDate,
+                periodEnd: entryDate,
+                summary: result,
+                language: language,
+                sourceEntryId: entryId
+            )
+            modelContext.insert(summary)
+            try? modelContext.save()
         }
     }
 }

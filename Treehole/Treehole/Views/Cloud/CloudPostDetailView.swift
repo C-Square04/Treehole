@@ -242,6 +242,7 @@ struct CloudPostDetailView: View {
             )
             comments.append(newComment)
             commentText = ""
+            AnalyticsService.track("cloud_commented")
         } catch {
             commentError = error.localizedDescription
         }
@@ -385,6 +386,7 @@ struct ReactionBar: View {
                 try await SupabaseService.removeReaction(postId: postId, type: type)
             } else {
                 try await SupabaseService.addReaction(postId: postId, type: type)
+                AnalyticsService.track("cloud_reacted", properties: ["type": type])
             }
             // Refresh counts from server
             let updated = try await SupabaseService.fetchReactionCounts(postId: postId)

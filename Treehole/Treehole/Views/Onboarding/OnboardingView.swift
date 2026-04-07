@@ -45,7 +45,7 @@ private struct WelcomePage: View {
             Image(systemName: "cloud.sun.fill")
                 .font(.system(size: 80))
                 .foregroundStyle(TreeholeTheme.warmGold, TreeholeTheme.skyBlue)
-                .symbolEffect(.breathe)
+                .symbolEffect(.pulse)
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
                 Text(L10n.t("Welcome to Treehole", "欢迎来到树洞"))

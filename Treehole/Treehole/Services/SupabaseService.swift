@@ -571,6 +571,51 @@ enum SupabaseService {
         }
     }
 
+    // MARK: - AI Journal Summary (MiniMax via Edge Function)
+
+    static func summarizeJournal(
+        mode: String,
+        language: String,
+        entries: [(date: String, mood: String, text: String)]
+    ) async throws -> String? {
+        let urlString = "\(SupabaseConfig.projectURL)/functions/v1/summarize-journal"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+
+        struct EntryPayload: Codable {
+            let date: String
+            let mood: String
+            let text: String
+        }
+        struct SummarizeRequest: Codable {
+            let mode: String
+            let language: String
+            let entries: [EntryPayload]
+        }
+        struct SummarizeResponse: Codable {
+            let summary: String?
+        }
+
+        let payload = SummarizeRequest(
+            mode: mode,
+            language: language,
+            entries: entries.map { EntryPayload(date: $0.date, mood: $0.mood, text: $0.text) }
+        )
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            return nil
+        }
+
+        let result = try JSONDecoder().decode(SummarizeResponse.self, from: data)
+        return result.summary
+    }
+
     // MARK: - Fetch reaction counts for a post
 
     static func fetchReactionCounts(postId: String) async throws -> ReactionCounts {
@@ -594,6 +639,75 @@ enum SupabaseService {
             starlightCount: 0,
             totalCount: 0
         )
+    }
+
+    // MARK: - Fetch unread interaction counts (comments + reactions on own posts)
+
+    static func fetchUnreadCount(since: Date) async -> (commentCount: Int, reactionCount: Int) {
+        let urlString = "\(SupabaseConfig.restURL)/rpc/get_my_unread_count"
+        guard let url = URL(string: urlString) else {
+            print("[API] fetchUnreadCount: invalid URL")
+            return (0, 0)
+        }
+
+        let iso = ISO8601DateFormatter()
+        let sinceStr = iso.string(from: since)
+
+        struct UnreadRequest: Codable {
+            let requestingDeviceId: String
+            let requestingAppleUserId: String?
+            let since: String
+            enum CodingKeys: String, CodingKey {
+                case requestingDeviceId = "requesting_device_id"
+                case requestingAppleUserId = "requesting_apple_user_id"
+                case since
+            }
+        }
+
+        let body = UnreadRequest(
+            requestingDeviceId: SupabaseConfig.deviceId,
+            requestingAppleUserId: SupabaseConfig.appleUserID,
+            since: sinceStr
+        )
+
+        guard let jsonData = try? JSONEncoder().encode(body) else {
+            print("[API] fetchUnreadCount: encoding failed")
+            return (0, 0)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        request.timeoutInterval = 10
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                print("[API] fetchUnreadCount: status=\(status)")
+                return (0, 0)
+            }
+
+            struct UnreadRow: Codable {
+                let commentCount: Int
+                let reactionCount: Int
+                enum CodingKeys: String, CodingKey {
+                    case commentCount = "comment_count"
+                    case reactionCount = "reaction_count"
+                }
+            }
+
+            if let rows = try? JSONDecoder().decode([UnreadRow].self, from: data),
+               let first = rows.first {
+                return (first.commentCount, first.reactionCount)
+            }
+        } catch {
+            print("[API] fetchUnreadCount: \(error.localizedDescription)")
+        }
+        return (0, 0)
     }
 
     // MARK: - Fetch current device's reactions on a post

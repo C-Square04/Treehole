@@ -62,6 +62,7 @@ final class CloudPostViewModel {
             )
             remotePosts.insert(newPost, at: 0)
             didCreatePost = true
+            AnalyticsService.track("cloud_posted", properties: ["mood": mood.rawValue])
 
             // Step 2: AI moderation + NPC reply in background (non-blocking)
             let postId = newPost.id

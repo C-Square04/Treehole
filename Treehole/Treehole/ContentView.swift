@@ -20,21 +20,21 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            Tab(L10n.t("Clouds", "云朵"), systemImage: "cloud.fill", value: 0) {
-                CloudPostListView()
-            }
-            Tab(L10n.t("Pet", "宠物"), systemImage: "cat.fill", value: 1) {
-                PetHomeView()
-            }
-            Tab(L10n.t("Garden", "花园"), systemImage: "leaf.fill", value: 2) {
-                PlantGardenView()
-            }
-            Tab(L10n.t("Journal", "日记"), systemImage: "book.fill", value: 3) {
-                JournalView()
-            }
-            Tab(L10n.t("Me", "我"), systemImage: "person.fill", value: 4) {
-                MeView()
-            }
+            CloudPostListView()
+                .tabItem { Label(L10n.t("Clouds", "云朵"), systemImage: "cloud.fill") }
+                .tag(0)
+            PetHomeView()
+                .tabItem { Label(L10n.t("Pet", "宠物"), systemImage: "cat.fill") }
+                .tag(1)
+            PlantGardenView()
+                .tabItem { Label(L10n.t("Garden", "花园"), systemImage: "leaf.fill") }
+                .tag(2)
+            JournalView()
+                .tabItem { Label(L10n.t("Journal", "日记"), systemImage: "book.fill") }
+                .tag(3)
+            MeView()
+                .tabItem { Label(L10n.t("Me", "我"), systemImage: "person.fill") }
+                .tag(4)
         }
         .tint(TreeholeTheme.softPurple)
     }

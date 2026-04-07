@@ -20,6 +20,9 @@ final class AppState {
         didSet {
             L10n.lang = preferredLanguage
             saveState()
+            if !isLoading {
+                AnalyticsService.track("language_switched", properties: ["language": preferredLanguage])
+            }
         }
     }
     var isDarkMode: Bool = false {
@@ -39,6 +42,9 @@ final class AppState {
         didSet { saveState() }
     }
     var selectedVoiceId: String = "apple_default" {
+        didSet { saveState() }
+    }
+    var allowAIJournalAnalysis: Bool = false {
         didSet { saveState() }
     }
 
@@ -197,6 +203,7 @@ final class AppState {
         defaults.set(appleUserEmail, forKey: "appleUserEmail")
         defaults.set(isSubscribed, forKey: "isSubscribed")
         defaults.set(selectedVoiceId, forKey: "selectedVoiceId")
+        defaults.set(allowAIJournalAnalysis, forKey: "allowAIJournalAnalysis")
     }
 
     private func loadState() {
@@ -215,6 +222,7 @@ final class AppState {
         isSubscribed = defaults.bool(forKey: "isSubscribed")
         selectedVoiceId = defaults.string(forKey: "selectedVoiceId") ?? "apple_default"
         colorSchemePreference = defaults.string(forKey: "colorSchemePreference") ?? "system"
+        allowAIJournalAnalysis = defaults.bool(forKey: "allowAIJournalAnalysis")
     }
 
     // MARK: - Subscriber Bonus

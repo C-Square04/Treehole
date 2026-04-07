@@ -345,6 +345,7 @@ struct PetChatView: View {
         // Decrease hunger
         pet.hungerLevel = max(0, pet.hungerLevel - cost)
         try? modelContext.save()
+        AnalyticsService.track("pet_chatted")
 
         // Show typing indicator
         isThinking = true

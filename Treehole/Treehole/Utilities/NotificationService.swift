@@ -8,6 +8,12 @@ enum NotificationService {
     private static let feedingID = "feeding_reminder"
     private static let wateringID = "watering_reminder"
     private static let checkinID = "checkin_reminder"
+    private static let eveningCheckinID = "eveningCheckIn"
+
+    // MARK: - UserDefaults keys
+
+    static let lastUnreadCheckKey = "notif_lastUnreadCheck"
+    static let lastNotificationFiredKey = "notif_lastNotificationFired"
 
     // MARK: - Schedule Feeding Reminder (fires 4 hours after last feed)
 
@@ -53,18 +59,62 @@ enum NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
-    // MARK: - Schedule Daily Check-In Reminder at 9 AM
+    // MARK: - Schedule Daily Check-In Reminder at 9 AM (with dynamic unread count)
 
     static func scheduleDailyCheckIn() {
         cancel(type: checkinID)
 
+        // Fetch unread count asynchronously; schedule notification afterward
+        Task.detached {
+            let since = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+            let (commentCount, reactionCount) = await SupabaseService.fetchUnreadCount(since: since)
+            let total = commentCount + reactionCount
+
+            let content = UNMutableNotificationContent()
+            content.title = L10n.t("Good morning!", "早上好！")
+
+            if total > 0 {
+                content.body = L10n.t(
+                    "\(total) new clouds are waiting for you ☁️",
+                    "\(total) 条新消息在等你 ☁️"
+                )
+            } else {
+                content.body = L10n.t(
+                    "Take a moment to check in with yourself 💙",
+                    "花点时间关注一下自己 💙"
+                )
+            }
+            content.sound = .default
+
+            var dateComponents = DateComponents()
+            dateComponents.hour = 9
+            dateComponents.minute = 0
+
+            let trigger = UNCalendarNotificationTrigger(
+                dateMatching: dateComponents,
+                repeats: true
+            )
+            let request = UNNotificationRequest(
+                identifier: checkinID,
+                content: content,
+                trigger: trigger
+            )
+            try? await UNUserNotificationCenter.current().add(request)
+        }
+    }
+
+    // MARK: - Schedule Evening Check-In Reminder at 6 PM
+
+    static func scheduleEveningCheckIn() {
+        cancel(type: eveningCheckinID)
+
         let content = UNMutableNotificationContent()
-        content.title = L10n.t("Good morning!", "早上好！")
-        content.body = L10n.t("Check in to keep your streak going", "签到保持连续记录")
+        content.title = L10n.t("Evening check-in", "晚间问候")
+        content.body = L10n.t("Your tree pet misses you 🐱 Stop by for a moment", "你的树洞宠物想你了 🐱 来看看吧")
         content.sound = .default
 
         var dateComponents = DateComponents()
-        dateComponents.hour = 9
+        dateComponents.hour = 18
         dateComponents.minute = 0
 
         let trigger = UNCalendarNotificationTrigger(
@@ -72,11 +122,75 @@ enum NotificationService {
             repeats: true
         )
         let request = UNNotificationRequest(
-            identifier: checkinID,
+            identifier: eveningCheckinID,
             content: content,
             trigger: trigger
         )
         UNUserNotificationCenter.current().add(request)
+    }
+
+    // MARK: - Schedule All Daily Notifications
+
+    static func scheduleAllNotifications() {
+        scheduleDailyCheckIn()
+        scheduleEveningCheckIn()
+    }
+
+    // MARK: - Check Unread Interactions and Notify
+
+    /// Call from scene active. Fetches unread counts since last check and fires a
+    /// local notification if interactions exist. Throttled to once per 6 hours.
+    static func checkUnreadInteractionsAndNotify() async {
+        let defaults = UserDefaults.standard
+
+        // Throttle: don't fire more than once per 6 hours
+        if let lastFired = defaults.object(forKey: lastNotificationFiredKey) as? Date {
+            let sixHours: TimeInterval = 6 * 3600
+            if Date().timeIntervalSince(lastFired) < sixHours {
+                return
+            }
+        }
+
+        // Determine since date (default: 7 days ago)
+        let since: Date
+        if let stored = defaults.object(forKey: lastUnreadCheckKey) as? Date {
+            since = stored
+        } else {
+            since = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        }
+
+        let (commentCount, reactionCount) = await SupabaseService.fetchUnreadCount(since: since)
+        let total = commentCount + reactionCount
+
+        guard total > 0 else {
+            // Update check timestamp even when no unread, so we move window forward
+            defaults.set(Date(), forKey: lastUnreadCheckKey)
+            return
+        }
+
+        // Fire immediate local notification
+        let content = UNMutableNotificationContent()
+        content.title = L10n.t("New replies on your clouds", "你的云朵收到新回复")
+        content.body = L10n.t(
+            "\(commentCount) new comments and \(reactionCount) new reactions",
+            "\(commentCount) 条新评论和 \(reactionCount) 个新反应"
+        )
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "unread_interactions_\(UUID().uuidString)",
+            content: content,
+            trigger: nil // fire immediately
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("[Notification] checkUnreadInteractionsAndNotify failed: \(error)")
+            }
+        }
+
+        // Update timestamps after firing
+        defaults.set(Date(), forKey: lastUnreadCheckKey)
+        defaults.set(Date(), forKey: lastNotificationFiredKey)
     }
 
     // MARK: - Cancel All Scheduled Reminders

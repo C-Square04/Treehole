@@ -8,9 +8,9 @@
 Treehole is an iOS app for anonymous emotional expression and gentle self-care. Inspired by the ancient idea of whispering secrets into a tree hollow, users release feelings as **drift bottle clouds** that float in a shared sky — any stranger can "grab a cloud" and read it, react with a breeze, hug, or starlight, and leave an NPC-powered reply. Alongside the cloud space, users raise a virtual cat, tend a multi-plant garden, and keep a private journal — all within one cozy, bilingual app.
 
 - **Bundle ID:** com.csquare04.Treehole
-- **Platform:** iOS 18.1+, SwiftUI + SwiftData + CloudKit + @Observable, Swift 6
+- **Platform:** iOS 17.0+, SwiftUI + SwiftData + CloudKit + @Observable, Swift 6
 - **Backend:** Supabase (PostgreSQL + Edge Functions)
-- **AI:** MiniMax M2.7-highspeed via Supabase Edge Functions (content moderation + NPC replies + pet chat + pet TTS)
+- **AI:** MiniMax M2.7-highspeed via Supabase Edge Functions (content moderation, NPC replies, pet chat, pet TTS, journal summarization with auto-language detection)
 - **Distribution:** TestFlight (Toki Studio)
 
 ---
@@ -22,11 +22,13 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Drift Bottle Clouds | Anonymous posting, "grab a cloud" for random posts (no repeats — server tracks grabbed history per user), comments, reactions (breeze / hug / starlight) with visual effects, My Clouds management, 3-layer content moderation |
 | Virtual Pet | Cartoon cat with mood-based animations, feed / pet / rest actions, hunger / energy / XP / level system, 4 home themes, feeding costs food currency |
 | Plant Garden | Up to 5 plants, 5 species, 5 growth stages per species, watering grants XP, custom plant visual art |
-| Journal | Mood-tagged entries, photo support (up to 3 photos, iCloud synced), mood week calendar strip, mood statistics (week / month / year), mood distribution chart, streak tracking, entry detail view |
+| Journal | Mood-tagged entries, photo support (up to 3 photos, iCloud synced), mood week calendar strip, mood statistics (week / month / year), mood distribution chart, streak tracking, entry detail view, **AI Insights card + auto weekly summary + per-entry AI summary (opt-in)** |
+| Notifications | Daily 9 AM check-in (enriched with unread cloud reply count), evening 6 PM pet reminder, on-launch unread interaction local notification (6h throttle), feeding / watering reminders |
+| Analytics | Anonymous event tracking via Supabase `analytics_events` table — fire-and-forget, never blocks UI, never logs user content text |
 | Economy | Food / Decoration Tokens / Gems currencies, 4 daily task types, 4 weekly challenge types, login streak rewards, shop (buy food with tokens) |
 | Privacy Lock | Apple-style 4-digit passcode (Keychain stored), FaceID / TouchID, lock My Clouds and/or Journal independently, gate page before passcode entry |
 | Onboarding | 4-page flow: welcome, features, privacy & aliases, get started (Apple Sign-In or Guest) |
-| Settings | Account, alias explanation, privacy lock, appearance (language / dark mode), iCloud sync status (real CKContainer.accountStatus check, requires Apple sign-in), privacy policy, hidden developer debug panel (5-tap version trigger) |
+| Settings | Account, alias explanation, privacy lock, appearance (language / dark mode), iCloud sync status (real CKContainer.accountStatus check, requires Apple sign-in), [privacy policy](https://c-square04.github.io/Treehole/privacy.html), hidden developer debug panel (5-tap version trigger) |
 | Authentication | Apple Sign-In (ASAuthorizationAppleIDCredential), Guest mode, device-to-account migration |
 | iCloud Sync | SwiftData + CloudKit for local data (pet / plant / journal / economy), iCloud ubiquity container for journal photos, Supabase for social data |
 | Push Notifications | Feeding reminder (4 h), watering reminder (24 h), daily check-in (9 AM) |
@@ -194,6 +196,8 @@ Built at **Toki Studio**.
 
 Contributions welcome — please keep bilingual resources (EN/ZH) in sync and run the full test suite before submitting.
 
+**[Privacy Policy](https://c-square04.github.io/Treehole/privacy.html)**
+
 </details>
 
 ---
@@ -206,9 +210,9 @@ Contributions welcome — please keep bilingual resources (EN/ZH) in sync and ru
 Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵感源自"把秘密说进树洞"的古老意象——用户将心情化为**漂流瓶云朵**飘向共享的云层，任何陌生人都能"抓住一朵云"阅读、用微风 / 拥抱 / 星光回应，并收到 AI 驱动的 NPC 留言。除漂流瓶外，用户还可以养一只卡通猫宠物、照料多种植物花园、写私密日记——全部收录于一款温暖、中英双语的应用中。
 
 - **Bundle ID：** com.csquare04.Treehole
-- **平台：** iOS 18.1+，SwiftUI + SwiftData + CloudKit + @Observable，Swift 6
+- **平台：** iOS 17.0+，SwiftUI + SwiftData + CloudKit + @Observable，Swift 6
 - **后端：** Supabase（PostgreSQL + Edge Functions）
-- **AI：** MiniMax M2.7-highspeed，通过 Supabase Edge Functions 代理（内容审核 + NPC 回复 + 宠物聊天 + 宠物 TTS）
+- **AI：** MiniMax M2.7-highspeed，通过 Supabase Edge Functions 代理（内容审核、NPC 回复、宠物聊天、宠物 TTS、日记智能摘要 + 自动语言识别）
 - **发布渠道：** TestFlight（Toki Studio）
 
 ---
@@ -220,11 +224,13 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 漂流瓶云朵 | 匿名发帖、"抓一朵云"随机浏览（服务端按用户记录已抓取记录，不会重复）、评论、微风/拥抱/星光三种反应（含视觉特效）、我的云朵管理页、三层内容审核 |
 | 虚拟宠物 | 心情动画卡通猫、喂食/抚摸/休息互动、饥饿值/精力/经验值/等级系统、4 套家居主题、喂食消耗食物货币 |
 | 植物花园 | 最多 5 株植物、5 种植物种类、每种 5 个成长阶段、浇水获得经验值、定制植物视觉艺术 |
-| 日记 | 心情标签记录、照片支持（最多 3 张，iCloud 同步）、心情周历带状视图、心情统计页（周/月/年）、心情分布图、连续打卡追踪、条目详情视图 |
+| 日记 | 心情标签记录、照片支持（最多 3 张，iCloud 同步）、心情周历带状视图、心情统计页（周/月/年）、心情分布图、连续打卡追踪、条目详情视图、**AI 洞察卡片 + 每周自动摘要 + 单条 AI 摘要（用户授权后）** |
+| 通知 | 每日上午 9 点签到（带未读云朵回复数）、傍晚 6 点宠物提醒、应用启动时本地通知未读互动（6 小时节流）、喂食/浇水提醒 |
+| 数据分析 | 通过 Supabase `analytics_events` 表的匿名事件追踪 — fire-and-forget，永不阻塞 UI，永不记录用户内容文本 |
 | 经济系统 | 食物/装饰代币/宝石三种货币、4 类每日任务、4 类每周挑战、登录连续奖励、商店（用代币购买食物） |
 | 隐私锁 | 苹果风格 4 位数字密码（Keychain 存储）、FaceID/TouchID、独立锁定我的云朵和/或日记、密码输入前的闸门页面 |
 | 新手引导 | 4 页流程：欢迎、功能介绍、隐私与别名说明、开始（Apple 登录或游客模式） |
-| 设置 | 账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态页（真实 CKContainer.accountStatus 检测，需 Apple 登录）、隐私政策、隐藏开发者调试面板（连击 5 次版本号触发） |
+| 设置 | 账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态页（真实 CKContainer.accountStatus 检测，需 Apple 登录）、[隐私政策](https://c-square04.github.io/Treehole/privacy.html)、隐藏开发者调试面板（连击 5 次版本号触发） |
 | 身份验证 | Apple Sign-In（ASAuthorizationAppleIDCredential）、游客模式、设备迁移至账户 |
 | iCloud 同步 | SwiftData + CloudKit 同步本地数据（宠物/植物/日记/经济），iCloud 容器存储日记照片，Supabase 存储社交数据 |
 | 推送通知 | 喂食提醒（4 小时）、浇水提醒（24 小时）、每日签到（上午 9 点） |
@@ -391,5 +397,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 由 **Toki Studio** 开发。
 
 欢迎贡献代码 — 请保持中英双语资源同步更新，并在提交前运行完整测试套件。
+
+**[隐私政策](https://c-square04.github.io/Treehole/privacy.html)**
 
 </details>

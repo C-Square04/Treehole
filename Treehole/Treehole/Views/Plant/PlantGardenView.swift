@@ -240,6 +240,7 @@ struct PlantGardenView: View {
             }
             economyVM.incrementChallenge(type: .waterStreak, economy: economy, challenges: weeklyChallenges)
             try? modelContext.save()
+            AnalyticsService.track("plant_watered")
             NotificationService.scheduleWateringReminder()
             showFeedback(L10n.t("+40 Hydration, +5 XP, +3 🍖", "+40 水分, +5 经验, +3 🍖"))
         } label: {

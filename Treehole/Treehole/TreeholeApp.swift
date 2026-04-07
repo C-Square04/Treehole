@@ -5,6 +5,7 @@ import SwiftData
 struct TreeholeApp: App {
     @State private var appState = AppState()
     @State private var lockManager = PrivacyLockManager()
+    @Environment(\.scenePhase) private var scenePhase
 
     // IMPORTANT: User must enable these in Xcode:
     // 1. Target → Signing & Capabilities → + Capability → "Sign in with Apple"
@@ -17,7 +18,7 @@ struct TreeholeApp: App {
         let schema = Schema([
             Pet.self, Plant.self, JournalEntry.self,
             Economy.self, DailyTask.self, WeeklyChallenge.self,
-            ChatMessage.self
+            ChatMessage.self, JournalSummary.self
         ])
 
         // Helper to delete all SwiftData stores
@@ -74,7 +75,15 @@ struct TreeholeApp: App {
                 )
                 .onAppear {
                     appState.requestNotificationPermission()
-                    NotificationService.scheduleDailyCheckIn()
+                    NotificationService.scheduleAllNotifications()
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        AnalyticsService.track("app_opened")
+                        Task {
+                            await NotificationService.checkUnreadInteractionsAndNotify()
+                        }
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)

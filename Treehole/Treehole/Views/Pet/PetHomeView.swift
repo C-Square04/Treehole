@@ -103,6 +103,7 @@ struct PetHomeView: View {
                                 }
                                 economyVM.incrementChallenge(type: .feedStreak, economy: economy, challenges: weeklyChallenges)
                                 try? modelContext.save()
+                                AnalyticsService.track("pet_fed")
                                 NotificationService.scheduleFeedingReminder()
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                     viewModel.showFeedingAnimation = false

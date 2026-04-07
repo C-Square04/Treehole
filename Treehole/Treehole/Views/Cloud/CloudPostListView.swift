@@ -237,6 +237,7 @@ struct CloudPostListView: View {
             if let post = try await SupabaseService.fetchRandomPost() {
                 grabbedPost = post
                 showGrabbedCloud = true
+                AnalyticsService.track("cloud_grabbed")
             } else {
                 grabError = L10n.t("No clouds out there right now. Try again soon!", "目前没有云朵，稍后再试！")
             }

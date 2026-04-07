@@ -7,6 +7,7 @@ struct JournalView: View {
     @Environment(AppState.self) private var appState
     @Environment(PrivacyLockManager.self) private var lockManager
     @Query(sort: \JournalEntry.createdAt, order: .reverse) private var entries: [JournalEntry]
+    @Query(sort: \JournalSummary.generatedAt, order: .reverse) private var allSummaries: [JournalSummary]
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
     @Query private var weeklyChallenges: [WeeklyChallenge]
@@ -15,6 +16,8 @@ struct JournalView: View {
     @State private var draftText = ""
     @State private var draftMood: MoodTag = .calm
     @State private var draftPhotoData: [Data] = []
+    @State private var isGeneratingInsights = false
+    @State private var isGeneratingWeekly = false
 
     var body: some View {
         Group {
@@ -45,6 +48,23 @@ struct JournalView: View {
                         MoodWeekStrip(entries: entries)
                             .padding(.horizontal, TreeholeTheme.spacingMedium)
                             .padding(.top, TreeholeTheme.spacingSmall)
+
+                        // MARK: - AI Insights Card (only if opted in)
+                        if appState.allowAIJournalAnalysis {
+                            AIInsightsCard(
+                                entries: entries,
+                                allSummaries: allSummaries,
+                                isGenerating: $isGeneratingInsights,
+                                language: appState.preferredLanguage
+                            )
+                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+
+                            // MARK: - Weekly Summary Card
+                            if let weeklySummary = latestWeeklySummary {
+                                AIWeeklySummaryCard(summary: weeklySummary)
+                                    .padding(.horizontal, TreeholeTheme.spacingMedium)
+                            }
+                        }
 
                         if entries.isEmpty {
                             // Empty state below week strip
@@ -157,6 +177,7 @@ struct JournalView: View {
                         }
                         economyVM.incrementChallenge(type: .journalStreak, economy: economy, challenges: weeklyChallenges)
                         try? modelContext.save()
+                        AnalyticsService.track("journal_written")
                         draftText = ""
                         draftMood = .calm
                         draftPhotoData = []
@@ -167,6 +188,7 @@ struct JournalView: View {
             .onAppear {
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                 try? modelContext.save()
+                maybeGenerateWeeklySummary()
             }
         }
     }
@@ -179,6 +201,57 @@ struct JournalView: View {
     private var thisMonthCount: Int {
         let monthAgo = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
         return entries.filter { $0.createdAt > monthAgo }.count
+    }
+
+    private var currentWeekStart: Date {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 1 // Sunday
+        return calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())) ?? Date()
+    }
+
+    private var latestWeeklySummary: JournalSummary? {
+        allSummaries.first { $0.kindRaw == "weekly" }
+    }
+
+    private var thisWeekEntries: [JournalEntry] {
+        entries.filter { $0.createdAt >= currentWeekStart }
+    }
+
+    private func maybeGenerateWeeklySummary() {
+        guard appState.allowAIJournalAnalysis else { return }
+        let weekStart = currentWeekStart
+        let alreadyExists = allSummaries.contains {
+            $0.kindRaw == "weekly" &&
+            Calendar.current.isDate($0.periodStart, inSameDayAs: weekStart)
+        }
+        guard !alreadyExists else { return }
+        let weekEntries = thisWeekEntries
+        guard weekEntries.count >= 3 else { return }
+        guard !isGeneratingWeekly else { return }
+        isGeneratingWeekly = true
+        let language = appState.preferredLanguage
+        let entryPayloads = weekEntries.map { entry -> (date: String, mood: String, text: String) in
+            let dateStr = entry.createdAt.formatted(.iso8601.year().month().day())
+            return (date: dateStr, mood: entry.moodTag.rawValue, text: entry.text)
+        }
+        Task {
+            defer { isGeneratingWeekly = false }
+            guard let text = try? await SupabaseService.summarizeJournal(
+                mode: "weekly",
+                language: language,
+                entries: entryPayloads
+            ) else { return }
+            let weekEnd = Date()
+            let summary = JournalSummary(
+                kind: .weekly,
+                periodStart: weekStart,
+                periodEnd: weekEnd,
+                summary: text,
+                language: language
+            )
+            modelContext.insert(summary)
+            try? modelContext.save()
+        }
     }
 }
 
@@ -488,6 +561,136 @@ private struct JournalEntryEditor: View {
             }
         }
         selectedItems = []
+    }
+}
+
+// MARK: - AI Insights Card
+
+private struct AIInsightsCard: View {
+    let entries: [JournalEntry]
+    let allSummaries: [JournalSummary]
+    @Binding var isGenerating: Bool
+    let language: String
+    @Environment(\.modelContext) private var modelContext
+
+    private var latestInsights: JournalSummary? {
+        allSummaries.first { $0.kindRaw == "insights" }
+    }
+
+    private var last14DayEntries: [JournalEntry] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        return entries.filter { $0.createdAt >= cutoff }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(TreeholeTheme.softPurple)
+                Text(L10n.t("AI Insights", "AI 洞察"))
+                    .font(.headline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Spacer()
+                Button {
+                    generateInsights()
+                } label: {
+                    if isGenerating {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.subheadline)
+                            .foregroundStyle(TreeholeTheme.softPurple)
+                    }
+                }
+                .disabled(isGenerating)
+            }
+
+            if isGenerating {
+                HStack {
+                    ProgressView()
+                    Text(L10n.t("Generating insights…", "正在生成洞察…"))
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textSecondary)
+                }
+            } else if let insights = latestInsights {
+                Text(insights.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+                Text(L10n.t("Generated \(insights.generatedAt.formatted(.relative(presentation: .named)))", "生成于 \(insights.generatedAt.formatted(date: .abbreviated, time: .omitted))"))
+                    .font(.caption2)
+                    .foregroundStyle(TreeholeTheme.textLight)
+            } else if last14DayEntries.isEmpty {
+                Text(L10n.t("Write a few entries to see your insights", "写几条日记后即可查看洞察"))
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textLight)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Text(L10n.t("Tap refresh to generate your insights", "点击刷新以生成你的洞察"))
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textLight)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+    }
+
+    private func generateInsights() {
+        let recentEntries = last14DayEntries
+        guard !recentEntries.isEmpty else { return }
+        guard !isGenerating else { return }
+        isGenerating = true
+        let lang = language
+        let payloads = recentEntries.map { entry -> (date: String, mood: String, text: String) in
+            let dateStr = entry.createdAt.formatted(.iso8601.year().month().day())
+            return (date: dateStr, mood: entry.moodTag.rawValue, text: entry.text)
+        }
+        let windowStart = recentEntries.last?.createdAt ?? Date()
+        Task {
+            defer { isGenerating = false }
+            guard let text = try? await SupabaseService.summarizeJournal(
+                mode: "insights",
+                language: lang,
+                entries: payloads
+            ) else { return }
+            let summary = JournalSummary(
+                kind: .insights,
+                periodStart: windowStart,
+                periodEnd: Date(),
+                summary: text,
+                language: lang
+            )
+            modelContext.insert(summary)
+            try? modelContext.save()
+        }
+    }
+}
+
+// MARK: - AI Weekly Summary Card
+
+private struct AIWeeklySummaryCard: View {
+    let summary: JournalSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            HStack {
+                Image(systemName: "calendar.badge.checkmark")
+                    .foregroundStyle(TreeholeTheme.skyBlue)
+                Text(L10n.t("Weekly Summary", "本周摘要"))
+                    .font(.headline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Spacer()
+            }
+            Text(summary.summary)
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textSecondary)
+            Text(L10n.t("Week of \(summary.periodStart.formatted(date: .abbreviated, time: .omitted))", "\(summary.periodStart.formatted(date: .abbreviated, time: .omitted)) 这周"))
+                .font(.caption2)
+                .foregroundStyle(TreeholeTheme.textLight)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
     }
 }
 

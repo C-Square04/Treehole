@@ -48,7 +48,7 @@ enum PetVoiceService {
         audioCache.contains { $0.key == messageId }
     }
 
-    private static let minimaxAPIKey = "sk-cp-z4CQ1mXhW7zic_yooLH76BxPnerSaOfmrM4eaYiu1iP-ArmWhAjB8JLvZKQN67OLubHnV3Xy8QX7Mn2AOnDIQcONI4yaEPUgPqQvmivxwot3fMJJyNxBdLI"
+    private static var minimaxAPIKey: String { PetChatService.minimaxAPIKey }
 
     // MARK: - Emoji Stripping
 
@@ -251,7 +251,9 @@ enum PetVoiceService {
                 }
                 if error != nil { continuation.finish() }
             }
-            continuation.onTermination = { _ in self.stopListening() }
+            continuation.onTermination = { @Sendable _ in
+                Task { await MainActor.run { self.stopListening() } }
+            }
         }
     }
 
@@ -269,8 +271,8 @@ enum PetVoiceService {
         case permissionDenied
         var errorDescription: String? {
             switch self {
-            case .notAvailable: "Speech recognition not available"
-            case .permissionDenied: "Microphone permission denied"
+            case .notAvailable: L10n.t("Speech recognition not available", "语音识别不可用")
+            case .permissionDenied: L10n.t("Microphone permission denied", "麦克风权限被拒绝")
             }
         }
     }

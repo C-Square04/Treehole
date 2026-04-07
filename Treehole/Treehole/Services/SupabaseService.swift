@@ -181,9 +181,19 @@ enum SupabaseService {
         request.addValue("return=representation", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONEncoder().encode(body)
 
+        print("[API] createPost: POST \(urlString)")
         let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("[API] createPost: status=\(statusCode) bytes=\(data.count)")
+
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
+            let errorBody = String(data: data, encoding: .utf8)
+            print("[API] createPost: ERROR body=\(errorBody ?? "nil")")
+            if let errorBody, let errorData = errorBody.data(using: .utf8),
+               let errorJson = try? JSONDecoder().decode(SupabaseErrorBody.self, from: errorData) {
+                throw SupabaseError.serverError(statusCode, errorJson.userMessage)
+            }
+            throw SupabaseError.serverError(statusCode, nil)
         }
 
         let posts = try JSONDecoder().decode([RemoteCloudPost].self, from: data)
@@ -203,7 +213,7 @@ enum SupabaseService {
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
 
-        let (responseData, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
@@ -227,7 +237,7 @@ enum SupabaseService {
         }
         request.httpBody = try JSONEncoder().encode(UpdateBody(npcReplyText: npcReply))
 
-        let (responseData, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
@@ -439,7 +449,7 @@ enum SupabaseService {
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
 
-        let (responseData, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
@@ -500,7 +510,7 @@ enum SupabaseService {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(MigrateRequest(pDeviceId: deviceId, pAppleUserId: appleUserId))
 
-        let (responseData, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
@@ -537,7 +547,7 @@ enum SupabaseService {
         request.addValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (responseData, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
@@ -555,7 +565,7 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
 
-        let (responseData, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
@@ -716,6 +726,35 @@ enum ContentModerator {
         }
 
         return Result(isAllowed: true, reason: nil)
+    }
+}
+
+// MARK: - Supabase Error Body (from REST API)
+
+private struct SupabaseErrorBody: Codable {
+    let message: String
+    let code: String?
+
+    var userMessage: String {
+        if message.contains("Please wait before posting again") || message.contains("wait") {
+            return L10n.t("Please wait a moment before posting again.", "请稍等片刻再发布。")
+        }
+        if message.contains("Post cannot be empty") {
+            return L10n.t("Post cannot be empty.", "内容不能为空。")
+        }
+        if message.contains("500 character") {
+            return L10n.t("Post exceeds 500 character limit.", "内容超过500字限制。")
+        }
+        if message.contains("prohibited content") || message.contains("threats") || message.contains("hate speech") {
+            return L10n.t("This content is not allowed.", "此内容不被允许。")
+        }
+        if message.contains("personal information") {
+            return L10n.t("Please don't share personal contact information.", "请不要分享个人联系方式。")
+        }
+        if message.contains("Advertising") || message.contains("links") {
+            return L10n.t("Links and advertising are not allowed.", "不允许发送链接和广告。")
+        }
+        return message
     }
 }
 

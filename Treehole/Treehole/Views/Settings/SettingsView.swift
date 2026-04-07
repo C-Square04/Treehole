@@ -344,13 +344,11 @@ struct SettingsView: View {
                 Button(L10n.t("Continue", "继续"), role: .destructive) {
                     deleteCountdown = 5
                     showDeleteDataStep2 = true
-                    deleteTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-                        DispatchQueue.main.async {
-                            if deleteCountdown > 0 {
-                                deleteCountdown -= 1
-                            } else {
-                                deleteTimer?.invalidate()
-                            }
+                    deleteTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+                        if deleteCountdown > 0 {
+                            deleteCountdown -= 1
+                        } else {
+                            timer.invalidate()
                         }
                     }
                 }
@@ -381,8 +379,6 @@ struct SettingsView: View {
 
     private func performAccountDeletion() {
         // 1. Delete cloud posts from Supabase FIRST (before clearing device_id)
-        let deviceId = SupabaseConfig.deviceId
-        let appleId = SupabaseConfig.appleUserID
         Task {
             // Fetch and delete all own posts
             if let posts = try? await SupabaseService.fetchMyPosts() {
@@ -712,7 +708,7 @@ struct PrivacyPolicyView: View {
                 }
                 .glassCard()
 
-                Text(L10n.t("© 2026 Toki Studio. Jimmy Chen & Kayli Cheung.", "© 2026 Toki Studio. 陈韬 & 张凯莉。"))
+                Text(L10n.t("© 2026 Toki Studio.", "© 2026 Toki Studio。"))
                     .font(.caption2)
                     .foregroundStyle(TreeholeTheme.textLight)
                     .multilineTextAlignment(.center)

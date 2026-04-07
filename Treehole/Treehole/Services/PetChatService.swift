@@ -2,6 +2,9 @@ import Foundation
 import FoundationModels
 
 enum PetChatService {
+    // API key stored centrally — move to server-side proxy before production release
+    static let minimaxAPIKey = "sk-cp-z4CQ1mXhW7zic_yooLH76BxPnerSaOfmrM4eaYiu1iP-ArmWhAjB8JLvZKQN67OLubHnV3Xy8QX7Mn2AOnDIQcONI4yaEPUgPqQvmivxwot3fMJJyNxBdLI"
+
     // System prompt for the pet personality
     static let petSystemPrompt = """
     You are a virtual companion cat named "Companion" living in a mental wellness app called Treehole.
@@ -139,7 +142,7 @@ enum PetChatService {
         userMessage: String,
         history: [(role: String, content: String)]
     ) async -> String? {
-        let url = URL(string: "https://api.minimaxi.com/v1/chat/completions")!
+        guard let url = URL(string: "https://api.minimaxi.com/v1/chat/completions") else { return nil }
 
         var messages: [[String: String]] = [
             ["role": "system", "content": systemPrompt]
@@ -160,7 +163,7 @@ enum PetChatService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer sk-cp-z4CQ1mXhW7zic_yooLH76BxPnerSaOfmrM4eaYiu1iP-ArmWhAjB8JLvZKQN67OLubHnV3Xy8QX7Mn2AOnDIQcONI4yaEPUgPqQvmivxwot3fMJJyNxBdLI", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(minimaxAPIKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         request.timeoutInterval = 30
 

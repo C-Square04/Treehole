@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import Observation
 
-@Observable
+@MainActor @Observable
 final class CloudPostViewModel {
     var draftText: String = ""
     var draftMood: MoodTag = .calm

@@ -1,10 +1,15 @@
 import Foundation
 import Observation
 import UserNotifications
+import CloudKit
 
 @Observable
 final class AppState {
     private var isLoading = false
+
+    /// Real CloudKit account status — populated asynchronously by `refreshCloudKitStatus()`.
+    /// `.couldNotDetermine` until the first check returns.
+    var cloudKitAccountStatus: CKAccountStatus = .couldNotDetermine
 
     var isGuest: Bool = true
     var hasCompletedOnboarding: Bool = false
@@ -56,20 +61,61 @@ final class AppState {
         isLoading = false
         L10n.lang = preferredLanguage
         checkAliasExpiry()
+        Task { await refreshCloudKitStatus() }
+        NotificationCenter.default.addObserver(
+            forName: .CKAccountChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { await self?.refreshCloudKitStatus() }
+        }
     }
 
-    // MARK: - Alias System
+    // MARK: - iCloud Sync Status
 
+    /// True only when the user is signed in with Apple AND CloudKit reports an available account.
+    /// Guest mode never reports active sync — the social cloud posts are tied to device_id and
+    /// won't follow the user across devices, so showing "sync active" would mislead them.
     var isCloudSyncAvailable: Bool {
-        FileManager.default.ubiquityIdentityToken != nil
+        guard !isGuest else { return false }
+        return cloudKitAccountStatus == .available
+            && FileManager.default.ubiquityIdentityToken != nil
     }
 
     var iCloudAccountStatus: String {
-        if FileManager.default.ubiquityIdentityToken == nil {
-            return L10n.t("Not signed into iCloud", "未登录 iCloud")
+        if isGuest {
+            return L10n.t("Sign in with Apple to enable sync", "登录 Apple 账户以启用同步")
         }
-        return L10n.t("Signed in", "已登录")
+        switch cloudKitAccountStatus {
+        case .available:
+            return FileManager.default.ubiquityIdentityToken != nil
+                ? L10n.t("Signed in", "已登录")
+                : L10n.t("iCloud Drive disabled for Treehole", "未为 Treehole 开启 iCloud 云盘")
+        case .noAccount:
+            return L10n.t("Not signed into iCloud", "未登录 iCloud")
+        case .restricted:
+            return L10n.t("iCloud restricted on this device", "此设备的 iCloud 受限")
+        case .temporarilyUnavailable:
+            return L10n.t("iCloud temporarily unavailable", "iCloud 暂时不可用")
+        case .couldNotDetermine:
+            return L10n.t("Checking iCloud status…", "正在检查 iCloud 状态…")
+        @unknown default:
+            return L10n.t("Unknown", "未知")
+        }
     }
+
+    @MainActor
+    func refreshCloudKitStatus() async {
+        do {
+            let status = try await CKContainer.default().accountStatus()
+            cloudKitAccountStatus = status
+        } catch {
+            print("[CloudKit] account status error: \(error)")
+            cloudKitAccountStatus = .couldNotDetermine
+        }
+    }
+
+    // MARK: - Alias System
 
     var isAliasExpired: Bool {
         Date() > aliasExpiryDate
@@ -116,6 +162,7 @@ final class AppState {
                 appleUserId: userID
             )
         }
+        Task { await refreshCloudKitStatus() }
 
         saveState()
     }
@@ -129,6 +176,7 @@ final class AppState {
         isGuest = true
         appleUserID = nil
         appleUserEmail = nil
+        Task { await refreshCloudKitStatus() }
         saveState()
     }
 

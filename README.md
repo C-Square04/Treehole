@@ -26,7 +26,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Economy | Food / Decoration Tokens / Gems currencies, 4 daily task types, 4 weekly challenge types, login streak rewards, shop (buy food with tokens) |
 | Privacy Lock | Apple-style 4-digit passcode (Keychain stored), FaceID / TouchID, lock My Clouds and/or Journal independently, gate page before passcode entry |
 | Onboarding | 4-page flow: welcome, features, privacy & aliases, get started (Apple Sign-In or Guest) |
-| Settings | Account, alias explanation, privacy lock, appearance (language / dark mode), iCloud sync status, privacy policy, hidden developer debug panel (5-tap version trigger) |
+| Settings | Account, alias explanation, privacy lock, appearance (language / dark mode), iCloud sync status (real CKContainer.accountStatus check, requires Apple sign-in), privacy policy, hidden developer debug panel (5-tap version trigger) |
 | Authentication | Apple Sign-In (ASAuthorizationAppleIDCredential), Guest mode, device-to-account migration |
 | iCloud Sync | SwiftData + CloudKit for local data (pet / plant / journal / economy), iCloud ubiquity container for journal photos, Supabase for social data |
 | Push Notifications | Feeding reminder (4 h), watering reminder (24 h), daily check-in (9 AM) |
@@ -224,7 +224,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 经济系统 | 食物/装饰代币/宝石三种货币、4 类每日任务、4 类每周挑战、登录连续奖励、商店（用代币购买食物） |
 | 隐私锁 | 苹果风格 4 位数字密码（Keychain 存储）、FaceID/TouchID、独立锁定我的云朵和/或日记、密码输入前的闸门页面 |
 | 新手引导 | 4 页流程：欢迎、功能介绍、隐私与别名说明、开始（Apple 登录或游客模式） |
-| 设置 | 账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态页、隐私政策、隐藏开发者调试面板（连击 5 次版本号触发） |
+| 设置 | 账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态页（真实 CKContainer.accountStatus 检测，需 Apple 登录）、隐私政策、隐藏开发者调试面板（连击 5 次版本号触发） |
 | 身份验证 | Apple Sign-In（ASAuthorizationAppleIDCredential）、游客模式、设备迁移至账户 |
 | iCloud 同步 | SwiftData + CloudKit 同步本地数据（宠物/植物/日记/经济），iCloud 容器存储日记照片，Supabase 存储社交数据 |
 | 推送通知 | 喂食提醒（4 小时）、浇水提醒（24 小时）、每日签到（上午 9 点） |

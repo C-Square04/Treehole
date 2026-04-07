@@ -2,9 +2,6 @@ import Foundation
 import FoundationModels
 
 enum PetChatService {
-    // API key stored centrally — move to server-side proxy before production release
-    static let minimaxAPIKey = "sk-cp-z4CQ1mXhW7zic_yooLH76BxPnerSaOfmrM4eaYiu1iP-ArmWhAjB8JLvZKQN67OLubHnV3Xy8QX7Mn2AOnDIQcONI4yaEPUgPqQvmivxwot3fMJJyNxBdLI"
-
     // System prompt for the pet personality
     static let petSystemPrompt = """
     You are a virtual companion cat named "Companion" living in a mental wellness app called Treehole.
@@ -102,12 +99,16 @@ enum PetChatService {
         return scriptedFallback(userMessage: userMessage)
     }
 
-    // Apple Foundation Models (on-device, free)
+    // Apple Foundation Models (on-device, free) — iOS 26+ only
     private static func tryFoundationModels(
         systemPrompt: String,
         userMessage: String,
         history: [(role: String, content: String)]
     ) async -> String? {
+        guard #available(iOS 26.0, *) else {
+            return nil
+        }
+
         let model = SystemLanguageModel.default
         guard model.availability == .available else {
             print("[PetChat] Foundation Models not available: \(model.availability)")
@@ -117,11 +118,8 @@ enum PetChatService {
         do {
             let session = LanguageModelSession(instructions: systemPrompt)
 
-            // Add history as context
-            // Note: Foundation Models doesn't have explicit chat history,
-            // so we build context into the prompt
             var contextPrompt = ""
-            for msg in history.suffix(6) { // Last 6 messages for context
+            for msg in history.suffix(6) {
                 let prefix = msg.role == "user" ? "User: " : "Pet: "
                 contextPrompt += prefix + msg.content + "\n"
             }
@@ -136,57 +134,41 @@ enum PetChatService {
         }
     }
 
-    // MiniMax API fallback (cloud, paid)
+    // MiniMax via Supabase Edge Function (key stays server-side)
     private static func tryMiniMaxAPI(
         systemPrompt: String,
         userMessage: String,
         history: [(role: String, content: String)]
     ) async -> String? {
-        guard let url = URL(string: "https://api.minimaxi.com/v1/chat/completions") else { return nil }
+        let urlString = "\(SupabaseConfig.projectURL)/functions/v1/pet-chat"
+        guard let url = URL(string: urlString) else { return nil }
 
-        var messages: [[String: String]] = [
-            ["role": "system", "content": systemPrompt]
-        ]
-        // Add history
-        for msg in history.suffix(6) {
-            messages.append(["role": msg.role == "user" ? "user" : "assistant", "content": msg.content])
-        }
-        messages.append(["role": "user", "content": userMessage])
-
+        let historyPayload: [[String: String]] = history.suffix(6).map { ["role": $0.role, "content": $0.content] }
         let body: [String: Any] = [
-            "model": "MiniMax-M2.7-highspeed",
-            "messages": messages,
-            "max_tokens": 1024,
-            "temperature": 0.8
+            "systemPrompt": systemPrompt,
+            "userMessage": userMessage,
+            "history": historyPayload
         ]
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(minimaxAPIKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         request.timeoutInterval = 30
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            print("[PetChat] MiniMax response status: \(statusCode)")
+            print("[PetChat] pet-chat status: \(statusCode)")
 
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let choices = json["choices"] as? [[String: Any]],
-               let first = choices.first,
-               let message = first["message"] as? [String: Any],
-               var content = message["content"] as? String {
-                // Clean up think tags
-                content = content.replacingOccurrences(of: "<think>[\\s\\S]*?</think>", with: "", options: .regularExpression)
-                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-                print("[PetChat] MiniMax reply: \(trimmed.prefix(50))...")
+               let reply = json["reply"] as? String {
+                let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
                 return trimmed.isEmpty ? nil : trimmed
-            } else {
-                print("[PetChat] MiniMax parse failed. Raw: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "nil")")
             }
         } catch {
-            print("[PetChat] MiniMax API error: \(error)")
+            print("[PetChat] pet-chat error: \(error)")
         }
         return nil
     }

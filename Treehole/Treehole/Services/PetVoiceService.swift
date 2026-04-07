@@ -48,7 +48,6 @@ enum PetVoiceService {
         audioCache.contains { $0.key == messageId }
     }
 
-    private static var minimaxAPIKey: String { PetChatService.minimaxAPIKey }
 
     // MARK: - Emoji Stripping
 
@@ -103,51 +102,38 @@ enum PetVoiceService {
     // MARK: - MiniMax T2A API
 
     static func fetchMiniMaxTTS(text: String, language: String, emotion: String, voiceId: String? = nil) async -> Data? {
-        guard let url = URL(string: "https://api.minimaxi.com/v1/t2a_v2") else { return nil }
+        let urlString = "\(SupabaseConfig.projectURL)/functions/v1/pet-tts"
+        guard let url = URL(string: urlString) else { return nil }
 
-        // Pick voice based on language (or use provided voiceId)
-        let voiceId = voiceId ?? (language == "zh-Hans" ? "female-tianmei" : "English_Graceful_Lady")
-
-        let body: [String: Any] = [
-            "model": "speech-2.8-hd",
+        var body: [String: Any] = [
             "text": text,
-            "stream": false,
-            "voice_setting": [
-                "voice_id": voiceId,
-                "speed": 1.0,
-                "vol": 1.0,
-                "emotion": emotion
-            ],
-            "audio_setting": [
-                "format": "mp3",
-                "sample_rate": 32000
-            ]
+            "language": language,
+            "emotion": emotion
         ]
+        if let voiceId { body["voiceId"] = voiceId }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer \(minimaxAPIKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        request.timeoutInterval = 15
+        request.timeoutInterval = 20
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                print("[TTS] MiniMax API status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                print("[TTS] pet-tts status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
                 return nil
             }
 
-            // Parse hex-encoded audio from response
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let dataObj = json["data"] as? [String: Any],
-               let hexString = dataObj["audio"] as? String {
+               let hexString = json["audio"] as? String {
                 let audioData = Data(hexString: hexString)
-                print("[TTS] MiniMax audio received: \(audioData?.count ?? 0) bytes")
+                print("[TTS] pet-tts audio received: \(audioData?.count ?? 0) bytes")
                 return audioData
             }
         } catch {
-            print("[TTS] MiniMax error: \(error)")
+            print("[TTS] pet-tts error: \(error)")
         }
         return nil
     }

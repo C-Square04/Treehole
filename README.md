@@ -7,11 +7,11 @@
 
 Treehole is an iOS app for anonymous emotional expression and gentle self-care. Inspired by the ancient idea of whispering secrets into a tree hollow, users release feelings as **drift bottle clouds** that float in a shared sky — any stranger can "grab a cloud" and read it, react with a breeze, hug, or starlight, and leave an NPC-powered reply. Alongside the cloud space, users raise a virtual cat, tend a multi-plant garden, and keep a private journal — all within one cozy, bilingual app.
 
-- **Bundle ID:** com.Toki.Treehole
-- **Platform:** iOS 26, SwiftUI + SwiftData + CloudKit + @Observable, Swift 6
+- **Bundle ID:** com.csquare04.Treehole
+- **Platform:** iOS 18.1+, SwiftUI + SwiftData + CloudKit + @Observable, Swift 6
 - **Backend:** Supabase (PostgreSQL + Edge Functions)
-- **AI:** MiniMax M2.7-highspeed (content moderation + NPC replies)
-- **Creators:** Jimmy Chen & Kayli Cheung / Toki Studio
+- **AI:** MiniMax M2.7-highspeed via Supabase Edge Functions (content moderation + NPC replies + pet chat + pet TTS)
+- **Distribution:** TestFlight (Toki Studio)
 
 ---
 
@@ -19,7 +19,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 
 | Module | What's Implemented |
 |---|---|
-| Drift Bottle Clouds | Anonymous posting, "grab a cloud" for random posts, comments, reactions (breeze / hug / starlight) with visual effects, My Clouds management, 3-layer content moderation |
+| Drift Bottle Clouds | Anonymous posting, "grab a cloud" for random posts (no repeats — server tracks grabbed history per user), comments, reactions (breeze / hug / starlight) with visual effects, My Clouds management, 3-layer content moderation |
 | Virtual Pet | Cartoon cat with mood-based animations, feed / pet / rest actions, hunger / energy / XP / level system, 4 home themes, feeding costs food currency |
 | Plant Garden | Up to 5 plants, 5 species, 5 growth stages per species, watering grants XP, custom plant visual art |
 | Journal | Mood-tagged entries, photo support (up to 3 photos, iCloud synced), mood week calendar strip, mood statistics (week / month / year), mood distribution chart, streak tracking, entry detail view |
@@ -137,10 +137,13 @@ Supabase project URL: `https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | `cloud_posts` | Anonymous posts (apple_user_id, device_id) |
 | `cloud_comments` | Comments on posts |
 | `cloud_reactions` | Breeze / hug / starlight reactions (unique per device per post) |
+| `grabbed_posts` | Tracks which posts each user has already grabbed (apple_user_id or device_id), prevents duplicates |
 | `npc_reply_templates` | Pre-written NPC response templates |
 | `post_reaction_counts` | View: aggregated reaction counts per post |
 
-**Edge Functions:** `moderate-post` (MiniMax moderation), `generate-npc-reply`
+**Edge Functions:** `moderate-post`, `generate-npc-reply`, `pet-chat`, `pet-tts` (all proxy MiniMax — API key stays server-side via `MINIMAX_API_KEY` env var)
+
+**RPCs:** `get_random_post(device_id, apple_user_id)` — returns an un-grabbed post for the user and records the grab; falls back to oldest-grabbed when exhausted.
 
 ---
 
@@ -187,7 +190,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 
 ## Credits
 
-Built by **Jimmy Chen** & **Kayli Cheung** at **Toki Studio**.
+Built at **Toki Studio**.
 
 Contributions welcome — please keep bilingual resources (EN/ZH) in sync and run the full test suite before submitting.
 
@@ -202,11 +205,11 @@ Contributions welcome — please keep bilingual resources (EN/ZH) in sync and ru
 
 Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵感源自"把秘密说进树洞"的古老意象——用户将心情化为**漂流瓶云朵**飘向共享的云层，任何陌生人都能"抓住一朵云"阅读、用微风 / 拥抱 / 星光回应，并收到 AI 驱动的 NPC 留言。除漂流瓶外，用户还可以养一只卡通猫宠物、照料多种植物花园、写私密日记——全部收录于一款温暖、中英双语的应用中。
 
-- **Bundle ID：** com.Toki.Treehole
-- **平台：** iOS 26，SwiftUI + SwiftData + CloudKit + @Observable，Swift 6
+- **Bundle ID：** com.csquare04.Treehole
+- **平台：** iOS 18.1+，SwiftUI + SwiftData + CloudKit + @Observable，Swift 6
 - **后端：** Supabase（PostgreSQL + Edge Functions）
-- **AI：** MiniMax M2.7-highspeed（内容审核 + NPC 回复）
-- **开发者：** Jimmy Chen & Kayli Cheung / Toki Studio
+- **AI：** MiniMax M2.7-highspeed，通过 Supabase Edge Functions 代理（内容审核 + NPC 回复 + 宠物聊天 + 宠物 TTS）
+- **发布渠道：** TestFlight（Toki Studio）
 
 ---
 
@@ -214,7 +217,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 
 | 模块 | 已实现内容 |
 |---|---|
-| 漂流瓶云朵 | 匿名发帖、"抓一朵云"随机浏览、评论、微风/拥抱/星光三种反应（含视觉特效）、我的云朵管理页、三层内容审核 |
+| 漂流瓶云朵 | 匿名发帖、"抓一朵云"随机浏览（服务端按用户记录已抓取记录，不会重复）、评论、微风/拥抱/星光三种反应（含视觉特效）、我的云朵管理页、三层内容审核 |
 | 虚拟宠物 | 心情动画卡通猫、喂食/抚摸/休息互动、饥饿值/精力/经验值/等级系统、4 套家居主题、喂食消耗食物货币 |
 | 植物花园 | 最多 5 株植物、5 种植物种类、每种 5 个成长阶段、浇水获得经验值、定制植物视觉艺术 |
 | 日记 | 心情标签记录、照片支持（最多 3 张，iCloud 同步）、心情周历带状视图、心情统计页（周/月/年）、心情分布图、连续打卡追踪、条目详情视图 |
@@ -332,10 +335,13 @@ Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | `cloud_posts` | 匿名帖子（含 apple_user_id、device_id） |
 | `cloud_comments` | 帖子评论 |
 | `cloud_reactions` | 微风/拥抱/星光反应（每设备每帖唯一） |
+| `grabbed_posts` | 按用户记录已抓取的云朵（apple_user_id 优先，否则 device_id），避免重复 |
 | `npc_reply_templates` | NPC 预设回复模板 |
 | `post_reaction_counts` | 视图：每帖反应数聚合统计 |
 
-**Edge Functions：** `moderate-post`（MiniMax 审核）、`generate-npc-reply`
+**Edge Functions：** `moderate-post`、`generate-npc-reply`、`pet-chat`、`pet-tts`（全部代理 MiniMax — API key 保存在服务端 `MINIMAX_API_KEY` 环境变量）
+
+**RPC 函数：** `get_random_post(device_id, apple_user_id)` — 为用户返回未抓取过的云朵并记录这次抓取；全部抓完后回退到最早抓取的那一条。
 
 ---
 
@@ -382,7 +388,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 
 ## 致谢
 
-由 **Jimmy Chen** 与 **Kayli Cheung** 在 **Toki Studio** 共同开发。
+由 **Toki Studio** 开发。
 
 欢迎贡献代码 — 请保持中英双语资源同步更新，并在提交前运行完整测试套件。
 

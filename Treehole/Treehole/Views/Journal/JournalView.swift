@@ -919,6 +919,9 @@ private struct AIInsightsCard: View {
     @Binding var isGenerating: Bool
     let language: String
     @Environment(\.modelContext) private var modelContext
+    // Collapsed by default — keeps the journal list visible and doesn't push it down.
+    // Persisted across sessions so the user's preference sticks.
+    @AppStorage("ai_insights_card_expanded") private var isExpanded: Bool = false
 
     private var latestInsights: JournalSummary? {
         allSummaries.first { $0.kindRaw == "insights" }
@@ -929,54 +932,92 @@ private struct AIInsightsCard: View {
         return entries.filter { $0.createdAt >= cutoff }
     }
 
+    private var collapsedSubtitle: String {
+        if let insights = latestInsights {
+            return L10n.t(
+                "Updated \(insights.generatedAt.formatted(.relative(presentation: .named)))",
+                "更新于 \(insights.generatedAt.formatted(date: .abbreviated, time: .omitted))"
+            )
+        } else if last14DayEntries.isEmpty {
+            return L10n.t("Write a few entries first", "先写几条日记")
+        } else {
+            return L10n.t("Tap to view", "点击查看")
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(TreeholeTheme.softPurple)
-                Text(L10n.t("AI Insights", "AI 洞察"))
-                    .font(.headline)
-                    .foregroundStyle(TreeholeTheme.textPrimary)
-                Spacer()
-                Button {
-                    generateInsights()
-                } label: {
-                    if isGenerating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.subheadline)
-                            .foregroundStyle(TreeholeTheme.softPurple)
-                    }
+            // Header — always visible, the whole row toggles expansion
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
                 }
-                .disabled(isGenerating)
-            }
-
-            if isGenerating {
+            } label: {
                 HStack {
-                    ProgressView()
-                    Text(L10n.t("Generating insights…", "正在生成洞察…"))
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(TreeholeTheme.softPurple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t("AI Insights", "AI 洞察"))
+                            .font(.headline)
+                            .foregroundStyle(TreeholeTheme.textPrimary)
+                        if !isExpanded {
+                            Text(collapsedSubtitle)
+                                .font(.caption2)
+                                .foregroundStyle(TreeholeTheme.textLight)
+                        }
+                    }
+                    Spacer()
+                    if isExpanded {
+                        Button {
+                            generateInsights()
+                        } label: {
+                            if isGenerating {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.subheadline)
+                                    .foregroundStyle(TreeholeTheme.softPurple)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isGenerating)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TreeholeTheme.textLight)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                if isGenerating {
+                    HStack {
+                        ProgressView()
+                        Text(L10n.t("Generating insights…", "正在生成洞察…"))
+                            .font(.subheadline)
+                            .foregroundStyle(TreeholeTheme.textSecondary)
+                    }
+                } else if let insights = latestInsights {
+                    Text(renderMarkdown(insights.summary))
                         .font(.subheadline)
                         .foregroundStyle(TreeholeTheme.textSecondary)
+                    Text(L10n.t("Generated \(insights.generatedAt.formatted(.relative(presentation: .named)))", "生成于 \(insights.generatedAt.formatted(date: .abbreviated, time: .omitted))"))
+                        .font(.caption2)
+                        .foregroundStyle(TreeholeTheme.textLight)
+                } else if last14DayEntries.isEmpty {
+                    Text(L10n.t("Write a few entries to see your insights", "写几条日记后即可查看洞察"))
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textLight)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text(L10n.t("Tap refresh to generate your insights", "点击刷新以生成你的洞察"))
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textLight)
                 }
-            } else if let insights = latestInsights {
-                Text(renderMarkdown(insights.summary))
-                    .font(.subheadline)
-                    .foregroundStyle(TreeholeTheme.textSecondary)
-                Text(L10n.t("Generated \(insights.generatedAt.formatted(.relative(presentation: .named)))", "生成于 \(insights.generatedAt.formatted(date: .abbreviated, time: .omitted))"))
-                    .font(.caption2)
-                    .foregroundStyle(TreeholeTheme.textLight)
-            } else if last14DayEntries.isEmpty {
-                Text(L10n.t("Write a few entries to see your insights", "写几条日记后即可查看洞察"))
-                    .font(.subheadline)
-                    .foregroundStyle(TreeholeTheme.textLight)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-            } else {
-                Text(L10n.t("Tap refresh to generate your insights", "点击刷新以生成你的洞察"))
-                    .font(.subheadline)
-                    .foregroundStyle(TreeholeTheme.textLight)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

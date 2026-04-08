@@ -7,6 +7,7 @@ struct CloudPostListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
     @Environment(PrivacyLockManager.self) private var lockManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
     @Query private var weeklyChallenges: [WeeklyChallenge]
@@ -14,6 +15,7 @@ struct CloudPostListView: View {
     @State private var economyVM = EconomyViewModel()
     @State private var didCreatePost = false
     @State private var showMyClouds: Bool = false
+    @State private var selectedPost: RemoteCloudPost? = nil
 
     // Drift bottle state
     @State private var grabbedPost: RemoteCloudPost? = nil
@@ -34,8 +36,30 @@ struct CloudPostListView: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            ZStack {
+        if horizontalSizeClass == .regular {
+            NavigationSplitView {
+                cloudFeedSidebar
+            } detail: {
+                if selectedPost != nil {
+                    GrabbedCloudView(post: $selectedPost, appState: appState, showGrabAnother: false)
+                } else {
+                    ContentUnavailableView(
+                        L10n.t("Grab a Cloud", "抓一朵云"),
+                        systemImage: "cloud",
+                        description: Text(L10n.t("Tap \"Grab a Cloud\" to receive a message from a stranger", "点击\"抓一朵云\"接收来自陌生人的心声"))
+                    )
+                }
+            }
+        } else {
+            NavigationStack {
+                cloudFeedSidebar
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cloudFeedSidebar: some View {
+        ZStack {
                 // Sky gradient background
                 LinearGradient(
                     colors: [
@@ -225,7 +249,6 @@ struct CloudPostListView: View {
                     floatOffsets[i] = (i % 2 == 0) ? 8 : -8
                 }
             }
-        }
     }
 
     // MARK: - Actions
@@ -235,8 +258,12 @@ struct CloudPostListView: View {
         grabError = nil
         do {
             if let post = try await SupabaseService.fetchRandomPost() {
-                grabbedPost = post
-                showGrabbedCloud = true
+                if horizontalSizeClass == .regular {
+                    selectedPost = post
+                } else {
+                    grabbedPost = post
+                    showGrabbedCloud = true
+                }
                 AnalyticsService.track("cloud_grabbed")
             } else {
                 grabError = L10n.t("No clouds out there right now. Try again soon!", "目前没有云朵，稍后再试！")

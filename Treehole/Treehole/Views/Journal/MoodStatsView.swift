@@ -470,14 +470,22 @@ struct MoodStatsView: View {
 
     private func moodColor(_ mood: MoodTag) -> Color {
         switch mood {
-        case .happy:    TreeholeTheme.warmGold
-        case .sad:      TreeholeTheme.skyBlue
-        case .angry:    TreeholeTheme.coral
-        case .anxious:  TreeholeTheme.softRose
-        case .tired:    TreeholeTheme.gentleLavender
-        case .confused: TreeholeTheme.softPurple
-        case .hopeful:  TreeholeTheme.mintCream
-        case .calm:     TreeholeTheme.warmPeach
+        case .happy:        TreeholeTheme.warmGold
+        case .sad:          TreeholeTheme.skyBlue
+        case .angry:        TreeholeTheme.coral
+        case .anxious:      TreeholeTheme.softRose
+        case .tired:        TreeholeTheme.gentleLavender
+        case .confused:     TreeholeTheme.softPurple
+        case .hopeful:      TreeholeTheme.mintCream
+        case .calm:         TreeholeTheme.warmPeach
+        case .grateful:     TreeholeTheme.warmPeach
+        case .loved:        TreeholeTheme.softRose
+        case .excited:      TreeholeTheme.warmGold
+        case .peaceful:     TreeholeTheme.mintCream
+        case .lonely:       TreeholeTheme.skyBlue
+        case .melancholic:  TreeholeTheme.gentleLavender
+        case .stressed:     TreeholeTheme.coral
+        case .proud:        TreeholeTheme.softPurple
         }
     }
 }
@@ -574,14 +582,22 @@ private struct PlacesMapView: View {
 
     private func moodColor(_ mood: MoodTag) -> Color {
         switch mood {
-        case .happy:    TreeholeTheme.warmGold
-        case .sad:      TreeholeTheme.skyBlue
-        case .angry:    TreeholeTheme.coral
-        case .anxious:  TreeholeTheme.softRose
-        case .tired:    TreeholeTheme.gentleLavender
-        case .confused: TreeholeTheme.softPurple
-        case .hopeful:  TreeholeTheme.mintCream
-        case .calm:     TreeholeTheme.warmPeach
+        case .happy:        TreeholeTheme.warmGold
+        case .sad:          TreeholeTheme.skyBlue
+        case .angry:        TreeholeTheme.coral
+        case .anxious:      TreeholeTheme.softRose
+        case .tired:        TreeholeTheme.gentleLavender
+        case .confused:     TreeholeTheme.softPurple
+        case .hopeful:      TreeholeTheme.mintCream
+        case .calm:         TreeholeTheme.warmPeach
+        case .grateful:     TreeholeTheme.warmPeach
+        case .loved:        TreeholeTheme.softRose
+        case .excited:      TreeholeTheme.warmGold
+        case .peaceful:     TreeholeTheme.mintCream
+        case .lonely:       TreeholeTheme.skyBlue
+        case .melancholic:  TreeholeTheme.gentleLavender
+        case .stressed:     TreeholeTheme.coral
+        case .proud:        TreeholeTheme.softPurple
         }
     }
 

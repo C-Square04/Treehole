@@ -9,6 +9,7 @@ struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
     @Environment(PrivacyLockManager.self) private var lockManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \JournalEntry.createdAt, order: .reverse) private var entries: [JournalEntry]
     @Query(sort: \JournalSummary.generatedAt, order: .reverse) private var allSummaries: [JournalSummary]
     @Query private var economies: [Economy]
@@ -20,6 +21,7 @@ struct JournalView: View {
     @State private var isGeneratingWeekly = false
     @State private var searchText = ""
     @State private var editingEntry: JournalEntry? = nil
+    @State private var selectedEntry: JournalEntry? = nil
 
     var body: some View {
         Group {
@@ -39,115 +41,146 @@ struct JournalView: View {
 
     @ViewBuilder
     private var journalContent: some View {
-        NavigationStack {
-            ZStack {
-                TreeholeTheme.warmBackground.ignoresSafeArea()
+        if horizontalSizeClass == .regular {
+            NavigationSplitView {
+                sidebar
+            } detail: {
+                if let entry = selectedEntry {
+                    JournalDetailView(entry: entry)
+                } else {
+                    ContentUnavailableView(
+                        L10n.t("Select an entry", "选择一篇日记"),
+                        systemImage: "book.closed",
+                        description: Text(L10n.t("Tap an entry on the left to read it", "点击左边的日记进行阅读"))
+                    )
+                }
+            }
+        } else {
+            NavigationStack {
+                sidebar
+            }
+        }
+    }
 
-                ScrollView {
-                    VStack(spacing: TreeholeTheme.spacingMedium) {
+    @ViewBuilder
+    private var sidebar: some View {
+        ZStack {
+            TreeholeTheme.warmBackground.ignoresSafeArea()
 
-                        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            // MARK: - Mood Week Strip (always visible)
-                            MoodWeekStrip(entries: entries)
-                                .padding(.horizontal, TreeholeTheme.spacingMedium)
-                                .padding(.top, TreeholeTheme.spacingSmall)
+            ScrollView {
+                VStack(spacing: TreeholeTheme.spacingMedium) {
 
-                            // MARK: - AI Cards (only if opted in)
-                            if appState.allowAIJournalAnalysis {
-                                // Weekly summary first (collapsible)
-                                if let weeklySummary = latestWeeklySummary {
-                                    AIWeeklySummaryCard(summary: weeklySummary)
-                                        .padding(.horizontal, TreeholeTheme.spacingMedium)
-                                }
+                    if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        // MARK: - Mood Week Strip (always visible)
+                        MoodWeekStrip(entries: entries)
+                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+                            .padding(.top, TreeholeTheme.spacingSmall)
 
-                                // AI Insights below
-                                AIInsightsCard(
-                                    entries: entries,
-                                    allSummaries: allSummaries,
-                                    isGenerating: $isGeneratingInsights,
-                                    language: appState.preferredLanguage
-                                )
-                                .padding(.horizontal, TreeholeTheme.spacingMedium)
+                        // MARK: - AI Cards (only if opted in)
+                        if appState.allowAIJournalAnalysis {
+                            // Weekly summary first (collapsible)
+                            if let weeklySummary = latestWeeklySummary {
+                                AIWeeklySummaryCard(summary: weeklySummary)
+                                    .padding(.horizontal, TreeholeTheme.spacingMedium)
                             }
+
+                            // AI Insights below
+                            AIInsightsCard(
+                                entries: entries,
+                                allSummaries: allSummaries,
+                                isGenerating: $isGeneratingInsights,
+                                language: appState.preferredLanguage
+                            )
+                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+                        }
+                    }
+
+                    if entries.isEmpty && searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        // Empty state below week strip
+                        VStack(spacing: TreeholeTheme.spacingMedium) {
+                            Spacer().frame(height: 40)
+                            EmptyStateView(
+                                icon: "book.closed",
+                                title: L10n.t("Start Your Journal", "开始写日记"),
+                                message: L10n.t("Write your first entry to begin reflecting on your feelings.", "写下你的第一篇日记吧..."),
+                                actionLabel: L10n.t("Write Entry", "写日记"),
+                                action: { showNewEntry = true }
+                            )
+                        }
+                    } else {
+                        let filtered = filteredEntries
+
+                        // MARK: - Search results header
+                        if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            HStack {
+                                Text(L10n.t("\(filtered.count) results", "\(filtered.count) 条结果"))
+                                    .font(.subheadline)
+                                    .foregroundStyle(TreeholeTheme.textSecondary)
+                                Spacer()
+                            }
+                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+                            .padding(.top, TreeholeTheme.spacingSmall)
                         }
 
-                        if entries.isEmpty && searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            // Empty state below week strip
-                            VStack(spacing: TreeholeTheme.spacingMedium) {
-                                Spacer().frame(height: 40)
-                                EmptyStateView(
-                                    icon: "book.closed",
-                                    title: L10n.t("Start Your Journal", "开始写日记"),
-                                    message: L10n.t("Write your first entry to begin reflecting on your feelings.", "写下你的第一篇日记吧..."),
-                                    actionLabel: L10n.t("Write Entry", "写日记"),
-                                    action: { showNewEntry = true }
-                                )
+                        if filtered.isEmpty && !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            VStack(spacing: TreeholeTheme.spacingSmall) {
+                                Spacer().frame(height: 60)
+                                Text(L10n.t("No matches", "没有匹配结果"))
+                                    .font(.headline)
+                                    .foregroundStyle(TreeholeTheme.textSecondary)
+                                Spacer()
                             }
+                            .frame(maxWidth: .infinity)
                         } else {
-                            let filtered = filteredEntries
-
-                            // MARK: - Search results header
-                            if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                                HStack {
-                                    Text(L10n.t("\(filtered.count) results", "\(filtered.count) 条结果"))
-                                        .font(.subheadline)
-                                        .foregroundStyle(TreeholeTheme.textSecondary)
-                                    Spacer()
+                            if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                // MARK: - Compact Stats Row (only shown outside search)
+                                HStack(spacing: TreeholeTheme.spacingMedium) {
+                                    MiniStat(
+                                        label: L10n.t("Total", "总计"),
+                                        value: "\(entries.count)",
+                                        icon: "book.fill",
+                                        color: TreeholeTheme.softPurple
+                                    )
+                                    MiniStat(
+                                        label: L10n.t("This Week", "本周"),
+                                        value: "\(thisWeekCount)",
+                                        icon: "calendar",
+                                        color: TreeholeTheme.skyBlue
+                                    )
+                                    MiniStat(
+                                        label: L10n.t("This Month", "本月"),
+                                        value: "\(thisMonthCount)",
+                                        icon: "calendar.badge.clock",
+                                        color: TreeholeTheme.coral
+                                    )
                                 }
+                                .glassCard()
                                 .padding(.horizontal, TreeholeTheme.spacingMedium)
-                                .padding(.top, TreeholeTheme.spacingSmall)
                             }
 
-                            if filtered.isEmpty && !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                                VStack(spacing: TreeholeTheme.spacingSmall) {
-                                    Spacer().frame(height: 60)
-                                    Text(L10n.t("No matches", "没有匹配结果"))
-                                        .font(.headline)
-                                        .foregroundStyle(TreeholeTheme.textSecondary)
-                                    Spacer()
-                                }
-                                .frame(maxWidth: .infinity)
-                            } else {
+                            // MARK: - Entries Section
+                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
                                 if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                                    // MARK: - Compact Stats Row (only shown outside search)
-                                    HStack(spacing: TreeholeTheme.spacingMedium) {
-                                        MiniStat(
-                                            label: L10n.t("Total", "总计"),
-                                            value: "\(entries.count)",
-                                            icon: "book.fill",
-                                            color: TreeholeTheme.softPurple
-                                        )
-                                        MiniStat(
-                                            label: L10n.t("This Week", "本周"),
-                                            value: "\(thisWeekCount)",
-                                            icon: "calendar",
-                                            color: TreeholeTheme.skyBlue
-                                        )
-                                        MiniStat(
-                                            label: L10n.t("This Month", "本月"),
-                                            value: "\(thisMonthCount)",
-                                            icon: "calendar.badge.clock",
-                                            color: TreeholeTheme.coral
-                                        )
+                                    HStack(spacing: TreeholeTheme.spacingTight) {
+                                        Image(systemName: "book.pages")
+                                            .foregroundStyle(TreeholeTheme.softPurple)
+                                        Text(L10n.t("Entries", "日记列表"))
+                                            .font(.headline)
+                                            .foregroundStyle(TreeholeTheme.textPrimary)
                                     }
-                                    .glassCard()
                                     .padding(.horizontal, TreeholeTheme.spacingMedium)
                                 }
 
-                                // MARK: - Entries Section
-                                VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                                    if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                                        HStack(spacing: TreeholeTheme.spacingTight) {
-                                            Image(systemName: "book.pages")
-                                                .foregroundStyle(TreeholeTheme.softPurple)
-                                            Text(L10n.t("Entries", "日记列表"))
-                                                .font(.headline)
-                                                .foregroundStyle(TreeholeTheme.textPrimary)
+                                ForEach(filtered) { entry in
+                                    if horizontalSizeClass == .regular {
+                                        Button {
+                                            selectedEntry = entry
+                                        } label: {
+                                            JournalEntryCard(entry: entry, appState: appState)
                                         }
+                                        .buttonStyle(.plain)
                                         .padding(.horizontal, TreeholeTheme.spacingMedium)
-                                    }
-
-                                    ForEach(filtered) { entry in
+                                    } else {
                                         NavigationLink(destination: JournalDetailView(entry: entry)) {
                                             JournalEntryCard(entry: entry, appState: appState)
                                         }
@@ -155,69 +188,69 @@ struct JournalView: View {
                                         .padding(.horizontal, TreeholeTheme.spacingMedium)
                                     }
                                 }
-                                .padding(.bottom, TreeholeTheme.spacingLarge)
                             }
+                            .padding(.bottom, TreeholeTheme.spacingLarge)
                         }
                     }
                 }
             }
-            .navigationTitle(L10n.t("Journal", "日记"))
-            .searchable(
-                text: $searchText,
-                prompt: L10n.t("Search entries", "搜索日记")
-            )
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    NavigationLink {
-                        MoodStatsView()
+        }
+        .navigationTitle(L10n.t("Journal", "日记"))
+        .searchable(
+            text: $searchText,
+            prompt: L10n.t("Search entries", "搜索日记")
+        )
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                NavigationLink {
+                    MoodStatsView()
+                } label: {
+                    Image(systemName: "chart.bar.fill")
+                        .foregroundStyle(TreeholeTheme.softPurple)
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button { showNewEntry = true } label: {
+                    Image(systemName: "square.and.pencil")
+                        .foregroundStyle(TreeholeTheme.coral)
+                }
+            }
+            if lockManager.isJournalLockEnabled {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        lockManager.lockAll()
                     } label: {
-                        Image(systemName: "chart.bar.fill")
+                        Image(systemName: "lock.fill")
                             .foregroundStyle(TreeholeTheme.softPurple)
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { showNewEntry = true } label: {
-                        Image(systemName: "square.and.pencil")
-                            .foregroundStyle(TreeholeTheme.coral)
-                    }
+            }
+        }
+        .sheet(isPresented: $showNewEntry) {
+            JournalEntryEditor(
+                existingEntry: nil,
+                allowAnyDate: appState.isDeveloperMode,
+                language: appState.preferredLanguage,
+                onSave: { draft in
+                    saveNewEntry(draft: draft)
+                    showNewEntry = false
                 }
-                if lockManager.isJournalLockEnabled {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            lockManager.lockAll()
-                        } label: {
-                            Image(systemName: "lock.fill")
-                                .foregroundStyle(TreeholeTheme.softPurple)
-                        }
-                    }
+            )
+        }
+        .sheet(item: $editingEntry) { entry in
+            JournalEntryEditor(
+                existingEntry: entry,
+                allowAnyDate: appState.isDeveloperMode,
+                language: appState.preferredLanguage,
+                onSave: { _ in
+                    editingEntry = nil
                 }
-            }
-            .sheet(isPresented: $showNewEntry) {
-                JournalEntryEditor(
-                    existingEntry: nil,
-                    allowAnyDate: appState.isDeveloperMode,
-                    language: appState.preferredLanguage,
-                    onSave: { draft in
-                        saveNewEntry(draft: draft)
-                        showNewEntry = false
-                    }
-                )
-            }
-            .sheet(item: $editingEntry) { entry in
-                JournalEntryEditor(
-                    existingEntry: entry,
-                    allowAnyDate: appState.isDeveloperMode,
-                    language: appState.preferredLanguage,
-                    onSave: { _ in
-                        editingEntry = nil
-                    }
-                )
-            }
-            .onAppear {
-                _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
-                try? modelContext.save()
-                maybeGenerateWeeklySummary()
-            }
+            )
+        }
+        .onAppear {
+            _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+            try? modelContext.save()
+            maybeGenerateWeeklySummary()
         }
     }
 
@@ -241,6 +274,8 @@ struct JournalView: View {
     private func saveNewEntry(draft: EntryDraft) {
         let entry = JournalEntry(moodTag: draft.mood, text: draft.text)
         entry.title = draft.title.isEmpty ? nil : draft.title
+        entry.moodValence = draft.moodValence
+        entry.moodArousal = draft.moodArousal
         // createdAt = now (immutable from creation)
         entry.createdAt = Date()
         // entryDate is user-chosen date (nil = same as createdAt)
@@ -349,6 +384,8 @@ struct EntryDraft {
     var text: String = ""
     var title: String = ""
     var mood: MoodTag = .calm
+    var moodValence: Double? = nil
+    var moodArousal: Double? = nil
     var photoData: [Data] = []
     var audioFilename: String? = nil
     var audioDuration: Double? = nil
@@ -534,6 +571,8 @@ struct JournalEntryEditor: View {
     @State private var draftText: String = ""
     @State private var draftTitle: String = ""
     @State private var draftMood: MoodTag = .calm
+    @State private var draftMoodValence: Double? = nil
+    @State private var draftMoodArousal: Double? = nil
     @State private var draftPhotoData: [Data] = []
     @State private var existingPhotoFilenames: [String] = []
     @State private var removedPhotoFilenames: [String] = []
@@ -591,7 +630,11 @@ struct JournalEntryEditor: View {
                             Text(L10n.t("How are you feeling?", "你现在感觉怎么样？"))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
-                            MoodPicker(selectedMood: $draftMood)
+                            MoodPicker(
+                                selectedMood: $draftMood,
+                                customValence: $draftMoodValence,
+                                customArousal: $draftMoodArousal
+                            )
                         }
                         .padding(.horizontal, TreeholeTheme.spacingSmall)
 
@@ -1123,6 +1166,8 @@ struct JournalEntryEditor: View {
             existing.weatherCode = draftWeatherCode
             existing.weatherEmoji = draftWeatherEmoji
             existing.weatherDescription = draftWeatherDescription
+            existing.moodValence = draftMoodValence
+            existing.moodArousal = draftMoodArousal
 
             try? modelContext.save()
             onSave(EntryDraft())
@@ -1133,6 +1178,8 @@ struct JournalEntryEditor: View {
             draft.text = draftText
             draft.title = draftTitle
             draft.mood = draftMood
+            draft.moodValence = draftMoodValence
+            draft.moodArousal = draftMoodArousal
             draft.photoData = draftPhotoData
             draft.audioFilename = draftAudioFilename
             draft.audioDuration = draftAudioDuration
@@ -1170,6 +1217,8 @@ struct JournalEntryEditor: View {
         draftText = entry.text
         draftTitle = entry.title ?? ""
         draftMood = entry.moodTag
+        draftMoodValence = entry.moodValence
+        draftMoodArousal = entry.moodArousal
         draftEntryDate = entry.entryDate
         existingPhotoFilenames = entry.photoFilenames ?? []
         existingAudioFilename = entry.audioFilename

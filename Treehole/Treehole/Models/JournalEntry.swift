@@ -29,6 +29,10 @@ final class JournalEntry {
     // Two dates: createdAt is immutable (when written), entryDate is user-editable (event date)
     var entryDate: Date? = nil
 
+    // Mood meter: precise coordinates (nil = use MoodTag defaults)
+    var moodValence: Double? = nil
+    var moodArousal: Double? = nil
+
     init() {}
 
     init(moodTag: MoodTag, text: String) {
@@ -47,6 +51,12 @@ final class JournalEntry {
         get { MoodTag(rawValue: moodTagRaw) ?? .calm }
         set { moodTagRaw = newValue.rawValue }
     }
+
+    /// Effective valence: custom value if user dragged the meter, else MoodTag default
+    var effectiveValence: Double { moodValence ?? moodTag.defaultValence }
+
+    /// Effective arousal: custom value if user dragged the meter, else MoodTag default
+    var effectiveArousal: Double { moodArousal ?? moodTag.defaultArousal }
 
     /// The date to display and use for grouping/filtering. Falls back to createdAt for old entries.
     var displayDate: Date { entryDate ?? createdAt }

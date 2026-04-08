@@ -439,7 +439,7 @@ struct CloudPostModelTests {
     }
 
     @Test func testMoodTagEnum() throws {
-        #expect(MoodTag.allCases.count == 8)
+        #expect(MoodTag.allCases.count == 16)
         for tag in MoodTag.allCases {
             #expect(!tag.emoji.isEmpty)
             #expect(!tag.labelEN.isEmpty)

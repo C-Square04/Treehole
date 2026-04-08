@@ -8,7 +8,7 @@
 Treehole is an iOS app for anonymous emotional expression and gentle self-care. Inspired by the ancient idea of whispering secrets into a tree hollow, users release feelings as **drift bottle clouds** that float in a shared sky — any stranger can "grab a cloud" and read it, react with a breeze, hug, or starlight, and leave an NPC-powered reply. Alongside the cloud space, users raise a virtual cat, tend a multi-plant garden, and keep a private journal — all within one cozy, bilingual app.
 
 - **Bundle ID:** com.csquare04.Treehole
-- **Platform:** iOS 17.0+, SwiftUI + SwiftData + CloudKit + @Observable, Swift 6
+- **Platform:** iOS 17.0+ (universal — iPhone + iPad with adaptive split view in landscape), SwiftUI + SwiftData + CloudKit + @Observable, Swift 6
 - **Backend:** Supabase (PostgreSQL + Edge Functions)
 - **AI:** MiniMax M2.7-highspeed via Supabase Edge Functions (content moderation, NPC replies, pet chat, pet TTS, journal summarization with auto-language detection)
 - **Distribution:** TestFlight (Toki Studio)
@@ -210,7 +210,7 @@ Contributions welcome — please keep bilingual resources (EN/ZH) in sync and ru
 Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵感源自"把秘密说进树洞"的古老意象——用户将心情化为**漂流瓶云朵**飘向共享的云层，任何陌生人都能"抓住一朵云"阅读、用微风 / 拥抱 / 星光回应，并收到 AI 驱动的 NPC 留言。除漂流瓶外，用户还可以养一只卡通猫宠物、照料多种植物花园、写私密日记——全部收录于一款温暖、中英双语的应用中。
 
 - **Bundle ID：** com.csquare04.Treehole
-- **平台：** iOS 17.0+，SwiftUI + SwiftData + CloudKit + @Observable，Swift 6
+- **平台：** iOS 17.0+（通用 — iPhone + iPad，横屏自适应分栏），SwiftUI + SwiftData + CloudKit + @Observable，Swift 6
 - **后端：** Supabase（PostgreSQL + Edge Functions）
 - **AI：** MiniMax M2.7-highspeed，通过 Supabase Edge Functions 代理（内容审核、NPC 回复、宠物聊天、宠物 TTS、日记智能摘要 + 自动语言识别）
 - **发布渠道：** TestFlight（Toki Studio）

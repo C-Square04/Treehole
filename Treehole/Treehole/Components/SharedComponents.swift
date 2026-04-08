@@ -210,7 +210,9 @@ private struct MoodMeterView: View {
             .frame(width: size, height: size)
             .contentShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
             .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-            .gesture(
+            // highPriorityGesture wins over the parent ScrollView's pan gesture,
+            // so the dot tracks the finger immediately and the page doesn't scroll.
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         if !isDragging { isDragging = true }
@@ -221,11 +223,18 @@ private struct MoodMeterView: View {
                     }
                     .onEnded { value in
                         let (v, a) = coords(from: value.location, in: size)
+                        // Update bindings if they're real (no-op for .constant(nil) wrappers)
                         customValence = v
                         customArousal = a
                         selectedMood = MoodTag.nearest(valence: v, arousal: a)
-                        dragValence = nil
-                        dragArousal = nil
+                        // Keep the dot where the finger lifted: only clear local
+                        // state if the bindings were real (we can recover from them).
+                        // For constant(nil) cloud-post mode, keep dragValence/dragArousal
+                        // so the dot stays put instead of snapping back.
+                        if customValence != nil {
+                            dragValence = nil
+                            dragArousal = nil
+                        }
                         isDragging = false
                     }
             )

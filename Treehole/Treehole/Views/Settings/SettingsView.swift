@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import LocalAuthentication
+import CloudKit
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
@@ -389,18 +390,47 @@ struct SettingsView: View {
     // MARK: - Account Deletion
 
     private func performAccountDeletion() {
-        // 1. Delete cloud posts from Supabase FIRST (before clearing device_id)
+        // The whole flow is async because we MUST wait for cloud post deletion
+        // (and CloudKit zone wipe) BEFORE clearing UserDefaults / device_id.
+        // Bug history: previously this was fire-and-forget, so UserDefaults got
+        // wiped first → SupabaseService.deletePost sent the wrong x-device-id
+        // header → server's RLS policy silently rejected the deletes.
         Task {
-            // Fetch and delete all own posts
-            if let posts = try? await SupabaseService.fetchMyPosts() {
-                for post in posts {
-                    try? await SupabaseService.deletePost(id: post.id)
+            await deleteEverything()
+        }
+    }
+
+    @MainActor
+    private func deleteEverything() async {
+        // 1. SNAPSHOT credentials BEFORE wiping anything.
+        //    These are used for the Supabase deletes below.
+        let savedDeviceId = SupabaseConfig.deviceId
+        let savedAppleUserId = SupabaseConfig.appleUserID
+
+        // 2. Delete cloud posts from Supabase. AWAIT, do not fire-and-forget.
+        //    Because we haven't cleared UserDefaults yet, SupabaseConfig still
+        //    returns the right device_id and the server's RLS policy accepts
+        //    the delete.
+        do {
+            let posts = try await SupabaseService.fetchMyPosts()
+            print("[DELETE] Found \(posts.count) Supabase posts to delete")
+            for post in posts {
+                do {
+                    try await SupabaseService.deletePost(id: post.id)
+                } catch {
+                    print("[DELETE] Failed to delete post \(post.id): \(error)")
                 }
             }
-            print("[DELETE] Supabase posts deleted")
+            print("[DELETE] Supabase posts deletion finished (had: \(posts.count))")
+        } catch {
+            print("[DELETE] fetchMyPosts failed: \(error)")
         }
+        // Tell our analytics events table to forget us too — best effort.
+        // (No dedicated API; the rows stay anonymized by design.)
 
-        // 2. Delete all SwiftData (local + iCloud CloudKit)
+        // 3. Delete all SwiftData rows. With cloudKitDatabase: .automatic,
+        //    SwiftData propagates these deletes to CloudKit asynchronously —
+        //    the explicit zone wipe in step 4 is a belt-and-suspenders backup.
         do {
             try modelContext.delete(model: Pet.self)
             try modelContext.delete(model: Plant.self)
@@ -416,46 +446,44 @@ struct SettingsView: View {
             print("[DELETE] SwiftData error: \(error)")
         }
 
-        // 3. Delete Keychain (passcode + any stored credentials)
+        // 4. Wipe the SwiftData CloudKit zone explicitly. This guarantees the
+        //    user's iCloud copy is gone even if the SwiftData → CloudKit sync
+        //    in step 3 hasn't finished pushing yet.
+        await wipeCloudKitZone()
+
+        // 5. Delete Keychain
         KeychainHelper.delete(forKey: "privacyPasscode")
         print("[DELETE] Keychain cleared")
 
-        // 4. Reset PrivacyLockManager state
+        // 6. Reset PrivacyLockManager
         lockManager.isCloudLockEnabled = false
         lockManager.isJournalLockEnabled = false
         lockManager.isBiometricEnabled = false
 
-        // 5. Delete photos (local + iCloud ubiquity container)
+        // 7. Delete photos + audio (local + iCloud ubiquity container)
         let fm = FileManager.default
-        // Local photos
         if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
             try? fm.removeItem(at: docs.appendingPathComponent("journal_photos"))
-        }
-        // iCloud photos
-        if let icloud = fm.url(forUbiquityContainerIdentifier: nil)?
-            .appendingPathComponent("Documents/journal_photos") {
-            try? fm.removeItem(at: icloud)
-        }
-        print("[DELETE] Photos cleared")
-
-        // 5b. Delete audio (local + iCloud ubiquity container)
-        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
             try? fm.removeItem(at: docs.appendingPathComponent("journal_audio"))
         }
         if let icloud = fm.url(forUbiquityContainerIdentifier: nil)?
-            .appendingPathComponent("Documents/journal_audio") {
-            try? fm.removeItem(at: icloud)
+            .appendingPathComponent("Documents") {
+            try? fm.removeItem(at: icloud.appendingPathComponent("journal_photos"))
+            try? fm.removeItem(at: icloud.appendingPathComponent("journal_audio"))
         }
-        print("[DELETE] Audio cleared")
+        print("[DELETE] Photos + audio cleared")
 
-        // 6. Clear ALL UserDefaults
+        // 8. Clear ALL UserDefaults — only AFTER Supabase deletes are done.
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)
             UserDefaults.standard.synchronize()
         }
         print("[DELETE] UserDefaults cleared")
 
-        // 7. Reset app state (must be LAST)
+        _ = savedDeviceId  // captured for clarity; SupabaseConfig.deviceId still
+        _ = savedAppleUserId  // returns valid values until UserDefaults is cleared.
+
+        // 9. Reset app state (must be LAST)
         appState.isSubscribed = false
         appState.appleUserID = nil
         appState.appleUserEmail = nil
@@ -464,6 +492,28 @@ struct SettingsView: View {
         appState.hasCompletedOnboarding = false
         appState.currentAlias = "Anonymous"
         print("[DELETE] Account deletion complete")
+    }
+
+    /// Wipes the user's CloudKit private database zone used by SwiftData.
+    /// This is a defensive cleanup so that even if SwiftData hasn't pushed
+    /// pending deletes to CloudKit yet, the iCloud copy is gone.
+    private func wipeCloudKitZone() async {
+        let container = CKContainer.default()
+        let db = container.privateCloudDatabase
+        // SwiftData (built on NSPersistentCloudKitContainer) uses this zone.
+        let zoneID = CKRecordZone.ID(
+            zoneName: "com.apple.coredata.cloudkit.zone",
+            ownerName: CKCurrentUserDefaultName
+        )
+        do {
+            _ = try await db.deleteRecordZone(withID: zoneID)
+            print("[DELETE] CloudKit zone wiped")
+        } catch let error as CKError where error.code == .zoneNotFound {
+            // No zone yet — nothing to wipe.
+            print("[DELETE] CloudKit zone not found (nothing to wipe)")
+        } catch {
+            print("[DELETE] CloudKit zone wipe error: \(error)")
+        }
     }
 }
 

@@ -16,18 +16,10 @@ struct JournalView: View {
     @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var economyVM = EconomyViewModel()
     @State private var showNewEntry = false
-    @State private var draftText = ""
-    @State private var draftMood: MoodTag = .calm
-    @State private var draftPhotoData: [Data] = []
-    @State private var draftDate: Date = Date()
-    @State private var draftAudioFilename: String? = nil
-    @State private var draftAudioDuration: Double? = nil
-    @State private var draftAudioTranscript: String? = nil
-    @State private var draftLatitude: Double? = nil
-    @State private var draftLongitude: Double? = nil
-    @State private var draftLocationName: String? = nil
     @State private var isGeneratingInsights = false
     @State private var isGeneratingWeekly = false
+    @State private var searchText = ""
+    @State private var editingEntry: JournalEntry? = nil
 
     var body: some View {
         Group {
@@ -54,29 +46,31 @@ struct JournalView: View {
                 ScrollView {
                     VStack(spacing: TreeholeTheme.spacingMedium) {
 
-                        // MARK: - Mood Week Strip (always visible)
-                        MoodWeekStrip(entries: entries)
-                            .padding(.horizontal, TreeholeTheme.spacingMedium)
-                            .padding(.top, TreeholeTheme.spacingSmall)
+                        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            // MARK: - Mood Week Strip (always visible)
+                            MoodWeekStrip(entries: entries)
+                                .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                .padding(.top, TreeholeTheme.spacingSmall)
 
-                        // MARK: - AI Insights Card (only if opted in)
-                        if appState.allowAIJournalAnalysis {
-                            AIInsightsCard(
-                                entries: entries,
-                                allSummaries: allSummaries,
-                                isGenerating: $isGeneratingInsights,
-                                language: appState.preferredLanguage
-                            )
-                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+                            // MARK: - AI Insights Card (only if opted in)
+                            if appState.allowAIJournalAnalysis {
+                                AIInsightsCard(
+                                    entries: entries,
+                                    allSummaries: allSummaries,
+                                    isGenerating: $isGeneratingInsights,
+                                    language: appState.preferredLanguage
+                                )
+                                .padding(.horizontal, TreeholeTheme.spacingMedium)
 
-                            // MARK: - Weekly Summary Card
-                            if let weeklySummary = latestWeeklySummary {
-                                AIWeeklySummaryCard(summary: weeklySummary)
-                                    .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                // MARK: - Weekly Summary Card
+                                if let weeklySummary = latestWeeklySummary {
+                                    AIWeeklySummaryCard(summary: weeklySummary)
+                                        .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                }
                             }
                         }
 
-                        if entries.isEmpty {
+                        if entries.isEmpty && searchText.trimmingCharacters(in: .whitespaces).isEmpty {
                             // Empty state below week strip
                             VStack(spacing: TreeholeTheme.spacingMedium) {
                                 Spacer().frame(height: 40)
@@ -89,55 +83,88 @@ struct JournalView: View {
                                 )
                             }
                         } else {
-                            // MARK: - Compact Stats Row
-                            HStack(spacing: TreeholeTheme.spacingMedium) {
-                                MiniStat(
-                                    label: L10n.t("Total", "总计"),
-                                    value: "\(entries.count)",
-                                    icon: "book.fill",
-                                    color: TreeholeTheme.softPurple
-                                )
-                                MiniStat(
-                                    label: L10n.t("This Week", "本周"),
-                                    value: "\(thisWeekCount)",
-                                    icon: "calendar",
-                                    color: TreeholeTheme.skyBlue
-                                )
-                                MiniStat(
-                                    label: L10n.t("This Month", "本月"),
-                                    value: "\(thisMonthCount)",
-                                    icon: "calendar.badge.clock",
-                                    color: TreeholeTheme.coral
-                                )
-                            }
-                            .glassCard()
-                            .padding(.horizontal, TreeholeTheme.spacingMedium)
+                            let filtered = filteredEntries
 
-                            // MARK: - Entries Section
-                            VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-                                HStack(spacing: TreeholeTheme.spacingTight) {
-                                    Image(systemName: "book.pages")
-                                        .foregroundStyle(TreeholeTheme.softPurple)
-                                    Text(L10n.t("Entries", "日记列表"))
-                                        .font(.headline)
-                                        .foregroundStyle(TreeholeTheme.textPrimary)
+                            // MARK: - Search results header
+                            if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                HStack {
+                                    Text(L10n.t("\(filtered.count) results", "\(filtered.count) 条结果"))
+                                        .font(.subheadline)
+                                        .foregroundStyle(TreeholeTheme.textSecondary)
+                                    Spacer()
                                 }
                                 .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                .padding(.top, TreeholeTheme.spacingSmall)
+                            }
 
-                                ForEach(entries) { entry in
-                                    NavigationLink(destination: JournalDetailView(entry: entry)) {
-                                        JournalEntryCard(entry: entry, appState: appState)
+                            if filtered.isEmpty && !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                VStack(spacing: TreeholeTheme.spacingSmall) {
+                                    Spacer().frame(height: 60)
+                                    Text(L10n.t("No matches", "没有匹配结果"))
+                                        .font(.headline)
+                                        .foregroundStyle(TreeholeTheme.textSecondary)
+                                    Spacer()
+                                }
+                                .frame(maxWidth: .infinity)
+                            } else {
+                                if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                    // MARK: - Compact Stats Row (only shown outside search)
+                                    HStack(spacing: TreeholeTheme.spacingMedium) {
+                                        MiniStat(
+                                            label: L10n.t("Total", "总计"),
+                                            value: "\(entries.count)",
+                                            icon: "book.fill",
+                                            color: TreeholeTheme.softPurple
+                                        )
+                                        MiniStat(
+                                            label: L10n.t("This Week", "本周"),
+                                            value: "\(thisWeekCount)",
+                                            icon: "calendar",
+                                            color: TreeholeTheme.skyBlue
+                                        )
+                                        MiniStat(
+                                            label: L10n.t("This Month", "本月"),
+                                            value: "\(thisMonthCount)",
+                                            icon: "calendar.badge.clock",
+                                            color: TreeholeTheme.coral
+                                        )
                                     }
-                                    .buttonStyle(.plain)
+                                    .glassCard()
                                     .padding(.horizontal, TreeholeTheme.spacingMedium)
                                 }
+
+                                // MARK: - Entries Section
+                                VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+                                    if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                        HStack(spacing: TreeholeTheme.spacingTight) {
+                                            Image(systemName: "book.pages")
+                                                .foregroundStyle(TreeholeTheme.softPurple)
+                                            Text(L10n.t("Entries", "日记列表"))
+                                                .font(.headline)
+                                                .foregroundStyle(TreeholeTheme.textPrimary)
+                                        }
+                                        .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                    }
+
+                                    ForEach(filtered) { entry in
+                                        NavigationLink(destination: JournalDetailView(entry: entry)) {
+                                            JournalEntryCard(entry: entry, appState: appState)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                    }
+                                }
+                                .padding(.bottom, TreeholeTheme.spacingLarge)
                             }
-                            .padding(.bottom, TreeholeTheme.spacingLarge)
                         }
                     }
                 }
             }
             .navigationTitle(L10n.t("Journal", "日记"))
+            .searchable(
+                text: $searchText,
+                prompt: L10n.t("Search entries", "搜索日记")
+            )
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     NavigationLink {
@@ -166,61 +193,22 @@ struct JournalView: View {
             }
             .sheet(isPresented: $showNewEntry) {
                 JournalEntryEditor(
-                    draftText: $draftText,
-                    draftMood: $draftMood,
-                    draftPhotoData: $draftPhotoData,
-                    draftDate: $draftDate,
-                    draftAudioFilename: $draftAudioFilename,
-                    draftAudioDuration: $draftAudioDuration,
-                    draftAudioTranscript: $draftAudioTranscript,
-                    draftLatitude: $draftLatitude,
-                    draftLongitude: $draftLongitude,
-                    draftLocationName: $draftLocationName,
+                    existingEntry: nil,
                     allowAnyDate: appState.isDeveloperMode,
-                    onSave: {
-                        let entry = JournalEntry(moodTag: draftMood, text: draftText)
-                        // Backdating: keep current time-of-day on the chosen day so sort still feels natural.
-                        let cal = Calendar.current
-                        let timeComps = cal.dateComponents([.hour, .minute, .second], from: Date())
-                        var dayComps = cal.dateComponents([.year, .month, .day], from: draftDate)
-                        dayComps.hour = timeComps.hour
-                        dayComps.minute = timeComps.minute
-                        dayComps.second = timeComps.second
-                        entry.createdAt = cal.date(from: dayComps) ?? draftDate
-                        if !draftPhotoData.isEmpty {
-                            var filenames: [String] = []
-                            for data in draftPhotoData {
-                                if let filename = PhotoStorage.savePhoto(data) {
-                                    filenames.append(filename)
-                                }
-                            }
-                            entry.photoFilenames = filenames.isEmpty ? nil : filenames
-                        }
-                        entry.audioFilename = draftAudioFilename
-                        entry.audioDurationSeconds = draftAudioDuration
-                        entry.audioTranscript = draftAudioTranscript
-                        entry.latitude = draftLatitude
-                        entry.longitude = draftLongitude
-                        entry.locationName = draftLocationName
-                        modelContext.insert(entry)
-                        let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
-                        if let task = dailyTasks.first(where: { $0.type == .writeJournal && !$0.isCompleted }) {
-                            economyVM.completeTask(task, economy: economy)
-                        }
-                        economyVM.incrementChallenge(type: .journalStreak, economy: economy, challenges: weeklyChallenges)
-                        try? modelContext.save()
-                        AnalyticsService.track("journal_written")
-                        draftText = ""
-                        draftMood = .calm
-                        draftPhotoData = []
-                        draftDate = Date()
-                        draftAudioFilename = nil
-                        draftAudioDuration = nil
-                        draftAudioTranscript = nil
-                        draftLatitude = nil
-                        draftLongitude = nil
-                        draftLocationName = nil
+                    language: appState.preferredLanguage,
+                    onSave: { draft in
+                        saveNewEntry(draft: draft)
                         showNewEntry = false
+                    }
+                )
+            }
+            .sheet(item: $editingEntry) { entry in
+                JournalEntryEditor(
+                    existingEntry: entry,
+                    allowAnyDate: appState.isDeveloperMode,
+                    language: appState.preferredLanguage,
+                    onSave: { _ in
+                        editingEntry = nil
                     }
                 )
             }
@@ -232,14 +220,74 @@ struct JournalView: View {
         }
     }
 
+    // MARK: - Search Filter
+
+    private var filteredEntries: [JournalEntry] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespaces)
+        let sorted = entries.sorted { $0.displayDate > $1.displayDate }
+        guard !trimmed.isEmpty else { return sorted }
+        let lowered = trimmed.lowercased()
+        return sorted.filter { entry in
+            entry.text.lowercased().contains(lowered) ||
+            (entry.title?.lowercased().contains(lowered) ?? false) ||
+            (entry.audioTranscript?.lowercased().contains(lowered) ?? false) ||
+            (entry.locationName?.lowercased().contains(lowered) ?? false)
+        }
+    }
+
+    // MARK: - Save New Entry
+
+    private func saveNewEntry(draft: EntryDraft) {
+        let entry = JournalEntry(moodTag: draft.mood, text: draft.text)
+        entry.title = draft.title.isEmpty ? nil : draft.title
+        // createdAt = now (immutable from creation)
+        entry.createdAt = Date()
+        // entryDate is user-chosen date (nil = same as createdAt)
+        if let ed = draft.entryDate {
+            let cal = Calendar.current
+            if !cal.isDateInToday(ed) {
+                entry.entryDate = ed
+            }
+        }
+        if !draft.photoData.isEmpty {
+            var filenames: [String] = []
+            for data in draft.photoData {
+                if let filename = PhotoStorage.savePhoto(data) {
+                    filenames.append(filename)
+                }
+            }
+            entry.photoFilenames = filenames.isEmpty ? nil : filenames
+        }
+        entry.audioFilename = draft.audioFilename
+        entry.audioDurationSeconds = draft.audioDuration
+        entry.audioTranscript = draft.audioTranscript
+        entry.latitude = draft.latitude
+        entry.longitude = draft.longitude
+        entry.locationName = draft.locationName
+        entry.weatherTempC = draft.weatherTempC
+        entry.weatherCode = draft.weatherCode
+        entry.weatherEmoji = draft.weatherEmoji
+        entry.weatherDescription = draft.weatherDescription
+        modelContext.insert(entry)
+        let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+        if let task = dailyTasks.first(where: { $0.type == .writeJournal && !$0.isCompleted }) {
+            economyVM.completeTask(task, economy: economy)
+        }
+        economyVM.incrementChallenge(type: .journalStreak, economy: economy, challenges: weeklyChallenges)
+        try? modelContext.save()
+        AnalyticsService.track("journal_written")
+    }
+
+    // MARK: - Stats
+
     private var thisWeekCount: Int {
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        return entries.filter { $0.createdAt > weekAgo }.count
+        return entries.filter { $0.displayDate > weekAgo }.count
     }
 
     private var thisMonthCount: Int {
         let monthAgo = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
-        return entries.filter { $0.createdAt > monthAgo }.count
+        return entries.filter { $0.displayDate > monthAgo }.count
     }
 
     private var currentWeekStart: Date {
@@ -253,7 +301,7 @@ struct JournalView: View {
     }
 
     private var thisWeekEntries: [JournalEntry] {
-        entries.filter { $0.createdAt >= currentWeekStart }
+        entries.filter { $0.displayDate >= currentWeekStart }
     }
 
     private func maybeGenerateWeeklySummary() {
@@ -270,7 +318,7 @@ struct JournalView: View {
         isGeneratingWeekly = true
         let language = appState.preferredLanguage
         let entryPayloads = weekEntries.map { entry -> (date: String, mood: String, text: String) in
-            let dateStr = entry.createdAt.formatted(.iso8601.year().month().day())
+            let dateStr = entry.displayDate.formatted(.iso8601.year().month().day())
             return (date: dateStr, mood: entry.moodTag.rawValue, text: entry.text)
         }
         Task {
@@ -292,6 +340,26 @@ struct JournalView: View {
             try? modelContext.save()
         }
     }
+}
+
+// MARK: - EntryDraft (shared between create and edit)
+
+struct EntryDraft {
+    var text: String = ""
+    var title: String = ""
+    var mood: MoodTag = .calm
+    var photoData: [Data] = []
+    var audioFilename: String? = nil
+    var audioDuration: Double? = nil
+    var audioTranscript: String? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var locationName: String? = nil
+    var weatherTempC: Double? = nil
+    var weatherCode: Int? = nil
+    var weatherEmoji: String? = nil
+    var weatherDescription: String? = nil
+    var entryDate: Date? = nil
 }
 
 // MARK: - Mood Week Strip
@@ -340,7 +408,7 @@ private struct MoodWeekStrip: View {
 
     /// First entry's mood for a given calendar day, if any
     private func mood(for date: Date) -> MoodTag? {
-        entries.first { calendar.isDate($0.createdAt, inSameDayAs: date) }?.moodTag
+        entries.first { calendar.isDate($0.displayDate, inSameDayAs: date) }?.moodTag
     }
 
     private func isToday(_ date: Date) -> Bool {
@@ -397,14 +465,8 @@ private struct JournalEntryCard: View {
         appState.preferredLanguage == "zh-Hans" ? entry.moodTag.labelZH : entry.moodTag.labelEN
     }
 
-    private var relativeDate: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: entry.createdAt, relativeTo: Date())
-    }
-
     private var shortDate: String {
-        entry.createdAt.formatted(.dateTime.month(.abbreviated).day())
+        entry.displayDate.formatted(.dateTime.month(.abbreviated).day())
     }
 
     var body: some View {
@@ -434,6 +496,14 @@ private struct JournalEntryCard: View {
                 }
             }
 
+            // Title (if any)
+            if let title = entry.title, !title.isEmpty {
+                Text(title)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                    .lineLimit(1)
+            }
+
             // Text preview
             if !entry.text.isEmpty {
                 Text(entry.text)
@@ -450,34 +520,52 @@ private struct JournalEntryCard: View {
 
 // MARK: - Journal Entry Editor
 
-private struct JournalEntryEditor: View {
+struct JournalEntryEditor: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var draftText: String
-    @Binding var draftMood: MoodTag
-    @Binding var draftPhotoData: [Data]
-    @Binding var draftDate: Date
-    @Binding var draftAudioFilename: String?
-    @Binding var draftAudioDuration: Double?
-    @Binding var draftAudioTranscript: String?
-    @Binding var draftLatitude: Double?
-    @Binding var draftLongitude: Double?
-    @Binding var draftLocationName: String?
-    let allowAnyDate: Bool
-    let onSave: () -> Void
+    @Environment(\.modelContext) private var modelContext
 
+    let existingEntry: JournalEntry?
+    let allowAnyDate: Bool
+    let language: String
+    let onSave: (EntryDraft) -> Void
+
+    // Draft state
+    @State private var draftText: String = ""
+    @State private var draftTitle: String = ""
+    @State private var draftMood: MoodTag = .calm
+    @State private var draftPhotoData: [Data] = []
+    @State private var existingPhotoFilenames: [String] = []
+    @State private var removedPhotoFilenames: [String] = []
+    @State private var draftAudioFilename: String? = nil
+    @State private var existingAudioFilename: String? = nil
+    @State private var draftAudioDuration: Double? = nil
+    @State private var draftAudioTranscript: String? = nil
+    @State private var draftLatitude: Double? = nil
+    @State private var draftLongitude: Double? = nil
+    @State private var draftLocationName: String? = nil
+    @State private var draftWeatherTempC: Double? = nil
+    @State private var draftWeatherCode: Int? = nil
+    @State private var draftWeatherEmoji: String? = nil
+    @State private var draftWeatherDescription: String? = nil
+    @State private var draftEntryDate: Date? = nil
+
+    // Toolbar / recording state
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
     @State private var audioRecorder = AudioRecorder()
     @State private var locationService = LocationService()
     @State private var isLoadingLocation = false
     @State private var permissionDeniedMessage: String? = nil
+    @State private var showDatePicker = false
+    @State private var showDeleteConfirm = false
+    @State private var showLocationRemoveAlert = false
 
     private let maxPhotos = 10
+    private var isEditMode: Bool { existingEntry != nil }
 
     private var dateRange: ClosedRange<Date> {
         let now = Date()
         if allowAnyDate {
-            // Allow up to 1 year in past to 1 year in future for developer mode.
             let cal = Calendar.current
             let lower = cal.date(byAdding: .year, value: -1, to: now) ?? now
             let upper = cal.date(byAdding: .year, value: 1, to: now) ?? now
@@ -494,294 +582,605 @@ private struct JournalEntryEditor: View {
                 TreeholeTheme.warmBackground.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: TreeholeTheme.spacingLarge) {
-                        // Date picker — backdate up to 3 days; developer mode allows any date
-                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                            Text(L10n.t("Date", "日期"))
-                                .font(.headline)
-                                .foregroundStyle(TreeholeTheme.textPrimary)
-                            DatePicker(
-                                "",
-                                selection: $draftDate,
-                                in: dateRange,
-                                displayedComponents: .date
-                            )
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
-                            if allowAnyDate {
-                                Text(L10n.t("Developer mode: any date allowed", "开发者模式：可选任意日期"))
-                                    .font(.caption2)
-                                    .foregroundStyle(TreeholeTheme.warmGold)
-                            } else {
-                                Text(L10n.t("You can backdate up to 3 days", "可以补写最近 3 天的日记"))
-                                    .font(.caption2)
-                                    .foregroundStyle(TreeholeTheme.textLight)
-                            }
-                        }
+                    VStack(spacing: TreeholeTheme.spacingMedium) {
 
-                        // Mood picker
+                        // Mood picker — always at top
                         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
                             Text(L10n.t("How are you feeling?", "你现在感觉怎么样？"))
                                 .font(.headline)
                                 .foregroundStyle(TreeholeTheme.textPrimary)
                             MoodPicker(selectedMood: $draftMood)
                         }
+                        .padding(.horizontal, TreeholeTheme.spacingSmall)
 
-                        // MARK: - Voice Note Section
-                        voiceNoteSection
+                        // Title field
+                        TextField(
+                            L10n.t("Title (optional)", "标题（可选）"),
+                            text: $draftTitle
+                        )
+                        .font(.title3.bold())
+                        .padding(.horizontal, TreeholeTheme.spacingSmall)
 
-                        // MARK: - Location Section
-                        locationSection
-
-                        // Text editor
+                        // Body TextEditor
                         TextEditor(text: $draftText)
                             .frame(minHeight: 200)
                             .padding(TreeholeTheme.spacingSmall)
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
                             .scrollContentBackground(.hidden)
+                            .padding(.horizontal, TreeholeTheme.spacingSmall)
 
-                        // MARK: - Photo Section
-                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-                            HStack {
-                                Text(L10n.t("Photos", "照片"))
-                                    .font(.headline)
-                                    .foregroundStyle(TreeholeTheme.textPrimary)
-                                Spacer()
-                                Text(L10n.t("\(draftPhotoData.count)/\(maxPhotos)", "\(draftPhotoData.count)/\(maxPhotos)"))
-                                    .font(.caption)
-                                    .foregroundStyle(TreeholeTheme.textLight)
-                            }
-
-                            // Photo thumbnails
-                            if !draftPhotoData.isEmpty {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: TreeholeTheme.spacingSmall) {
-                                        ForEach(Array(draftPhotoData.enumerated()), id: \.offset) { index, data in
-                                            ZStack(alignment: .topTrailing) {
-                                                if let uiImage = UIImage(data: data) {
-                                                    Image(uiImage: uiImage)
-                                                        .resizable()
-                                                        .scaledToFill()
-                                                        .frame(width: 80, height: 80)
-                                                        .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
-                                                }
-                                                Button {
-                                                    draftPhotoData.remove(at: index)
-                                                } label: {
-                                                    Image(systemName: "xmark.circle.fill")
-                                                        .font(.system(size: 18))
-                                                        .foregroundStyle(.white)
-                                                        .background(Circle().fill(Color.black.opacity(0.5)))
-                                                }
-                                                .offset(x: 6, y: -6)
-                                            }
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                            }
-
-                            // Photos picker button
-                            if draftPhotoData.count < maxPhotos {
-                                PhotosPicker(
-                                    selection: $selectedItems,
-                                    maxSelectionCount: maxPhotos - draftPhotoData.count,
-                                    matching: .images
-                                ) {
-                                    HStack(spacing: TreeholeTheme.spacingTight) {
-                                        if isLoadingPhotos {
-                                            ProgressView()
-                                                .scaleEffect(0.8)
-                                        } else {
-                                            Image(systemName: "photo.badge.plus")
-                                        }
-                                        Text(L10n.t("Add Photos", "添加照片"))
-                                            .font(.subheadline)
-                                    }
-                                    .foregroundStyle(TreeholeTheme.skyBlue)
-                                    .padding(.vertical, TreeholeTheme.spacingTight)
-                                    .padding(.horizontal, TreeholeTheme.spacingSmall)
-                                    .background(TreeholeTheme.skyBlue.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
-                                }
-                            }
+                        // Photo grid (only if photos exist)
+                        if !existingPhotoFilenames.isEmpty || !draftPhotoData.isEmpty {
+                            photoGridSection
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
                         }
-                        .padding(.horizontal, 2)
+
+                        // Audio chip (only if audio recorded — recording bar is in the bottom inset)
+                        if !audioRecorder.isRecording,
+                           let fn = draftAudioFilename ?? existingAudioFilename,
+                           let dur = draftAudioDuration {
+                            audioChip(filename: fn, duration: dur)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        }
+
+                        // Location + weather chip
+                        if draftLocationName != nil || draftWeatherEmoji != nil {
+                            locationWeatherChip
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        }
+
+                        // Event date chip (only if entryDate set AND not today)
+                        if let ed = draftEntryDate,
+                           !Calendar.current.isDateInToday(ed) {
+                            eventDateChip(date: ed)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        }
+
+                        // Permission denied message
+                        if let msg = permissionDeniedMessage {
+                            Text(msg)
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.coral)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        }
+
+                        // Big bottom padding so content clears the floating toolbar
+                        Spacer().frame(height: 80)
                     }
-                    .padding()
+                    .padding(.vertical, TreeholeTheme.spacingMedium)
                 }
             }
-            .navigationTitle(L10n.t("New Entry", "新日记"))
+            .safeAreaInset(edge: .bottom) {
+                // Floating bottom toolbar — SwiftUI auto-shifts it above the keyboard
+                Group {
+                    if audioRecorder.isRecording {
+                        recordingBar
+                    } else {
+                        floatingToolbar
+                    }
+                }
+                .padding(.horizontal, TreeholeTheme.spacingMedium)
+                .padding(.bottom, TreeholeTheme.spacingSmall)
+            }
+            .navigationTitle(isEditMode
+                             ? L10n.t("Edit Entry", "编辑日记")
+                             : L10n.t("New Entry", "新日记"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.t("Cancel", "取消")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.t("Save", "保存")) { onSave() }
+                    Button(L10n.t("Save", "保存")) { handleSave() }
                         .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .tint(TreeholeTheme.coral)
                 }
             }
             .onChange(of: selectedItems) { _, newItems in
-                Task {
-                    await loadPhotos(from: newItems)
-                }
+                Task { await loadPhotos(from: newItems) }
             }
+            .sheet(isPresented: $showDatePicker) {
+                eventDatePickerSheet
+            }
+            .confirmationDialog(
+                L10n.t("Delete this entry?", "删除这篇日记？"),
+                isPresented: $showDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(L10n.t("Delete", "删除"), role: .destructive) {
+                    deleteEntry()
+                }
+                Button(L10n.t("Cancel", "取消"), role: .cancel) {}
+            } message: {
+                Text(L10n.t("This action cannot be undone.", "此操作无法撤销。"))
+            }
+            .onAppear { populateFromExisting() }
         }
     }
 
-    // MARK: - Voice Note Section
+    // MARK: - Photo Grid
 
     @ViewBuilder
-    private var voiceNoteSection: some View {
+    private var photoGridSection: some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-            Text(L10n.t("Voice Note", "语音备注"))
-                .font(.headline)
-                .foregroundStyle(TreeholeTheme.textPrimary)
-
-            if let message = permissionDeniedMessage {
-                Text(message)
+            HStack {
+                Text(L10n.t("Photos", "照片"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Spacer()
+                let total = existingPhotoFilenames.count + draftPhotoData.count
+                Text(L10n.t("\(total)/\(maxPhotos)", "\(total)/\(maxPhotos)"))
                     .font(.caption)
-                    .foregroundStyle(TreeholeTheme.coral)
-            } else if audioRecorder.isRecording {
-                // Recording state
-                VStack(spacing: TreeholeTheme.spacingTight) {
-                    HStack(spacing: TreeholeTheme.spacingSmall) {
-                        Image(systemName: "waveform")
-                            .foregroundStyle(TreeholeTheme.coral)
-                            .symbolEffect(.variableColor.iterative, isActive: true)
-                        Text(formatElapsed(audioRecorder.elapsed))
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(TreeholeTheme.textPrimary)
-                        Text(L10n.t("/ 5:00 max", "/ 最长 5:00"))
-                            .font(.caption)
-                            .foregroundStyle(TreeholeTheme.textLight)
-                        Spacer()
-                    }
-                    // Simple level bar
-                    ProgressView(value: Double(audioRecorder.currentLevel))
-                        .progressViewStyle(.linear)
-                        .tint(TreeholeTheme.coral)
-                    HStack(spacing: TreeholeTheme.spacingSmall) {
+                    .foregroundStyle(TreeholeTheme.textLight)
+            }
+
+            let columns = Array(repeating: GridItem(.flexible(), spacing: TreeholeTheme.spacingSmall), count: 2)
+            LazyVGrid(columns: columns, spacing: TreeholeTheme.spacingSmall) {
+                // Existing photos
+                ForEach(existingPhotoFilenames, id: \.self) { filename in
+                    ZStack(alignment: .topTrailing) {
+                        if let image = PhotoStorage.loadImage(filename) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 120)
+                                .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                        }
                         Button {
-                            finishRecording()
+                            if let idx = existingPhotoFilenames.firstIndex(of: filename) {
+                                removedPhotoFilenames.append(filename)
+                                existingPhotoFilenames.remove(at: idx)
+                            }
                         } label: {
-                            Label(L10n.t("Stop", "停止"), systemImage: "stop.circle.fill")
-                                .font(.subheadline)
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20))
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, TreeholeTheme.spacingSmall)
-                                .padding(.vertical, 6)
-                                .background(TreeholeTheme.coral, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        .offset(x: 6, y: -6)
+                    }
+                }
+                // New photos
+                ForEach(Array(draftPhotoData.enumerated()), id: \.offset) { index, data in
+                    ZStack(alignment: .topTrailing) {
+                        if let uiImage = UIImage(data: data) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 120)
+                                .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
                         }
                         Button {
-                            audioRecorder.cancelRecording()
+                            draftPhotoData.remove(at: index)
                         } label: {
-                            Label(L10n.t("Cancel", "取消"), systemImage: "xmark.circle")
-                                .font(.subheadline)
-                                .foregroundStyle(TreeholeTheme.textSecondary)
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white)
+                                .background(Circle().fill(Color.black.opacity(0.5)))
                         }
+                        .offset(x: 6, y: -6)
                     }
-                }
-            } else if let filename = draftAudioFilename, let duration = draftAudioDuration {
-                // Recorded state
-                HStack(spacing: TreeholeTheme.spacingSmall) {
-                    Image(systemName: "waveform.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(TreeholeTheme.skyBlue)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.t("Voice Note", "语音备注"))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(TreeholeTheme.textPrimary)
-                        Text(formatElapsed(duration))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(TreeholeTheme.textLight)
-                    }
-                    Spacer()
-                    Button {
-                        AudioStorage.deleteAudio(filename: filename)
-                        draftAudioFilename = nil
-                        draftAudioDuration = nil
-                        draftAudioTranscript = nil
-                    } label: {
-                        Image(systemName: "trash")
-                            .foregroundStyle(TreeholeTheme.coral)
-                    }
-                }
-                .padding(TreeholeTheme.spacingSmall)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
-            } else {
-                // Idle state
-                Button {
-                    Task { await startRecordingWithPermissionCheck() }
-                } label: {
-                    HStack(spacing: TreeholeTheme.spacingTight) {
-                        Image(systemName: "mic.fill")
-                        Text(L10n.t("Record Voice Note", "录制语音备注"))
-                            .font(.subheadline)
-                    }
-                    .foregroundStyle(TreeholeTheme.coral)
-                    .padding(.vertical, TreeholeTheme.spacingTight)
-                    .padding(.horizontal, TreeholeTheme.spacingSmall)
-                    .background(TreeholeTheme.coral.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
                 }
             }
         }
-        .padding(.horizontal, 2)
     }
 
-    // MARK: - Location Section
+    // MARK: - Recording Bar
 
     @ViewBuilder
-    private var locationSection: some View {
-        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
-            Text(L10n.t("Location", "位置"))
-                .font(.headline)
+    private var recordingBar: some View {
+        HStack(spacing: TreeholeTheme.spacingSmall) {
+            Circle()
+                .fill(Color.red)
+                .frame(width: 10, height: 10)
+                .symbolEffect(.pulse, isActive: true)
+
+            Image(systemName: "waveform")
+                .foregroundStyle(TreeholeTheme.coral)
+                .symbolEffect(.variableColor.iterative, isActive: true)
+
+            Text(formatElapsed(audioRecorder.elapsed))
+                .font(.subheadline.monospacedDigit())
                 .foregroundStyle(TreeholeTheme.textPrimary)
 
-            if isLoadingLocation {
-                HStack(spacing: TreeholeTheme.spacingTight) {
-                    ProgressView().scaleEffect(0.8)
-                    Text(L10n.t("Finding location…", "正在获取位置…"))
-                        .font(.subheadline)
-                        .foregroundStyle(TreeholeTheme.textSecondary)
-                }
-            } else if let name = draftLocationName {
-                HStack(spacing: TreeholeTheme.spacingTight) {
-                    Image(systemName: "mappin.circle.fill")
-                        .foregroundStyle(TreeholeTheme.coral)
-                    Text(name)
-                        .font(.subheadline)
-                        .foregroundStyle(TreeholeTheme.textPrimary)
-                    Spacer()
-                    Button {
-                        draftLocationName = nil
-                        draftLatitude = nil
-                        draftLongitude = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(TreeholeTheme.textLight)
-                    }
-                }
-                .padding(.horizontal, TreeholeTheme.spacingSmall)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
-            } else {
-                Button {
-                    Task { await fetchLocation() }
-                } label: {
-                    HStack(spacing: TreeholeTheme.spacingTight) {
-                        Image(systemName: "mappin.and.ellipse")
-                        Text(L10n.t("Add Location", "添加位置"))
-                            .font(.subheadline)
-                    }
-                    .foregroundStyle(TreeholeTheme.skyBlue)
-                    .padding(.vertical, TreeholeTheme.spacingTight)
+            Spacer()
+
+            Button {
+                finishRecording()
+            } label: {
+                Label(L10n.t("Stop", "停止"), systemImage: "stop.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, TreeholeTheme.spacingSmall)
-                    .background(TreeholeTheme.skyBlue.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                    .padding(.vertical, 6)
+                    .background(TreeholeTheme.coral, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+            }
+
+            Button {
+                audioRecorder.cancelRecording()
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+            }
+        }
+        .padding(TreeholeTheme.spacingSmall)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+    }
+
+    // MARK: - Audio Chip
+
+    @ViewBuilder
+    private func audioChip(filename: String, duration: Double) -> some View {
+        HStack(spacing: TreeholeTheme.spacingSmall) {
+            Image(systemName: "waveform.circle.fill")
+                .font(.title3)
+                .foregroundStyle(TreeholeTheme.skyBlue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.t("Voice Note", "语音备注"))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+                Text(formatElapsed(duration))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(TreeholeTheme.textLight)
+            }
+            Spacer()
+            Button {
+                if draftAudioFilename != nil {
+                    AudioStorage.deleteAudio(filename: filename)
+                    draftAudioFilename = nil
+                } else {
+                    existingAudioFilename = nil
+                }
+                draftAudioDuration = nil
+                draftAudioTranscript = nil
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(TreeholeTheme.coral)
+            }
+        }
+        .padding(TreeholeTheme.spacingSmall)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+    }
+
+    // MARK: - Location + Weather Chip
+
+    @ViewBuilder
+    private var locationWeatherChip: some View {
+        let chipText: String = {
+            var parts: [String] = []
+            if let name = draftLocationName { parts.append("📍 \(name)") }
+            if let emoji = draftWeatherEmoji, let temp = draftWeatherTempC {
+                parts.append("\(emoji) \(Int(temp.rounded()))°C")
+            }
+            return parts.joined(separator: " · ")
+        }()
+
+        HStack {
+            Text(chipText)
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+            Spacer()
+            Button {
+                showLocationRemoveAlert = true
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(TreeholeTheme.textLight)
+            }
+        }
+        .padding(.horizontal, TreeholeTheme.spacingSmall)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .confirmationDialog(
+            L10n.t("Remove location?", "移除位置？"),
+            isPresented: $showLocationRemoveAlert,
+            titleVisibility: .visible
+        ) {
+            Button(L10n.t("Remove", "移除"), role: .destructive) {
+                draftLocationName = nil
+                draftLatitude = nil
+                draftLongitude = nil
+                draftWeatherTempC = nil
+                draftWeatherCode = nil
+                draftWeatherEmoji = nil
+                draftWeatherDescription = nil
+            }
+            Button(L10n.t("Cancel", "取消"), role: .cancel) {}
+        }
+    }
+
+    // MARK: - Event Date Chip
+
+    @ViewBuilder
+    private func eventDateChip(date: Date) -> some View {
+        HStack {
+            Text("📅 \(date.formatted(.dateTime.month(.abbreviated).day()))")
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+            Spacer()
+            Button {
+                draftEntryDate = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(TreeholeTheme.textLight)
+            }
+        }
+        .padding(.horizontal, TreeholeTheme.spacingSmall)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+    }
+
+    // MARK: - Event Date Picker Sheet
+
+    private var eventDatePickerSheet: some View {
+        NavigationStack {
+            VStack(spacing: TreeholeTheme.spacingLarge) {
+                DatePicker(
+                    L10n.t("Event Date", "事件日期"),
+                    selection: Binding(
+                        get: { draftEntryDate ?? Date() },
+                        set: { draftEntryDate = $0 }
+                    ),
+                    in: dateRange,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+
+                if allowAnyDate {
+                    Text(L10n.t("Developer mode: any date allowed", "开发者模式：可选任意日期"))
+                        .font(.caption2)
+                        .foregroundStyle(TreeholeTheme.warmGold)
+                } else {
+                    Text(L10n.t("You can backdate up to 3 days", "可以补写最近 3 天的日记"))
+                        .font(.caption2)
+                        .foregroundStyle(TreeholeTheme.textLight)
+                }
+
+                Spacer()
+            }
+            .navigationTitle(L10n.t("When did this happen?", "事件发生时间"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.t("Done", "完成")) { showDatePicker = false }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.t("Clear", "清除")) {
+                        draftEntryDate = nil
+                        showDatePicker = false
+                    }
                 }
             }
         }
-        .padding(.horizontal, 2)
+        .presentationDetents([.medium])
+    }
+
+    // MARK: - Floating Toolbar
+
+    @ViewBuilder
+    private var floatingToolbar: some View {
+        HStack(spacing: 0) {
+            // Camera (placeholder — opens photo picker)
+            PhotosPicker(
+                selection: $selectedItems,
+                maxSelectionCount: maxPhotos - existingPhotoFilenames.count - draftPhotoData.count,
+                matching: .images
+            ) {
+                toolbarIcon(
+                    systemName: "camera",
+                    active: false
+                )
+            }
+            .disabled(existingPhotoFilenames.count + draftPhotoData.count >= maxPhotos)
+
+            // Photos picker
+            PhotosPicker(
+                selection: $selectedItems,
+                maxSelectionCount: maxPhotos - existingPhotoFilenames.count - draftPhotoData.count,
+                matching: .images
+            ) {
+                toolbarIcon(
+                    systemName: "photo.on.rectangle",
+                    active: !draftPhotoData.isEmpty || !existingPhotoFilenames.isEmpty
+                )
+            }
+            .disabled(existingPhotoFilenames.count + draftPhotoData.count >= maxPhotos)
+
+            // Mic
+            Button {
+                Task {
+                    if audioRecorder.isRecording {
+                        finishRecording()
+                    } else {
+                        await startRecordingWithPermissionCheck()
+                    }
+                }
+            } label: {
+                toolbarIcon(
+                    systemName: (draftAudioFilename != nil || existingAudioFilename != nil) ? "mic.fill" : "mic",
+                    active: draftAudioFilename != nil || existingAudioFilename != nil
+                )
+            }
+
+            // Location
+            Button {
+                Task {
+                    if draftLocationName != nil {
+                        showLocationRemoveAlert = true
+                    } else {
+                        await fetchLocationAndWeather()
+                    }
+                }
+            } label: {
+                if isLoadingLocation {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    toolbarIcon(
+                        systemName: draftLocationName != nil ? "mappin.circle.fill" : "mappin",
+                        active: draftLocationName != nil
+                    )
+                }
+            }
+
+            // Calendar / event date
+            Button {
+                showDatePicker = true
+            } label: {
+                let hasDate = draftEntryDate != nil && !Calendar.current.isDateInToday(draftEntryDate!)
+                toolbarIcon(systemName: "calendar", active: hasDate)
+            }
+
+            // Ellipsis / more menu
+            Menu {
+                Button {
+                    // "Find in entry" — placeholder, no-op
+                } label: {
+                    Label(L10n.t("Find in Entry", "在日记中查找"), systemImage: "magnifyingglass")
+                }
+                if isEditMode {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label(L10n.t("Delete Entry", "删除日记"), systemImage: "trash")
+                    }
+                }
+            } label: {
+                toolbarIcon(systemName: "ellipsis", active: false)
+            }
+        }
+        .padding(.horizontal, TreeholeTheme.spacingSmall)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        .frame(maxWidth: 360)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func toolbarIcon(systemName: String, active: Bool) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 18))
+            .foregroundStyle(active ? TreeholeTheme.softPurple : TreeholeTheme.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+            .background(
+                active
+                    ? TreeholeTheme.softPurple.opacity(0.12)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+    }
+
+    // MARK: - Save / Edit Logic
+
+    private func handleSave() {
+        if let existing = existingEntry {
+            // Edit mode: update in place
+            existing.text = draftText
+            existing.title = draftTitle.isEmpty ? nil : draftTitle
+            existing.moodTagRaw = draftMood.rawValue
+            existing.entryDate = draftEntryDate
+
+            // Photos: remove deleted ones, add new ones
+            for fn in removedPhotoFilenames {
+                PhotoStorage.deletePhotos([fn])
+            }
+            var allFilenames = existingPhotoFilenames
+            for data in draftPhotoData {
+                if let fn = PhotoStorage.savePhoto(data) {
+                    allFilenames.append(fn)
+                }
+            }
+            existing.photoFilenames = allFilenames.isEmpty ? nil : allFilenames
+
+            // Audio: handle removal or new
+            if existingAudioFilename == nil && draftAudioFilename == nil {
+                // both cleared
+                if let old = existing.audioFilename {
+                    AudioStorage.deleteAudio(filename: old)
+                }
+                existing.audioFilename = nil
+                existing.audioDurationSeconds = nil
+                existing.audioTranscript = nil
+            } else if let newFn = draftAudioFilename {
+                // replaced with new recording
+                if let old = existing.audioFilename, old != newFn {
+                    AudioStorage.deleteAudio(filename: old)
+                }
+                existing.audioFilename = newFn
+                existing.audioDurationSeconds = draftAudioDuration
+                existing.audioTranscript = draftAudioTranscript
+            }
+            // else existingAudioFilename still set = keep existing, no change
+
+            existing.latitude = draftLatitude
+            existing.longitude = draftLongitude
+            existing.locationName = draftLocationName
+            existing.weatherTempC = draftWeatherTempC
+            existing.weatherCode = draftWeatherCode
+            existing.weatherEmoji = draftWeatherEmoji
+            existing.weatherDescription = draftWeatherDescription
+
+            try? modelContext.save()
+            onSave(EntryDraft())
+            dismiss()
+        } else {
+            // Create mode
+            var draft = EntryDraft()
+            draft.text = draftText
+            draft.title = draftTitle
+            draft.mood = draftMood
+            draft.photoData = draftPhotoData
+            draft.audioFilename = draftAudioFilename
+            draft.audioDuration = draftAudioDuration
+            draft.audioTranscript = draftAudioTranscript
+            draft.latitude = draftLatitude
+            draft.longitude = draftLongitude
+            draft.locationName = draftLocationName
+            draft.weatherTempC = draftWeatherTempC
+            draft.weatherCode = draftWeatherCode
+            draft.weatherEmoji = draftWeatherEmoji
+            draft.weatherDescription = draftWeatherDescription
+            draft.entryDate = draftEntryDate
+            onSave(draft)
+            dismiss()
+        }
+    }
+
+    private func deleteEntry() {
+        guard let existing = existingEntry else { return }
+        if let filenames = existing.photoFilenames {
+            PhotoStorage.deletePhotos(filenames)
+        }
+        if let audioFilename = existing.audioFilename {
+            AudioStorage.deleteAudio(filename: audioFilename)
+        }
+        modelContext.delete(existing)
+        try? modelContext.save()
+        dismiss()
+    }
+
+    // MARK: - Populate from Existing
+
+    private func populateFromExisting() {
+        guard let entry = existingEntry else { return }
+        draftText = entry.text
+        draftTitle = entry.title ?? ""
+        draftMood = entry.moodTag
+        draftEntryDate = entry.entryDate
+        existingPhotoFilenames = entry.photoFilenames ?? []
+        existingAudioFilename = entry.audioFilename
+        draftAudioDuration = entry.audioDurationSeconds
+        draftAudioTranscript = entry.audioTranscript
+        draftLatitude = entry.latitude
+        draftLongitude = entry.longitude
+        draftLocationName = entry.locationName
+        draftWeatherTempC = entry.weatherTempC
+        draftWeatherCode = entry.weatherCode
+        draftWeatherEmoji = entry.weatherEmoji
+        draftWeatherDescription = entry.weatherDescription
     }
 
     // MARK: - Recording Helpers
@@ -808,7 +1207,6 @@ private struct JournalEntryEditor: View {
         if let filename = AudioStorage.saveAudio(result.data) {
             draftAudioFilename = filename
             draftAudioDuration = result.duration
-            // Run transcription in background
             Task.detached(priority: .background) {
                 let transcript = await transcribeAudio(data: result.data)
                 await MainActor.run {
@@ -819,7 +1217,6 @@ private struct JournalEntryEditor: View {
     }
 
     private func transcribeAudio(data: Data) async -> String? {
-        // Write to a temp file for SFSpeechURLRecognitionRequest
         let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".m4a")
         do {
             try data.write(to: tmpURL)
@@ -828,7 +1225,6 @@ private struct JournalEntryEditor: View {
         }
         defer { try? FileManager.default.removeItem(at: tmpURL) }
 
-        // Try zh-CN and en-US; pick the longer result
         let zhResult = await runSpeechRecognition(url: tmpURL, locale: Locale(identifier: "zh-CN"))
         let enResult = await runSpeechRecognition(url: tmpURL, locale: Locale(identifier: "en-US"))
 
@@ -862,15 +1258,27 @@ private struct JournalEntryEditor: View {
         }
     }
 
-    // MARK: - Location Helper
+    // MARK: - Location + Weather Helper
 
-    private func fetchLocation() async {
+    private func fetchLocationAndWeather() async {
         isLoadingLocation = true
         defer { isLoadingLocation = false }
         let result = await locationService.fetchCurrentLocation()
-        draftLatitude = result?.latitude
-        draftLongitude = result?.longitude
-        draftLocationName = result?.name
+        guard let loc = result else { return }
+        draftLatitude = loc.latitude
+        draftLongitude = loc.longitude
+        draftLocationName = loc.name
+
+        // Fetch weather in parallel (non-blocking)
+        let lang = language
+        async let weatherFetch = WeatherService.fetchWeather(lat: loc.latitude, lng: loc.longitude, language: lang)
+        let weatherInfo = await weatherFetch
+        if let w = weatherInfo {
+            draftWeatherTempC = w.tempC
+            draftWeatherCode = w.code
+            draftWeatherEmoji = w.emoji
+            draftWeatherDescription = w.description
+        }
     }
 
     // MARK: - Format Helpers
@@ -887,11 +1295,11 @@ private struct JournalEntryEditor: View {
         isLoadingPhotos = true
         defer { isLoadingPhotos = false }
 
+        let currentCount = existingPhotoFilenames.count + draftPhotoData.count
         for item in items {
-            guard draftPhotoData.count < maxPhotos else { break }
+            guard currentCount + draftPhotoData.count < maxPhotos else { break }
             if let data = try? await item.loadTransferable(type: Data.self),
                let uiImage = UIImage(data: data) {
-                // Resize if too large
                 let maxDimension: CGFloat = 1024
                 let resized: UIImage
                 if max(uiImage.size.width, uiImage.size.height) > maxDimension {
@@ -919,8 +1327,6 @@ private struct AIInsightsCard: View {
     @Binding var isGenerating: Bool
     let language: String
     @Environment(\.modelContext) private var modelContext
-    // Collapsed by default — keeps the journal list visible and doesn't push it down.
-    // Persisted across sessions so the user's preference sticks.
     @AppStorage("ai_insights_card_expanded") private var isExpanded: Bool = false
 
     private var latestInsights: JournalSummary? {
@@ -929,7 +1335,7 @@ private struct AIInsightsCard: View {
 
     private var last14DayEntries: [JournalEntry] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
-        return entries.filter { $0.createdAt >= cutoff }
+        return entries.filter { $0.displayDate >= cutoff }
     }
 
     private var collapsedSubtitle: String {
@@ -947,7 +1353,6 @@ private struct AIInsightsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-            // Header — always visible, the whole row toggles expansion
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
@@ -1031,10 +1436,10 @@ private struct AIInsightsCard: View {
         isGenerating = true
         let lang = language
         let payloads = recentEntries.map { entry -> (date: String, mood: String, text: String) in
-            let dateStr = entry.createdAt.formatted(.iso8601.year().month().day())
+            let dateStr = entry.displayDate.formatted(.iso8601.year().month().day())
             return (date: dateStr, mood: entry.moodTag.rawValue, text: entry.text)
         }
-        let windowStart = recentEntries.last?.createdAt ?? Date()
+        let windowStart = recentEntries.last?.displayDate ?? Date()
         Task {
             defer { isGenerating = false }
             guard let text = try? await SupabaseService.summarizeJournal(
@@ -1082,8 +1487,6 @@ private struct AIWeeklySummaryCard: View {
     }
 }
 
-// MARK: - Mini Stat
-
 // MARK: - Markdown helper
 
 /// Render AI-generated markdown text (e.g. **bold**, *italic*, lists) into an AttributedString.
@@ -1097,6 +1500,8 @@ func renderMarkdown(_ raw: String) -> AttributedString {
     }
     return AttributedString(raw)
 }
+
+// MARK: - Mini Stat
 
 private struct MiniStat: View {
     let label: String

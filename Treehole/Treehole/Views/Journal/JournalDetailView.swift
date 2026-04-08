@@ -11,6 +11,7 @@ struct JournalDetailView: View {
 
     @State private var showDeleteConfirm = false
     @State private var isGeneratingSummary = false
+    @State private var showEditSheet = false
 
     var moodLabel: String {
         appState.preferredLanguage == "zh-Hans" ? entry.moodTag.labelZH : entry.moodTag.labelEN
@@ -214,6 +215,14 @@ struct JournalDetailView: View {
         .navigationTitle(L10n.t("Journal Detail", "日记详情"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEditSheet = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundStyle(TreeholeTheme.softPurple)
+                }
+            }
             ToolbarItem(placement: .destructiveAction) {
                 Button {
                     showDeleteConfirm = true
@@ -222,6 +231,16 @@ struct JournalDetailView: View {
                         .foregroundStyle(TreeholeTheme.coral)
                 }
             }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            JournalEntryEditor(
+                existingEntry: entry,
+                allowAnyDate: appState.isDeveloperMode,
+                language: appState.preferredLanguage,
+                onSave: { _ in
+                    showEditSheet = false
+                }
+            )
         }
         .confirmationDialog(
             L10n.t("Delete this entry?", "删除这篇日记？"),

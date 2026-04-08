@@ -384,7 +384,7 @@ struct MoodStatsView: View {
 
     private var filteredEntries: [JournalEntry] {
         let range = currentDateRange
-        return allEntries.filter { $0.createdAt >= range.start && $0.createdAt < range.end }
+        return allEntries.filter { $0.displayDate >= range.start && $0.displayDate < range.end }
     }
 
     private var currentDateRange: (start: Date, end: Date) {
@@ -406,7 +406,7 @@ struct MoodStatsView: View {
     private var moodMapForPeriod: [Date: MoodTag] {
         var dict: [Date: [MoodTag]] = [:]
         for entry in filteredEntries {
-            let day = cal.startOfDay(for: entry.createdAt)
+            let day = cal.startOfDay(for: entry.displayDate)
             dict[day, default: []].append(entry.moodTag)
         }
         return dict.mapValues { moods in
@@ -435,7 +435,7 @@ struct MoodStatsView: View {
 
     private func calculateStreaks() -> (current: Int, longest: Int) {
         let today = cal.startOfDay(for: Date())
-        let days = Set(allEntries.map { cal.startOfDay(for: $0.createdAt) }).sorted()
+        let days = Set(allEntries.map { cal.startOfDay(for: $0.displayDate) }).sorted()
 
         guard !days.isEmpty else { return (0, 0) }
 

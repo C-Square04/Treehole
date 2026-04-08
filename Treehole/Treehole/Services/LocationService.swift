@@ -8,7 +8,6 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     // MARK: - Private
     private let manager = CLLocationManager()
     private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
-    private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
 
     override init() {
         super.init()
@@ -27,11 +26,18 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         }
 
         if status == .notDetermined {
-            // Wait for the system prompt to actually return via the delegate, not a fragile sleep.
-            status = await withCheckedContinuation { continuation in
-                self.authContinuation = continuation
-                self.manager.requestWhenInUseAuthorization()
+            // Trigger the system prompt and poll for the result.
+            // Polling avoids a leaked continuation when the prompt never fires
+            // (e.g. test environment, simulator without UI).
+            manager.requestWhenInUseAuthorization()
+            for _ in 0..<40 {
+                if Task.isCancelled { return nil }
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms × 40 = 4s max
+                if manager.authorizationStatus != .notDetermined {
+                    break
+                }
             }
+            status = manager.authorizationStatus
         }
 
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
@@ -101,11 +107,6 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        // The system fires this once after the user responds to the permission prompt
-        // (and also at observer attach time with .notDetermined — ignore that case).
-        let status = manager.authorizationStatus
-        guard status != .notDetermined else { return }
-        authContinuation?.resume(returning: status)
-        authContinuation = nil
+        // No-op: fetchCurrentLocation polls authorizationStatus after requesting.
     }
 }

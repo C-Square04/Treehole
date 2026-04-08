@@ -103,4 +103,94 @@ struct JournalEntryFieldsTests {
         #expect(entry.latitude == nil)
         #expect(entry.locationName == nil)
     }
+
+    // MARK: - Two Dates
+
+    // entryDate defaults to nil on a new entry
+    @Test func testEntryDateDefaultsToNil() throws {
+        let entry = JournalEntry(moodTag: .calm, text: "Test entry")
+        #expect(entry.entryDate == nil)
+    }
+
+    // displayDate returns entryDate when it is set
+    @Test func testDisplayDateReturnsEntryDateWhenSet() throws {
+        let entry = JournalEntry(moodTag: .calm, text: "Test")
+        let specificDate = Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
+        entry.entryDate = specificDate
+        #expect(entry.displayDate == specificDate)
+    }
+
+    // displayDate falls back to createdAt when entryDate is nil
+    @Test func testDisplayDateFallsBackToCreatedAt() throws {
+        let entry = JournalEntry(moodTag: .happy, text: "Fallback test")
+        #expect(entry.entryDate == nil)
+        // displayDate should equal createdAt within a second tolerance
+        let diff = abs(entry.displayDate.timeIntervalSince(entry.createdAt))
+        #expect(diff < 1.0)
+    }
+
+    // title defaults to nil
+    @Test func testTitleDefaultsToNil() throws {
+        let entry = JournalEntry(moodTag: .calm, text: "No title")
+        #expect(entry.title == nil)
+    }
+
+    // title can be set and read back
+    @Test func testTitleSetAndRead() throws {
+        let entry = JournalEntry(moodTag: .hopeful, text: "Titled entry")
+        entry.title = "My Title"
+        #expect(entry.title == "My Title")
+    }
+
+    // MARK: - Weather Fields
+
+    // Weather fields all default to nil
+    @Test func testWeatherFieldsDefaultToNil() throws {
+        let entry = JournalEntry(moodTag: .calm, text: "Weather test")
+        #expect(entry.weatherTempC == nil)
+        #expect(entry.weatherCode == nil)
+        #expect(entry.weatherEmoji == nil)
+        #expect(entry.weatherDescription == nil)
+    }
+
+    // Weather fields round-trip via SwiftData
+    @Test func testWeatherFieldsPersistedViaSwiftData() throws {
+        let (container, context) = try makeJournalContainer()
+        let entry = JournalEntry(moodTag: .calm, text: "Sunny day")
+        entry.weatherTempC = 22.5
+        entry.weatherCode = 0
+        entry.weatherEmoji = "☀️"
+        entry.weatherDescription = "Clear"
+        context.insert(entry)
+        try context.save()
+
+        let fetchDescriptor = FetchDescriptor<JournalEntry>()
+        let fetched = try context.fetch(fetchDescriptor)
+        #expect(fetched.count == 1)
+        #expect(fetched[0].weatherTempC == 22.5)
+        #expect(fetched[0].weatherCode == 0)
+        #expect(fetched[0].weatherEmoji == "☀️")
+        #expect(fetched[0].weatherDescription == "Clear")
+        _ = container
+    }
+
+    // entryDate persists via SwiftData
+    @Test func testEntryDatePersistedViaSwiftData() throws {
+        let (container, context) = try makeJournalContainer()
+        let entry = JournalEntry(moodTag: .calm, text: "Past event")
+        let pastDate = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        entry.entryDate = pastDate
+        context.insert(entry)
+        try context.save()
+
+        let fetchDescriptor = FetchDescriptor<JournalEntry>()
+        let fetched = try context.fetch(fetchDescriptor)
+        #expect(fetched.count == 1)
+        #expect(fetched[0].entryDate != nil)
+        if let storedDate = fetched[0].entryDate {
+            let diff = abs(storedDate.timeIntervalSince(pastDate))
+            #expect(diff < 1.0)
+        }
+        _ = container
+    }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import MapKit
 
 struct JournalDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -113,23 +114,96 @@ struct JournalDetailView: View {
                                     .foregroundStyle(TreeholeTheme.textLight)
                             }
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: TreeholeTheme.spacingSmall) {
-                                    ForEach(filenames, id: \.self) { filename in
-                                        if let image = PhotoStorage.loadImage(filename) {
-                                            Image(uiImage: image)
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                                .frame(width: 120, height: 120)
-                                                .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-                                        }
+                            let columns = Array(repeating: GridItem(.flexible(), spacing: TreeholeTheme.spacingSmall), count: 3)
+                            LazyVGrid(columns: columns, spacing: TreeholeTheme.spacingSmall) {
+                                ForEach(filenames, id: \.self) { filename in
+                                    if let image = PhotoStorage.loadImage(filename) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(height: 100)
+                                            .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
                                     }
                                 }
-                                .padding(.horizontal, 2)
-                                .padding(.vertical, 4)
                             }
                         }
                         .glassCard()
+                    }
+
+                    // MARK: - Voice Note Section
+                    if let audioFilename = entry.audioFilename {
+                        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+                            HStack {
+                                Image(systemName: "waveform.circle.fill")
+                                    .foregroundStyle(TreeholeTheme.skyBlue)
+                                Text(L10n.t("Voice Note", "语音备注"))
+                                    .font(.headline)
+                                    .foregroundStyle(TreeholeTheme.textPrimary)
+                                Spacer()
+                                Button {
+                                    if let fn = entry.audioFilename {
+                                        AudioStorage.deleteAudio(filename: fn)
+                                    }
+                                    entry.audioFilename = nil
+                                    entry.audioDurationSeconds = nil
+                                    entry.audioTranscript = nil
+                                    try? modelContext.save()
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.subheadline)
+                                        .foregroundStyle(TreeholeTheme.coral)
+                                }
+                            }
+
+                            if let audioURL = AudioStorage.loadAudioURL(filename: audioFilename) {
+                                AudioPlayerView(
+                                    audioURL: audioURL,
+                                    totalDuration: entry.audioDurationSeconds ?? 0
+                                )
+                            } else {
+                                Text(L10n.t("Audio file not found.", "音频文件未找到。"))
+                                    .font(.caption)
+                                    .foregroundStyle(TreeholeTheme.textLight)
+                            }
+
+                            if let transcript = entry.audioTranscript {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(L10n.t("Voice transcript / 语音转录", "语音转录 / Voice transcript"))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(TreeholeTheme.textLight)
+                                    Text(transcript)
+                                        .font(.subheadline.italic())
+                                        .foregroundStyle(TreeholeTheme.textSecondary)
+                                }
+                                .padding(TreeholeTheme.spacingSmall)
+                                .background(Color.gray.opacity(0.08), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                            }
+                        }
+                        .glassCard()
+                    }
+
+                    // MARK: - Location Chip
+                    if let locationName = entry.locationName {
+                        HStack(spacing: TreeholeTheme.spacingTight) {
+                            Image(systemName: "mappin.circle.fill")
+                                .foregroundStyle(TreeholeTheme.coral)
+                            Text(locationName)
+                                .font(.subheadline)
+                                .foregroundStyle(TreeholeTheme.textPrimary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+                        .onTapGesture {
+                            if let lat = entry.latitude, let lon = entry.longitude {
+                                let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                                let placemark = MKPlacemark(coordinate: coordinate)
+                                let mapItem = MKMapItem(placemark: placemark)
+                                mapItem.name = locationName
+                                mapItem.openInMaps()
+                            }
+                        }
                     }
 
                     Spacer(minLength: TreeholeTheme.spacingXL)
@@ -157,6 +231,9 @@ struct JournalDetailView: View {
             Button(L10n.t("Delete", "删除"), role: .destructive) {
                 if let filenames = entry.photoFilenames {
                     PhotoStorage.deletePhotos(filenames)
+                }
+                if let audioFilename = entry.audioFilename {
+                    AudioStorage.deleteAudio(filename: audioFilename)
                 }
                 modelContext.delete(entry)
                 try? modelContext.save()

@@ -438,6 +438,16 @@ struct SettingsView: View {
         }
         print("[DELETE] Photos cleared")
 
+        // 5b. Delete audio (local + iCloud ubiquity container)
+        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? fm.removeItem(at: docs.appendingPathComponent("journal_audio"))
+        }
+        if let icloud = fm.url(forUbiquityContainerIdentifier: nil)?
+            .appendingPathComponent("Documents/journal_audio") {
+            try? fm.removeItem(at: icloud)
+        }
+        print("[DELETE] Audio cleared")
+
         // 6. Clear ALL UserDefaults
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)

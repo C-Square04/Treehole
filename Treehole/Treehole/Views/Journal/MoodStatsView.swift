@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import MapKit
 
 // MARK: - Time Period
 
@@ -50,6 +51,7 @@ struct MoodStatsView: View {
 
             ScrollView {
                 VStack(spacing: TreeholeTheme.spacingLarge) {
+                    placesMapSection
                     periodPickerSection
                     subPeriodScroller
                     calendarSection
@@ -62,6 +64,43 @@ struct MoodStatsView: View {
         }
         .navigationTitle(L10n.t("Mood Stats", "情绪统计"))
         .navigationBarTitleDisplayMode(.large)
+    }
+
+    // MARK: - Places Map Section
+
+    private var entriesWithLocation: [JournalEntry] {
+        allEntries.filter { $0.latitude != nil && $0.longitude != nil }
+    }
+
+    @ViewBuilder
+    private var placesMapSection: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+            HStack {
+                Image(systemName: "map.fill")
+                    .foregroundStyle(TreeholeTheme.skyBlue)
+                Text(L10n.t("Places", "地点"))
+                    .font(.headline)
+                    .foregroundStyle(TreeholeTheme.textPrimary)
+            }
+
+            let located = entriesWithLocation
+            if located.isEmpty {
+                Text(L10n.t(
+                    "Add a location to your next entry to see it here",
+                    "在下一条日记中添加位置以在这里查看"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textLight)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, TreeholeTheme.spacingMedium)
+            } else {
+                PlacesMapView(entries: located)
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+            }
+        }
+        .glassCard()
     }
 
     // MARK: - Period Picker
@@ -516,5 +555,83 @@ private struct StreakCard: View {
         .frame(maxWidth: .infinity)
         .padding(TreeholeTheme.spacingSmall)
         .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+    }
+}
+
+// MARK: - Places Map View
+
+private struct PlacesMapView: View {
+    let entries: [JournalEntry]
+
+    @State private var selectedEntry: JournalEntry? = nil
+    @State private var cameraPosition: MapCameraPosition
+
+    init(entries: [JournalEntry]) {
+        self.entries = entries
+        let region = Self.fitRegion(for: entries)
+        _cameraPosition = State(initialValue: .region(region))
+    }
+
+    private func moodColor(_ mood: MoodTag) -> Color {
+        switch mood {
+        case .happy:    TreeholeTheme.warmGold
+        case .sad:      TreeholeTheme.skyBlue
+        case .angry:    TreeholeTheme.coral
+        case .anxious:  TreeholeTheme.softRose
+        case .tired:    TreeholeTheme.gentleLavender
+        case .confused: TreeholeTheme.softPurple
+        case .hopeful:  TreeholeTheme.mintCream
+        case .calm:     TreeholeTheme.warmPeach
+        }
+    }
+
+    private static func fitRegion(for entries: [JournalEntry]) -> MKCoordinateRegion {
+        let coords = entries.compactMap { entry -> CLLocationCoordinate2D? in
+            guard let lat = entry.latitude, let lon = entry.longitude else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        guard !coords.isEmpty else {
+            return MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4),
+                span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+            )
+        }
+        let lats = coords.map { $0.latitude }
+        let lons = coords.map { $0.longitude }
+        let minLat = lats.min()!, maxLat = lats.max()!
+        let minLon = lons.min()!, maxLon = lons.max()!
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max(0.02, (maxLat - minLat) * 1.5),
+            longitudeDelta: max(0.02, (maxLon - minLon) * 1.5)
+        )
+        return MKCoordinateRegion(center: center, span: span)
+    }
+
+    var body: some View {
+        Map(position: $cameraPosition, selection: $selectedEntry) {
+            ForEach(entries, id: \.self) { entry in
+                if let lat = entry.latitude, let lon = entry.longitude {
+                    Annotation(
+                        entry.formattedDate,
+                        coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                    ) {
+                        Circle()
+                            .fill(moodColor(entry.moodTag))
+                            .frame(width: 18, height: 18)
+                            .overlay(Circle().stroke(.white, lineWidth: 2))
+                            .shadow(radius: 3)
+                    }
+                    .tag(entry)
+                }
+            }
+        }
+        .mapStyle(.standard)
+        .navigationDestination(item: $selectedEntry) { entry in
+            JournalDetailView(entry: entry)
+        }
     }
 }

@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import AVFoundation
+import Speech
+import CoreLocation
 
 struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
@@ -17,6 +20,12 @@ struct JournalView: View {
     @State private var draftMood: MoodTag = .calm
     @State private var draftPhotoData: [Data] = []
     @State private var draftDate: Date = Date()
+    @State private var draftAudioFilename: String? = nil
+    @State private var draftAudioDuration: Double? = nil
+    @State private var draftAudioTranscript: String? = nil
+    @State private var draftLatitude: Double? = nil
+    @State private var draftLongitude: Double? = nil
+    @State private var draftLocationName: String? = nil
     @State private var isGeneratingInsights = false
     @State private var isGeneratingWeekly = false
 
@@ -161,6 +170,12 @@ struct JournalView: View {
                     draftMood: $draftMood,
                     draftPhotoData: $draftPhotoData,
                     draftDate: $draftDate,
+                    draftAudioFilename: $draftAudioFilename,
+                    draftAudioDuration: $draftAudioDuration,
+                    draftAudioTranscript: $draftAudioTranscript,
+                    draftLatitude: $draftLatitude,
+                    draftLongitude: $draftLongitude,
+                    draftLocationName: $draftLocationName,
                     allowAnyDate: appState.isDeveloperMode,
                     onSave: {
                         let entry = JournalEntry(moodTag: draftMood, text: draftText)
@@ -181,6 +196,12 @@ struct JournalView: View {
                             }
                             entry.photoFilenames = filenames.isEmpty ? nil : filenames
                         }
+                        entry.audioFilename = draftAudioFilename
+                        entry.audioDurationSeconds = draftAudioDuration
+                        entry.audioTranscript = draftAudioTranscript
+                        entry.latitude = draftLatitude
+                        entry.longitude = draftLongitude
+                        entry.locationName = draftLocationName
                         modelContext.insert(entry)
                         let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                         if let task = dailyTasks.first(where: { $0.type == .writeJournal && !$0.isCompleted }) {
@@ -193,6 +214,12 @@ struct JournalView: View {
                         draftMood = .calm
                         draftPhotoData = []
                         draftDate = Date()
+                        draftAudioFilename = nil
+                        draftAudioDuration = nil
+                        draftAudioTranscript = nil
+                        draftLatitude = nil
+                        draftLongitude = nil
+                        draftLocationName = nil
                         showNewEntry = false
                     }
                 )
@@ -429,13 +456,23 @@ private struct JournalEntryEditor: View {
     @Binding var draftMood: MoodTag
     @Binding var draftPhotoData: [Data]
     @Binding var draftDate: Date
+    @Binding var draftAudioFilename: String?
+    @Binding var draftAudioDuration: Double?
+    @Binding var draftAudioTranscript: String?
+    @Binding var draftLatitude: Double?
+    @Binding var draftLongitude: Double?
+    @Binding var draftLocationName: String?
     let allowAnyDate: Bool
     let onSave: () -> Void
 
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
+    @State private var audioRecorder = AudioRecorder()
+    @State private var locationService = LocationService()
+    @State private var isLoadingLocation = false
+    @State private var permissionDeniedMessage: String? = nil
 
-    private let maxPhotos = 3
+    private let maxPhotos = 10
 
     private var dateRange: ClosedRange<Date> {
         let now = Date()
@@ -489,6 +526,12 @@ private struct JournalEntryEditor: View {
                                 .foregroundStyle(TreeholeTheme.textPrimary)
                             MoodPicker(selectedMood: $draftMood)
                         }
+
+                        // MARK: - Voice Note Section
+                        voiceNoteSection
+
+                        // MARK: - Location Section
+                        locationSection
 
                         // Text editor
                         TextEditor(text: $draftText)
@@ -585,6 +628,258 @@ private struct JournalEntryEditor: View {
                 }
             }
         }
+    }
+
+    // MARK: - Voice Note Section
+
+    @ViewBuilder
+    private var voiceNoteSection: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+            Text(L10n.t("Voice Note", "语音备注"))
+                .font(.headline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            if let message = permissionDeniedMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(TreeholeTheme.coral)
+            } else if audioRecorder.isRecording {
+                // Recording state
+                VStack(spacing: TreeholeTheme.spacingTight) {
+                    HStack(spacing: TreeholeTheme.spacingSmall) {
+                        Image(systemName: "waveform")
+                            .foregroundStyle(TreeholeTheme.coral)
+                            .symbolEffect(.variableColor.iterative, isActive: true)
+                        Text(formatElapsed(audioRecorder.elapsed))
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(TreeholeTheme.textPrimary)
+                        Text(L10n.t("/ 5:00 max", "/ 最长 5:00"))
+                            .font(.caption)
+                            .foregroundStyle(TreeholeTheme.textLight)
+                        Spacer()
+                    }
+                    // Simple level bar
+                    ProgressView(value: Double(audioRecorder.currentLevel))
+                        .progressViewStyle(.linear)
+                        .tint(TreeholeTheme.coral)
+                    HStack(spacing: TreeholeTheme.spacingSmall) {
+                        Button {
+                            finishRecording()
+                        } label: {
+                            Label(L10n.t("Stop", "停止"), systemImage: "stop.circle.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                                .padding(.vertical, 6)
+                                .background(TreeholeTheme.coral, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                        }
+                        Button {
+                            audioRecorder.cancelRecording()
+                        } label: {
+                            Label(L10n.t("Cancel", "取消"), systemImage: "xmark.circle")
+                                .font(.subheadline)
+                                .foregroundStyle(TreeholeTheme.textSecondary)
+                        }
+                    }
+                }
+            } else if let filename = draftAudioFilename, let duration = draftAudioDuration {
+                // Recorded state
+                HStack(spacing: TreeholeTheme.spacingSmall) {
+                    Image(systemName: "waveform.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(TreeholeTheme.skyBlue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t("Voice Note", "语音备注"))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(TreeholeTheme.textPrimary)
+                        Text(formatElapsed(duration))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(TreeholeTheme.textLight)
+                    }
+                    Spacer()
+                    Button {
+                        AudioStorage.deleteAudio(filename: filename)
+                        draftAudioFilename = nil
+                        draftAudioDuration = nil
+                        draftAudioTranscript = nil
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(TreeholeTheme.coral)
+                    }
+                }
+                .padding(TreeholeTheme.spacingSmall)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+            } else {
+                // Idle state
+                Button {
+                    Task { await startRecordingWithPermissionCheck() }
+                } label: {
+                    HStack(spacing: TreeholeTheme.spacingTight) {
+                        Image(systemName: "mic.fill")
+                        Text(L10n.t("Record Voice Note", "录制语音备注"))
+                            .font(.subheadline)
+                    }
+                    .foregroundStyle(TreeholeTheme.coral)
+                    .padding(.vertical, TreeholeTheme.spacingTight)
+                    .padding(.horizontal, TreeholeTheme.spacingSmall)
+                    .background(TreeholeTheme.coral.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                }
+            }
+        }
+        .padding(.horizontal, 2)
+    }
+
+    // MARK: - Location Section
+
+    @ViewBuilder
+    private var locationSection: some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingTight) {
+            Text(L10n.t("Location", "位置"))
+                .font(.headline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            if isLoadingLocation {
+                HStack(spacing: TreeholeTheme.spacingTight) {
+                    ProgressView().scaleEffect(0.8)
+                    Text(L10n.t("Finding location…", "正在获取位置…"))
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textSecondary)
+                }
+            } else if let name = draftLocationName {
+                HStack(spacing: TreeholeTheme.spacingTight) {
+                    Image(systemName: "mappin.circle.fill")
+                        .foregroundStyle(TreeholeTheme.coral)
+                    Text(name)
+                        .font(.subheadline)
+                        .foregroundStyle(TreeholeTheme.textPrimary)
+                    Spacer()
+                    Button {
+                        draftLocationName = nil
+                        draftLatitude = nil
+                        draftLongitude = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(TreeholeTheme.textLight)
+                    }
+                }
+                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
+            } else {
+                Button {
+                    Task { await fetchLocation() }
+                } label: {
+                    HStack(spacing: TreeholeTheme.spacingTight) {
+                        Image(systemName: "mappin.and.ellipse")
+                        Text(L10n.t("Add Location", "添加位置"))
+                            .font(.subheadline)
+                    }
+                    .foregroundStyle(TreeholeTheme.skyBlue)
+                    .padding(.vertical, TreeholeTheme.spacingTight)
+                    .padding(.horizontal, TreeholeTheme.spacingSmall)
+                    .background(TreeholeTheme.skyBlue.opacity(0.15), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                }
+            }
+        }
+        .padding(.horizontal, 2)
+    }
+
+    // MARK: - Recording Helpers
+
+    private func startRecordingWithPermissionCheck() async {
+        let granted = await audioRecorder.requestPermission()
+        guard granted else {
+            permissionDeniedMessage = L10n.t(
+                "Microphone access denied. Enable it in Settings.",
+                "麦克风权限被拒绝，请在设置中开启。"
+            )
+            return
+        }
+        permissionDeniedMessage = nil
+        do {
+            try audioRecorder.startRecording()
+        } catch {
+            permissionDeniedMessage = L10n.t("Unable to start recording.", "无法开始录音。")
+        }
+    }
+
+    private func finishRecording() {
+        guard let result = audioRecorder.stopRecording() else { return }
+        if let filename = AudioStorage.saveAudio(result.data) {
+            draftAudioFilename = filename
+            draftAudioDuration = result.duration
+            // Run transcription in background
+            Task.detached(priority: .background) {
+                let transcript = await transcribeAudio(data: result.data)
+                await MainActor.run {
+                    draftAudioTranscript = transcript
+                }
+            }
+        }
+    }
+
+    private func transcribeAudio(data: Data) async -> String? {
+        // Write to a temp file for SFSpeechURLRecognitionRequest
+        let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".m4a")
+        do {
+            try data.write(to: tmpURL)
+        } catch {
+            return nil
+        }
+        defer { try? FileManager.default.removeItem(at: tmpURL) }
+
+        // Try zh-CN and en-US; pick the longer result
+        let zhResult = await runSpeechRecognition(url: tmpURL, locale: Locale(identifier: "zh-CN"))
+        let enResult = await runSpeechRecognition(url: tmpURL, locale: Locale(identifier: "en-US"))
+
+        let best: String?
+        switch (zhResult, enResult) {
+        case (let zh?, let en?) where zh.count >= en.count:
+            best = zh
+        case (_, let en?):
+            best = en
+        case (let zh?, _):
+            best = zh
+        default:
+            best = nil
+        }
+        return (best?.isEmpty == false) ? best : nil
+    }
+
+    private func runSpeechRecognition(url: URL, locale: Locale) async -> String? {
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized else { return nil }
+        guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else { return nil }
+        return await withCheckedContinuation { continuation in
+            let request = SFSpeechURLRecognitionRequest(url: url)
+            request.shouldReportPartialResults = false
+            recognizer.recognitionTask(with: request) { result, error in
+                if let result = result, result.isFinal {
+                    continuation.resume(returning: result.bestTranscription.formattedString)
+                } else if error != nil {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    // MARK: - Location Helper
+
+    private func fetchLocation() async {
+        isLoadingLocation = true
+        defer { isLoadingLocation = false }
+        let result = await locationService.fetchCurrentLocation()
+        draftLatitude = result?.latitude
+        draftLongitude = result?.longitude
+        draftLocationName = result?.name
+    }
+
+    // MARK: - Format Helpers
+
+    private func formatElapsed(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds))
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%d:%02d", m, s)
     }
 
     @MainActor

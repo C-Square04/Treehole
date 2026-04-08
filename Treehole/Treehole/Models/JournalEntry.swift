@@ -9,6 +9,16 @@ final class JournalEntry {
     var text: String = ""
     var photoFilenames: [String]? = nil
 
+    // Audio (voice note)
+    var audioFilename: String? = nil
+    var audioTranscript: String? = nil
+    var audioDurationSeconds: Double? = nil
+
+    // Location
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var locationName: String? = nil
+
     init() {}
 
     init(moodTag: MoodTag, text: String) {

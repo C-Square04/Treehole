@@ -22,7 +22,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Drift Bottle Clouds | Anonymous posting, "grab a cloud" for random posts (no repeats — server tracks grabbed history per user), comments, reactions (breeze / hug / starlight) with visual effects, My Clouds management, 3-layer content moderation |
 | Virtual Pet | Cartoon cat with mood-based animations, feed / pet / rest actions, hunger / energy / XP / level system, 4 home themes, feeding costs food currency |
 | Plant Garden | Up to 5 plants, 5 species, 5 growth stages per species, watering grants XP, custom plant visual art |
-| Journal | Mood-tagged entries, photo support (up to 3 photos, iCloud synced), mood week calendar strip, mood statistics (week / month / year), mood distribution chart, streak tracking, entry detail view, **AI Insights card + auto weekly summary + per-entry AI summary (opt-in, renders markdown), backdate entries up to 3 days (any date in developer mode)** |
+| Journal | Mood-tagged entries, **photo support (up to 10 photos, iCloud synced)**, **voice notes (m4a, 5 min cap, auto-transcribed via Apple Speech in zh/en)**, **optional location tagging (precise GPS + reverse-geocoded name)**, mood week calendar strip, mood statistics (week / month / year), mood distribution chart, **Places map (tappable mood markers → entry detail)**, streak tracking, entry detail view, AI Insights card + auto weekly summary + per-entry AI summary (opt-in, renders markdown), backdate entries up to 3 days (any date in developer mode) |
 | Notifications | Daily 9 AM check-in (enriched with unread cloud reply count), evening 6 PM pet reminder, on-launch unread interaction local notification (6h throttle), feeding / watering reminders |
 | Analytics | Anonymous event tracking via Supabase `analytics_events` table — fire-and-forget, never blocks UI, never logs user content text |
 | Economy | Food / Decoration Tokens / Gems currencies, 4 daily task types, 4 weekly challenge types, login streak rewards, shop (buy food with tokens) |
@@ -224,7 +224,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 漂流瓶云朵 | 匿名发帖、"抓一朵云"随机浏览（服务端按用户记录已抓取记录，不会重复）、评论、微风/拥抱/星光三种反应（含视觉特效）、我的云朵管理页、三层内容审核 |
 | 虚拟宠物 | 心情动画卡通猫、喂食/抚摸/休息互动、饥饿值/精力/经验值/等级系统、4 套家居主题、喂食消耗食物货币 |
 | 植物花园 | 最多 5 株植物、5 种植物种类、每种 5 个成长阶段、浇水获得经验值、定制植物视觉艺术 |
-| 日记 | 心情标签记录、照片支持（最多 3 张，iCloud 同步）、心情周历带状视图、心情统计页（周/月/年）、心情分布图、连续打卡追踪、条目详情视图、**AI 洞察卡片 + 每周自动摘要 + 单条 AI 摘要（用户授权后，渲染 markdown）、可补写最近 3 天日记（开发者模式可选任意日期）** |
+| 日记 | 心情标签记录、**照片支持（最多 10 张，iCloud 同步）**、**语音备忘（m4a，5 分钟上限，Apple Speech 中英自动转写）**、**可选位置标签（精确 GPS + 反向解析地名）**、心情周历带状视图、心情统计页（周/月/年）、心情分布图、**地点地图（按心情着色的可点击 marker → 进入日记详情）**、连续打卡追踪、条目详情视图、AI 洞察卡片 + 每周自动摘要 + 单条 AI 摘要（用户授权后，渲染 markdown）、可补写最近 3 天日记（开发者模式可选任意日期） |
 | 通知 | 每日上午 9 点签到（带未读云朵回复数）、傍晚 6 点宠物提醒、应用启动时本地通知未读互动（6 小时节流）、喂食/浇水提醒 |
 | 数据分析 | 通过 Supabase `analytics_events` 表的匿名事件追踪 — fire-and-forget，永不阻塞 UI，永不记录用户内容文本 |
 | 经济系统 | 食物/装饰代币/宝石三种货币、4 类每日任务、4 类每周挑战、登录连续奖励、商店（用代币购买食物） |

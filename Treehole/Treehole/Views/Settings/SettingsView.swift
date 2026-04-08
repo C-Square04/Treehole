@@ -407,23 +407,15 @@ struct SettingsView: View {
         let savedDeviceId = SupabaseConfig.deviceId
         let savedAppleUserId = SupabaseConfig.appleUserID
 
-        // 2. Delete cloud posts from Supabase. AWAIT, do not fire-and-forget.
-        //    Because we haven't cleared UserDefaults yet, SupabaseConfig still
-        //    returns the right device_id and the server's RLS policy accepts
-        //    the delete.
+        // 2. Delete cloud posts from Supabase via SECURITY DEFINER RPC.
+        //    Bypasses RLS and matches by device_id OR apple_user_id, so it
+        //    deletes posts even if the user's device_id has rotated since
+        //    they posted (e.g. reinstall). AWAIT — do not fire-and-forget.
         do {
-            let posts = try await SupabaseService.fetchMyPosts()
-            print("[DELETE] Found \(posts.count) Supabase posts to delete")
-            for post in posts {
-                do {
-                    try await SupabaseService.deletePost(id: post.id)
-                } catch {
-                    print("[DELETE] Failed to delete post \(post.id): \(error)")
-                }
-            }
-            print("[DELETE] Supabase posts deletion finished (had: \(posts.count))")
+            let count = try await SupabaseService.deleteAllMyPosts()
+            print("[DELETE] Supabase deleted \(count) posts")
         } catch {
-            print("[DELETE] fetchMyPosts failed: \(error)")
+            print("[DELETE] deleteAllMyPosts failed: \(error)")
         }
         // Tell our analytics events table to forget us too — best effort.
         // (No dedicated API; the rows stay anonymized by design.)

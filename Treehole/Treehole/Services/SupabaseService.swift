@@ -212,10 +212,22 @@ enum SupabaseService {
         request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
+        // Sending apple_user_id lets the RLS policy delete posts that were
+        // created under a different device_id but the same apple_user_id
+        // (e.g. user reinstalled the app since posting).
+        if let appleId = SupabaseConfig.appleUserID {
+            request.addValue(appleId, forHTTPHeaderField: "x-apple-user-id")
+        }
+        request.addValue("return=minimal", forHTTPHeaderField: "Prefer")
 
-        let (_, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
+        print("[API] deletePost id=\(id)")
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("[API] deletePost status=\(statusCode)")
+        guard (200...204).contains(statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "nil"
+            print("[API] deletePost ERROR body=\(body)")
+            throw SupabaseError.serverError(statusCode, nil)
         }
     }
 
@@ -453,6 +465,50 @@ enum SupabaseService {
         guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
             throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
         }
+    }
+
+    // MARK: - Bulk delete all of the user's posts via SECURITY DEFINER RPC
+    //
+    // This is the canonical "wipe my account" path. It bypasses RLS so it
+    // works even if the user's device_id has rotated (e.g. they reinstalled).
+    // Returns the number of rows deleted (for logging / verification).
+    @discardableResult
+    static func deleteAllMyPosts() async throws -> Int {
+        let urlString = "\(SupabaseConfig.restURL)/rpc/delete_my_posts"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        struct DeleteRequest: Codable {
+            let requestingDeviceId: String
+            let requestingAppleUserId: String?
+            enum CodingKeys: String, CodingKey {
+                case requestingDeviceId = "requesting_device_id"
+                case requestingAppleUserId = "requesting_apple_user_id"
+            }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(DeleteRequest(
+            requestingDeviceId: SupabaseConfig.deviceId,
+            requestingAppleUserId: SupabaseConfig.appleUserID
+        ))
+
+        print("[API] deleteAllMyPosts: device=\(SupabaseConfig.deviceId) apple=\(SupabaseConfig.appleUserID ?? "nil")")
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let body = String(data: data, encoding: .utf8) ?? "nil"
+        print("[API] deleteAllMyPosts: status=\(statusCode) body=\(body)")
+        guard (200...204).contains(statusCode) else {
+            throw SupabaseError.serverError(statusCode, nil)
+        }
+        // The RPC returns a single int; PostgREST wraps it as the response body.
+        if let count = Int(body.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            return count
+        }
+        return 0
     }
 
     // MARK: - Fetch own posts

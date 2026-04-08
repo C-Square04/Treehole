@@ -183,15 +183,31 @@ struct JournalDetailView: View {
                         .glassCard()
                     }
 
-                    // MARK: - Location Chip
-                    if let locationName = entry.locationName {
+                    // MARK: - Location + Weather + Date Chip
+                    // Combined: 📍 Brooklyn · ☀️ 18°C · Apr 5
+                    if entry.locationName != nil || entry.weatherEmoji != nil {
                         HStack(spacing: TreeholeTheme.spacingTight) {
-                            Image(systemName: "mappin.circle.fill")
-                                .foregroundStyle(TreeholeTheme.coral)
-                            Text(locationName)
-                                .font(.subheadline)
-                                .foregroundStyle(TreeholeTheme.textPrimary)
+                            if let locationName = entry.locationName {
+                                Image(systemName: "mappin.circle.fill")
+                                    .foregroundStyle(TreeholeTheme.coral)
+                                Text(locationName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(TreeholeTheme.textPrimary)
+                            }
+                            if let emoji = entry.weatherEmoji,
+                               let temp = entry.weatherTempC {
+                                if entry.locationName != nil {
+                                    Text("·")
+                                        .foregroundStyle(TreeholeTheme.textLight)
+                                }
+                                Text("\(emoji) \(Int(temp.rounded()))°C")
+                                    .font(.subheadline)
+                                    .foregroundStyle(TreeholeTheme.textPrimary)
+                            }
                             Spacer()
+                            Text(entry.displayDate.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.textLight)
                         }
                         .padding(.horizontal, TreeholeTheme.spacingSmall)
                         .padding(.vertical, 10)
@@ -201,7 +217,7 @@ struct JournalDetailView: View {
                                 let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                                 let placemark = MKPlacemark(coordinate: coordinate)
                                 let mapItem = MKMapItem(placemark: placemark)
-                                mapItem.name = locationName
+                                mapItem.name = entry.locationName ?? ""
                                 mapItem.openInMaps()
                             }
                         }

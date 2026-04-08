@@ -403,6 +403,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Unlock your private clouds and journal entries";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos to attach to journal entries";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Optionally tag journal entries with your location";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to your pet companion using voice";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save journal photos to your library";
@@ -444,6 +445,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Unlock your private clouds and journal entries";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos to attach to journal entries";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Optionally tag journal entries with your location";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to your pet companion using voice";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save journal photos to your library";

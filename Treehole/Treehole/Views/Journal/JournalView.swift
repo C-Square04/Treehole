@@ -52,8 +52,15 @@ struct JournalView: View {
                                 .padding(.horizontal, TreeholeTheme.spacingMedium)
                                 .padding(.top, TreeholeTheme.spacingSmall)
 
-                            // MARK: - AI Insights Card (only if opted in)
+                            // MARK: - AI Cards (only if opted in)
                             if appState.allowAIJournalAnalysis {
+                                // Weekly summary first (collapsible)
+                                if let weeklySummary = latestWeeklySummary {
+                                    AIWeeklySummaryCard(summary: weeklySummary)
+                                        .padding(.horizontal, TreeholeTheme.spacingMedium)
+                                }
+
+                                // AI Insights below
                                 AIInsightsCard(
                                     entries: entries,
                                     allSummaries: allSummaries,
@@ -61,12 +68,6 @@ struct JournalView: View {
                                     language: appState.preferredLanguage
                                 )
                                 .padding(.horizontal, TreeholeTheme.spacingMedium)
-
-                                // MARK: - Weekly Summary Card
-                                if let weeklySummary = latestWeeklySummary {
-                                    AIWeeklySummaryCard(summary: weeklySummary)
-                                        .padding(.horizontal, TreeholeTheme.spacingMedium)
-                                }
                             }
                         }
 
@@ -559,6 +560,7 @@ struct JournalEntryEditor: View {
     @State private var showDatePicker = false
     @State private var showDeleteConfirm = false
     @State private var showLocationRemoveAlert = false
+    @State private var showCameraSheet = false
 
     private let maxPhotos = 10
     private var isEditMode: Bool { existingEntry != nil }
@@ -681,6 +683,13 @@ struct JournalEntryEditor: View {
             }
             .sheet(isPresented: $showDatePicker) {
                 eventDatePickerSheet
+            }
+            .sheet(isPresented: $showCameraSheet) {
+                CameraPicker { data in
+                    guard existingPhotoFilenames.count + draftPhotoData.count < maxPhotos else { return }
+                    draftPhotoData.append(data)
+                }
+                .ignoresSafeArea()
             }
             .confirmationDialog(
                 L10n.t("Delete this entry?", "删除这篇日记？"),
@@ -960,18 +969,15 @@ struct JournalEntryEditor: View {
     @ViewBuilder
     private var floatingToolbar: some View {
         HStack(spacing: 0) {
-            // Camera (placeholder — opens photo picker)
-            PhotosPicker(
-                selection: $selectedItems,
-                maxSelectionCount: maxPhotos - existingPhotoFilenames.count - draftPhotoData.count,
-                matching: .images
-            ) {
-                toolbarIcon(
-                    systemName: "camera",
-                    active: false
-                )
+            // Camera — actually opens the camera (only on devices with one)
+            if CameraPicker.isAvailable {
+                Button {
+                    showCameraSheet = true
+                } label: {
+                    toolbarIcon(systemName: "camera", active: false)
+                }
+                .disabled(existingPhotoFilenames.count + draftPhotoData.count >= maxPhotos)
             }
-            .disabled(existingPhotoFilenames.count + draftPhotoData.count >= maxPhotos)
 
             // Photos picker
             PhotosPicker(
@@ -1032,22 +1038,17 @@ struct JournalEntryEditor: View {
                 toolbarIcon(systemName: "calendar", active: hasDate)
             }
 
-            // Ellipsis / more menu
-            Menu {
-                Button {
-                    // "Find in entry" — placeholder, no-op
-                } label: {
-                    Label(L10n.t("Find in Entry", "在日记中查找"), systemImage: "magnifyingglass")
-                }
-                if isEditMode {
+            // Ellipsis / more menu — only shown in edit mode (only contains Delete for now)
+            if isEditMode {
+                Menu {
                     Button(role: .destructive) {
                         showDeleteConfirm = true
                     } label: {
                         Label(L10n.t("Delete Entry", "删除日记"), systemImage: "trash")
                     }
+                } label: {
+                    toolbarIcon(systemName: "ellipsis", active: false)
                 }
-            } label: {
-                toolbarIcon(systemName: "ellipsis", active: false)
             }
         }
         .padding(.horizontal, TreeholeTheme.spacingSmall)
@@ -1464,23 +1465,53 @@ private struct AIInsightsCard: View {
 
 private struct AIWeeklySummaryCard: View {
     let summary: JournalSummary
+    // Collapsed by default — same UX as the AI Insights card.
+    @AppStorage("weekly_summary_card_expanded") private var isExpanded: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
-            HStack {
-                Image(systemName: "calendar.badge.checkmark")
-                    .foregroundStyle(TreeholeTheme.skyBlue)
-                Text(L10n.t("Weekly Summary", "本周摘要"))
-                    .font(.headline)
-                    .foregroundStyle(TreeholeTheme.textPrimary)
-                Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "calendar.badge.checkmark")
+                        .foregroundStyle(TreeholeTheme.skyBlue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t("Weekly Summary", "本周摘要"))
+                            .font(.headline)
+                            .foregroundStyle(TreeholeTheme.textPrimary)
+                        if !isExpanded {
+                            Text(L10n.t(
+                                "Week of \(summary.periodStart.formatted(date: .abbreviated, time: .omitted))",
+                                "\(summary.periodStart.formatted(date: .abbreviated, time: .omitted)) 这周"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(TreeholeTheme.textLight)
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TreeholeTheme.textLight)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .contentShape(Rectangle())
             }
-            Text(renderMarkdown(summary.summary))
-                .font(.subheadline)
-                .foregroundStyle(TreeholeTheme.textSecondary)
-            Text(L10n.t("Week of \(summary.periodStart.formatted(date: .abbreviated, time: .omitted))", "\(summary.periodStart.formatted(date: .abbreviated, time: .omitted)) 这周"))
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Text(renderMarkdown(summary.summary))
+                    .font(.subheadline)
+                    .foregroundStyle(TreeholeTheme.textSecondary)
+                Text(L10n.t(
+                    "Week of \(summary.periodStart.formatted(date: .abbreviated, time: .omitted))",
+                    "\(summary.periodStart.formatted(date: .abbreviated, time: .omitted)) 这周"
+                ))
                 .font(.caption2)
                 .foregroundStyle(TreeholeTheme.textLight)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()

@@ -1244,6 +1244,15 @@ struct JournalEntryEditor: View {
             )
             return
         }
+        // Ask for Speech Recognition permission too — without it,
+        // auto-transcription silently returns nil after recording.
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { _ in
+                    continuation.resume()
+                }
+            }
+        }
         permissionDeniedMessage = nil
         do {
             try audioRecorder.startRecording()

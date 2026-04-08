@@ -7,6 +7,7 @@ struct MoodPicker: View {
     @Binding var customValence: Double?
     @Binding var customArousal: Double?
 
+    /// "pills" or "slider" — replaces the old 2D meter mode.
     @AppStorage("mood_picker_style") private var style: String = "pills"
     @AppStorage("mood_pills_expanded") private var pillsExpanded: Bool = false
 
@@ -65,14 +66,14 @@ struct MoodPicker: View {
                 Spacer()
 
                 Button {
-                    style = (style == "pills") ? "meter" : "pills"
+                    style = (style == "pills") ? "slider" : "pills"
                     if style == "pills" {
                         // Clear custom coords when switching back to pills
                         customValence = nil
                         customArousal = nil
                     }
                 } label: {
-                    Image(systemName: style == "pills" ? "circle.grid.cross" : "square.grid.2x2")
+                    Image(systemName: style == "pills" ? "slider.horizontal.below.rectangle" : "square.grid.2x2")
                         .font(.subheadline)
                         .foregroundStyle(TreeholeTheme.softPurple)
                         .padding(6)
@@ -93,8 +94,7 @@ struct MoodPicker: View {
                     expanded: effectivelyExpanded
                 )
             } else {
-                // Meter mode is always full-size; no collapse.
-                MoodMeterView(
+                MoodSliderView(
                     selectedMood: $selectedMood,
                     customValence: $customValence,
                     customArousal: $customArousal
@@ -152,174 +152,89 @@ private struct MoodPillsView: View {
     }
 }
 
-// MARK: - Meter View
+// MARK: - Slider View (continuous valence picker)
 
-private struct MoodMeterView: View {
+private struct MoodSliderView: View {
     @Binding var selectedMood: MoodTag
     @Binding var customValence: Double?
     @Binding var customArousal: Double?
 
-    @State private var isDragging = false
-    /// Local-only drag position so SwiftUI doesn't re-render every emoji on every frame.
-    /// We commit to customValence/customArousal/selectedMood only on .onEnded.
-    @State private var dragValence: Double? = nil
-    @State private var dragArousal: Double? = nil
+    /// Continuous slider position. Single source of truth so the slider
+    /// remains 100% smooth — we only mirror to the external bindings on commit.
+    @State private var sliderValue: Double = 0
+    @State private var didInitFromBinding: Bool = false
 
-    /// Current dot position in valence/arousal space
-    private var dotValence: Double {
-        dragValence ?? customValence ?? selectedMood.defaultValence
-    }
-    private var dotArousal: Double {
-        dragArousal ?? customArousal ?? selectedMood.defaultArousal
+    /// The mood whose valence is closest to the current slider value.
+    private var nearestMood: MoodTag {
+        MoodTag.nearestByValence(sliderValue)
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let size = geo.size.width  // square
+        VStack(spacing: TreeholeTheme.spacingMedium) {
+            Text(L10n.t("How are you feeling right now?", "你现在感觉怎么样？"))
+                .font(.subheadline)
+                .foregroundStyle(TreeholeTheme.textSecondary)
 
+            // Concentric ripple decoration with the current mood emoji in the center.
             ZStack {
-                // 4-quadrant blended background
-                quadrantBackground(size: size)
-
-                // Axis labels
-                axisLabels(size: size)
-
-                // Mood dots at fixed positions — opacity is constant during drag
-                // (no per-frame re-render of selection state).
-                ForEach(MoodTag.allCases) { mood in
-                    let pos = position(valence: mood.defaultValence, arousal: mood.defaultArousal, in: size)
-                    Text(mood.emoji)
-                        .font(.system(size: 16))
-                        .position(pos)
-                        .opacity(selectedMood == mood && !isDragging ? 1.0 : 0.55)
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .stroke(TreeholeTheme.softPurple.opacity(0.18 - Double(i) * 0.05),
+                                lineWidth: 1)
+                        .frame(width: CGFloat(60 + i * 28), height: CGFloat(60 + i * 28))
                 }
-
-                // Draggable selection indicator
-                let dotPos = position(valence: dotValence, arousal: dotArousal, in: size)
                 Circle()
-                    .fill(TreeholeTheme.softPurple)
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        Circle().strokeBorder(.white, lineWidth: 2.5)
-                    )
-                    .shadow(color: .black.opacity(0.3), radius: 5)
-                    .position(dotPos)
-                    .scaleEffect(isDragging ? 1.3 : 1.0)
-                    .animation(.spring(response: 0.18, dampingFraction: 0.7), value: isDragging)
+                    .fill(TreeholeTheme.softPurple.opacity(0.18))
+                    .frame(width: 64, height: 64)
+                Text(nearestMood.emoji)
+                    .font(.system(size: 36))
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.15), value: nearestMood)
             }
-            .frame(width: size, height: size)
-            .contentShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-            .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-            // highPriorityGesture wins over the parent ScrollView's pan gesture,
-            // so the dot tracks the finger immediately and the page doesn't scroll.
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if !isDragging { isDragging = true }
-                        let (v, a) = coords(from: value.location, in: size)
-                        // Local-only state — no binding/re-render storm.
-                        dragValence = v
-                        dragArousal = a
-                    }
-                    .onEnded { value in
-                        let (v, a) = coords(from: value.location, in: size)
-                        // Update bindings if they're real (no-op for .constant(nil) wrappers)
-                        customValence = v
-                        customArousal = a
-                        selectedMood = MoodTag.nearest(valence: v, arousal: a)
-                        // Keep the dot where the finger lifted: only clear local
-                        // state if the bindings were real (we can recover from them).
-                        // For constant(nil) cloud-post mode, keep dragValence/dragArousal
-                        // so the dot stays put instead of snapping back.
-                        if customValence != nil {
-                            dragValence = nil
-                            dragArousal = nil
-                        }
-                        isDragging = false
-                    }
-            )
+            .frame(height: 130)
+
+            Text(L10n.t(nearestMood.labelEN, nearestMood.labelZH))
+                .font(.headline)
+                .foregroundStyle(TreeholeTheme.textPrimary)
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.15), value: nearestMood)
+
+            // The slider itself — Apple Slider tracks the finger natively
+            // and works correctly inside ScrollViews (no gesture conflict).
+            VStack(spacing: 4) {
+                Slider(value: $sliderValue, in: -1.0...1.0)
+                    .tint(TreeholeTheme.softPurple)
+                    .padding(.horizontal, TreeholeTheme.spacingSmall)
+
+                HStack {
+                    Text(L10n.t("VERY UNPLEASANT", "非常不愉快"))
+                        .font(.system(size: 10).weight(.semibold))
+                        .foregroundStyle(TreeholeTheme.textLight)
+                    Spacer()
+                    Text(L10n.t("VERY PLEASANT", "非常愉快"))
+                        .font(.system(size: 10).weight(.semibold))
+                        .foregroundStyle(TreeholeTheme.textLight)
+                }
+                .padding(.horizontal, TreeholeTheme.spacingSmall)
+            }
         }
-        .aspectRatio(1, contentMode: .fit)
-    }
-
-    // Convert valence/arousal to CGPoint within the square
-    private func position(valence: Double, arousal: Double, in size: CGFloat) -> CGPoint {
-        let x = CGFloat((valence + 1.0) / 2.0) * size
-        let y = CGFloat(1.0 - arousal) * size
-        return CGPoint(x: x, y: y)
-    }
-
-    // Convert drag location to clamped valence/arousal
-    private func coords(from point: CGPoint, in size: CGFloat) -> (Double, Double) {
-        let valence = Double(point.x / size) * 2.0 - 1.0
-        let arousal = 1.0 - Double(point.y / size)
-        return (
-            min(1.0, max(-1.0, valence)),
-            min(1.0, max(0.0, arousal))
-        )
-    }
-
-    @ViewBuilder
-    private func quadrantBackground(size: CGFloat) -> some View {
-        // 4 colored rectangles with heavy blur to create smooth gradient transitions
-        ZStack {
-            // Top-left: high arousal + negative = red/coral
-            Rectangle()
-                .fill(TreeholeTheme.coral.opacity(0.6))
-                .frame(width: size / 2, height: size / 2)
-                .position(x: size / 4, y: size / 4)
-
-            // Top-right: high arousal + positive = yellow/gold
-            Rectangle()
-                .fill(TreeholeTheme.warmGold.opacity(0.6))
-                .frame(width: size / 2, height: size / 2)
-                .position(x: size * 3 / 4, y: size / 4)
-
-            // Bottom-right: low arousal + positive = green/mint
-            Rectangle()
-                .fill(TreeholeTheme.mintCream.opacity(0.8))
-                .frame(width: size / 2, height: size / 2)
-                .position(x: size * 3 / 4, y: size * 3 / 4)
-
-            // Bottom-left: low arousal + negative = blue/sky
-            Rectangle()
-                .fill(TreeholeTheme.skyBlue.opacity(0.8))
-                .frame(width: size / 2, height: size / 2)
-                .position(x: size / 4, y: size * 3 / 4)
+        .padding(.vertical, TreeholeTheme.spacingMedium)
+        .padding(.horizontal, TreeholeTheme.spacingSmall)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+        .onAppear {
+            // Initialize from existing custom valence or the selected mood's default.
+            if !didInitFromBinding {
+                sliderValue = customValence ?? selectedMood.defaultValence
+                didInitFromBinding = true
+            }
         }
-        .blur(radius: size * 0.2)
-    }
-
-    @ViewBuilder
-    private func axisLabels(size: CGFloat) -> some View {
-        let labelFont = Font.system(size: 9).weight(.medium)
-        let labelColor = TreeholeTheme.textSecondary.opacity(0.8)
-
-        // Top center: energetic
-        Text(L10n.t("Energetic ↑", "精力充沛 ↑"))
-            .font(labelFont)
-            .foregroundStyle(labelColor)
-            .position(x: size / 2, y: 10)
-
-        // Bottom center: calm
-        Text(L10n.t("↓ Calm", "↓ 平静"))
-            .font(labelFont)
-            .foregroundStyle(labelColor)
-            .position(x: size / 2, y: size - 10)
-
-        // Left center: negative
-        Text(L10n.t("← Negative", "← 消极"))
-            .font(labelFont)
-            .foregroundStyle(labelColor)
-            .rotationEffect(.degrees(-90))
-            .position(x: 14, y: size / 2)
-
-        // Right center: positive
-        Text(L10n.t("Positive →", "积极 →"))
-            .font(labelFont)
-            .foregroundStyle(labelColor)
-            .rotationEffect(.degrees(90))
-            .position(x: size - 14, y: size / 2)
+        .onChange(of: sliderValue) { _, newValue in
+            // Commit on every change — no gesture state to manage, no race.
+            customValence = newValue
+            customArousal = nil  // Slider only controls valence
+            selectedMood = MoodTag.nearestByValence(newValue)
+        }
     }
 }
 

@@ -132,6 +132,19 @@ extension MoodTag {
             return da < db
         } ?? .calm
     }
+
+    /// Find nearest MoodTag by valence only (for the 1D pleasantness slider).
+    /// Tie-breaks toward lower arousal so the slider feels calm/grounded.
+    static func nearestByValence(_ valence: Double) -> MoodTag {
+        MoodTag.allCases.min { a, b in
+            let da = abs(a.defaultValence - valence)
+            let db = abs(b.defaultValence - valence)
+            if abs(da - db) < 0.001 {
+                return a.defaultArousal < b.defaultArousal
+            }
+            return da < db
+        } ?? .calm
+    }
 }
 
 // MARK: - Cloud Post Model

@@ -28,80 +28,81 @@ struct MoodPicker: View {
     }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: TreeholeTheme.spacingSmall) {
-            // Toggle button
-            Button {
-                style = (style == "pills") ? "meter" : "pills"
-                if style == "pills" {
-                    // Clear custom coords when switching back to pills
-                    customValence = nil
-                    customArousal = nil
-                }
-            } label: {
-                Image(systemName: style == "pills" ? "circle.grid.cross" : "square.grid.2x2")
-                    .font(.subheadline)
-                    .foregroundStyle(TreeholeTheme.softPurple)
-                    .padding(6)
-                    .background(TreeholeTheme.softPurple.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
-            }
-            .buttonStyle(.plain)
+        if style == "pills" {
+            MoodPillsView(
+                selectedMood: $selectedMood,
+                customValence: $customValence,
+                customArousal: $customArousal,
+                onToggleStyle: toggleStyle
+            )
+        } else {
+            MoodMeterView(
+                selectedMood: $selectedMood,
+                customValence: $customValence,
+                customArousal: $customArousal,
+                onToggleStyle: toggleStyle
+            )
+        }
+    }
 
-            if style == "pills" {
-                MoodPillsView(
-                    selectedMood: $selectedMood,
-                    customValence: $customValence,
-                    customArousal: $customArousal
-                )
-            } else {
-                MoodMeterView(
-                    selectedMood: $selectedMood,
-                    customValence: $customValence,
-                    customArousal: $customArousal
-                )
-            }
+    private func toggleStyle() {
+        style = (style == "pills") ? "meter" : "pills"
+        if style == "pills" {
+            // Clear custom coords when switching back to pills
+            customValence = nil
+            customArousal = nil
         }
     }
 }
 
-// MARK: - Pills View
+// MARK: - Pills View (compact horizontal scroll)
 
 private struct MoodPillsView: View {
     @Binding var selectedMood: MoodTag
     @Binding var customValence: Double?
     @Binding var customArousal: Double?
-
-    // 4 columns × 4 rows grid
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    let onToggleStyle: () -> Void
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(MoodTag.allCases) { mood in
-                Button {
-                    selectedMood = mood
-                    customValence = nil
-                    customArousal = nil
-                } label: {
-                    VStack(spacing: 3) {
-                        Text(mood.emoji)
-                            .font(.title3)
-                        Text(L10n.t(mood.labelEN, mood.labelZH))
-                            .font(.system(size: 10))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .foregroundStyle(selectedMood == mood ? .white : TreeholeTheme.textPrimary)
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(MoodTag.allCases) { mood in
+                        Button {
+                            selectedMood = mood
+                            customValence = nil
+                            customArousal = nil
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(mood.emoji)
+                                    .font(.system(size: 16))
+                                Text(L10n.t(mood.labelEN, mood.labelZH))
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(selectedMood == mood ? .white : TreeholeTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                selectedMood == mood
+                                    ? TreeholeTheme.softPurple
+                                    : TreeholeTheme.softPurple.opacity(0.10),
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        selectedMood == mood
-                            ? TreeholeTheme.softPurple
-                            : TreeholeTheme.softPurple.opacity(0.08),
-                        in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall)
-                    )
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 2)
             }
+
+            Button(action: onToggleStyle) {
+                Image(systemName: "circle.grid.cross")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(TreeholeTheme.softPurple)
+                    .frame(width: 30, height: 30)
+                    .background(TreeholeTheme.softPurple.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -112,67 +113,94 @@ private struct MoodMeterView: View {
     @Binding var selectedMood: MoodTag
     @Binding var customValence: Double?
     @Binding var customArousal: Double?
+    let onToggleStyle: () -> Void
 
-    @State private var isDragging = false
+    /// Local-only drag position. Updated 60fps without touching parent state.
+    /// nil = not currently dragging; render from binding instead.
+    @GestureState private var liveLocation: CGPoint? = nil
 
-    /// Current dot position in valence/arousal space
-    private var dotValence: Double { customValence ?? selectedMood.defaultValence }
-    private var dotArousal: Double { customArousal ?? selectedMood.defaultArousal }
-
-    var body: some View {
-        GeometryReader { geo in
-            let size = geo.size.width  // square
-
-            ZStack {
-                // 4-quadrant blended background
-                quadrantBackground(size: size)
-
-                // Axis labels
-                axisLabels(size: size)
-
-                // Mood dots at fixed positions
-                ForEach(MoodTag.allCases) { mood in
-                    let pos = position(valence: mood.defaultValence, arousal: mood.defaultArousal, in: size)
-                    Text(mood.emoji)
-                        .font(.system(size: 16))
-                        .position(pos)
-                        .opacity(selectedMood == mood ? 1.0 : 0.55)
-                }
-
-                // Draggable selection indicator
-                let dotPos = position(valence: dotValence, arousal: dotArousal, in: size)
-                Circle()
-                    .fill(TreeholeTheme.softPurple)
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Circle().strokeBorder(.white, lineWidth: 2)
-                    )
-                    .shadow(color: .black.opacity(0.25), radius: 4)
-                    .position(dotPos)
-                    .scaleEffect(isDragging ? 1.25 : 1.0)
-                    .animation(.spring(response: 0.2), value: isDragging)
-            }
-            .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        isDragging = true
-                        let (v, a) = coords(from: value.location, in: size)
-                        customValence = v
-                        customArousal = a
-                        selectedMood = MoodTag.nearest(valence: v, arousal: a)
-                    }
-                    .onEnded { value in
-                        isDragging = false
-                        let (v, a) = coords(from: value.location, in: size)
-                        customValence = v
-                        customArousal = a
-                        selectedMood = MoodTag.nearest(valence: v, arousal: a)
-                    }
+    /// What the dot should display: prefer live drag position, else custom coords, else mood default.
+    private func dotPosition(in size: CGFloat) -> CGPoint {
+        if let loc = liveLocation {
+            return CGPoint(
+                x: min(size, max(0, loc.x)),
+                y: min(size, max(0, loc.y))
             )
         }
-        .aspectRatio(1, contentMode: .fit)
+        let v = customValence ?? selectedMood.defaultValence
+        let a = customArousal ?? selectedMood.defaultArousal
+        return position(valence: v, arousal: a, in: size)
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Spacer()
+                Button(action: onToggleStyle) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(TreeholeTheme.softPurple)
+                        .frame(width: 30, height: 30)
+                        .background(TreeholeTheme.softPurple.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Show the chosen mood label inline so the user always knows what they picked
+            Text("\(selectedMood.emoji)  \(L10n.t(selectedMood.labelEN, selectedMood.labelZH))")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(TreeholeTheme.textPrimary)
+
+            GeometryReader { geo in
+                let size = min(geo.size.width, geo.size.height)
+                let dotPos = dotPosition(in: size)
+
+                ZStack {
+                    quadrantBackground(size: size)
+                    axisLabels(size: size)
+
+                    // Mood dots at fixed positions
+                    ForEach(MoodTag.allCases) { mood in
+                        let pos = position(valence: mood.defaultValence, arousal: mood.defaultArousal, in: size)
+                        Text(mood.emoji)
+                            .font(.system(size: 16))
+                            .position(pos)
+                            .opacity(selectedMood == mood ? 1.0 : 0.45)
+                            .allowsHitTesting(false)
+                    }
+
+                    // Draggable selection indicator
+                    Circle()
+                        .fill(TreeholeTheme.softPurple)
+                        .frame(width: 26, height: 26)
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                        .shadow(color: .black.opacity(0.25), radius: 4)
+                        .position(dotPos)
+                        .scaleEffect(liveLocation != nil ? 1.2 : 1.0)
+                        .animation(.spring(response: 0.2), value: liveLocation != nil)
+                        .allowsHitTesting(false)
+                }
+                .frame(width: size, height: size)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+                .contentShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+                .gesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                        .updating($liveLocation) { value, state, _ in
+                            // 60fps local update — does NOT trigger parent re-render.
+                            state = value.location
+                        }
+                        .onEnded { value in
+                            // Only commit to parent state on release.
+                            let (v, a) = coords(from: value.location, in: size)
+                            customValence = v
+                            customArousal = a
+                            selectedMood = MoodTag.nearest(valence: v, arousal: a)
+                        }
+                )
+            }
+            .frame(height: 200)
+        }
     }
 
     // Convert valence/arousal to CGPoint within the square

@@ -42,6 +42,7 @@ struct MoodStatsView: View {
     @State private var selectedPeriod: TimePeriod = .month
     @State private var selectedMonthOffset: Int = 0
     @State private var selectedWeekOffset: Int = 0
+    @State private var selectedYearOffset: Int = 0
 
     private let cal = Calendar.current
 
@@ -124,10 +125,10 @@ struct MoodStatsView: View {
                     ForEach(subPeriodItems) { item in
                         Button {
                             withAnimation(.spring(response: 0.3)) {
-                                if selectedPeriod == .week {
-                                    selectedWeekOffset = item.id
-                                } else {
-                                    selectedMonthOffset = item.id
+                                switch selectedPeriod {
+                                case .week:  selectedWeekOffset = item.id
+                                case .month: selectedMonthOffset = item.id
+                                case .year:  selectedYearOffset = item.id
                                 }
                             }
                         } label: {
@@ -153,10 +154,16 @@ struct MoodStatsView: View {
 
     private var subPeriodItems: [SubPeriodItem] {
         switch selectedPeriod {
-        case .month, .year:
+        case .month:
             return (-11...0).map { offset in
                 let date = cal.date(byAdding: .month, value: offset, to: Date()) ?? Date()
                 let label = date.formatted(.dateTime.month(.abbreviated).year(.twoDigits))
+                return SubPeriodItem(id: offset, label: label)
+            }
+        case .year:
+            return (-4...0).map { offset in
+                let date = cal.date(byAdding: .year, value: offset, to: Date()) ?? Date()
+                let label = date.formatted(.dateTime.year())
                 return SubPeriodItem(id: offset, label: label)
             }
         case .week:
@@ -171,7 +178,11 @@ struct MoodStatsView: View {
     }
 
     private func isSelected(_ offset: Int) -> Bool {
-        selectedPeriod == .week ? selectedWeekOffset == offset : selectedMonthOffset == offset
+        switch selectedPeriod {
+        case .week:  selectedWeekOffset == offset
+        case .month: selectedMonthOffset == offset
+        case .year:  selectedYearOffset == offset
+        }
     }
 
     // MARK: - Calendar Section
@@ -186,7 +197,16 @@ struct MoodStatsView: View {
         .glassCard()
     }
 
+    @ViewBuilder
     private var calendarGrid: some View {
+        if selectedPeriod == .year {
+            yearGrid
+        } else {
+            dayGrid
+        }
+    }
+
+    private var dayGrid: some View {
         VStack(spacing: 6) {
             // Weekday headers Mon–Sun
             HStack(spacing: 6) {
@@ -204,6 +224,17 @@ struct MoodStatsView: View {
                 ForEach(days) { day in
                     dayCellView(day)
                 }
+            }
+        }
+    }
+
+    /// Year mode: 12 month cells, each showing the month's dominant mood.
+    private var yearGrid: some View {
+        let months = buildYearMonths()
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
+        return LazyVGrid(columns: columns, spacing: TreeholeTheme.spacingSmall) {
+            ForEach(months) { month in
+                monthCellView(month)
             }
         }
     }
@@ -248,14 +279,45 @@ struct MoodStatsView: View {
         .frame(maxWidth: .infinity)
     }
 
+    @ViewBuilder
+    private func monthCellView(_ month: CalendarDay) -> some View {
+        VStack(spacing: 4) {
+            Text(month.date?.formatted(.dateTime.month(.abbreviated)) ?? "")
+                .font(.caption2.weight(month.isToday ? .semibold : .regular))
+                .foregroundStyle(month.isToday ? TreeholeTheme.softPurple : TreeholeTheme.textLight)
+
+            ZStack {
+                if month.isToday {
+                    Circle()
+                        .strokeBorder(TreeholeTheme.softPurple, lineWidth: 2)
+                        .frame(width: 36, height: 36)
+                }
+                if let mood = month.mood {
+                    Text(mood.emoji)
+                        .font(.system(size: 22))
+                } else {
+                    // In-period months without entries get the same gray dot
+                    // as empty days; future months are barely visible.
+                    Circle()
+                        .fill(Color.gray.opacity(month.isInPeriod ? 0.2 : 0.08))
+                        .frame(width: 36, height: 36)
+                }
+            }
+            .frame(width: 36, height: 36)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     // MARK: - Calendar Day Building
 
     private func buildCalendarDays() -> [CalendarDay] {
         switch selectedPeriod {
         case .week:
             return buildWeekDays()
-        case .month, .year:
+        case .month:
             return buildMonthDays()
+        case .year:
+            return buildYearMonths()
         }
     }
 
@@ -312,6 +374,34 @@ struct MoodStatsView: View {
                 mood: moodMap[dayStart],
                 isToday: dayStart == today,
                 isInPeriod: true
+            )
+        }
+    }
+
+    /// One CalendarDay per month of the selected year, mood = dominant mood
+    /// across all of that month's entries. Future months are out-of-period.
+    private func buildYearMonths() -> [CalendarDay] {
+        let range = currentDateRange
+        let currentMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date()))
+
+        var byMonth: [Date: [MoodTag]] = [:]
+        for entry in filteredEntries {
+            guard let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: entry.displayDate)) else { continue }
+            byMonth[monthStart, default: []].append(entry.moodTag)
+        }
+        let dominant = byMonth.mapValues { moods -> MoodTag in
+            let freq = moods.reduce(into: [MoodTag: Int]()) { $0[$1, default: 0] += 1 }
+            return freq.max(by: { $0.value < $1.value })?.key ?? moods[0]
+        }
+
+        return (0..<12).compactMap { m in
+            guard let monthStart = cal.date(byAdding: .month, value: m, to: range.start) else { return nil }
+            return CalendarDay(
+                id: m + 1,
+                date: monthStart,
+                mood: dominant[monthStart],
+                isToday: monthStart == currentMonthStart,
+                isInPeriod: monthStart <= Date()
             )
         }
     }
@@ -393,11 +483,17 @@ struct MoodStatsView: View {
             let start = weekStart(offset: selectedWeekOffset)
             let end = cal.date(byAdding: .day, value: 7, to: start) ?? start
             return (start, end)
-        case .month, .year:
+        case .month:
             let target = cal.date(byAdding: .month, value: selectedMonthOffset, to: Date()) ?? Date()
             let comps = cal.dateComponents([.year, .month], from: target)
             let start = cal.date(from: comps) ?? target
             let end = cal.date(byAdding: .month, value: 1, to: start) ?? start
+            return (start, end)
+        case .year:
+            let target = cal.date(byAdding: .year, value: selectedYearOffset, to: Date()) ?? Date()
+            let comps = cal.dateComponents([.year], from: target)
+            let start = cal.date(from: comps) ?? target
+            let end = cal.date(byAdding: .year, value: 1, to: start) ?? start
             return (start, end)
         }
     }
@@ -420,17 +516,12 @@ struct MoodStatsView: View {
     }
 
     private func weekStart(offset: Int) -> Date {
-        // Find Monday of current week then apply offset
-        let now = Date()
-        let dow = isoWeekday(now)  // Mon=1..Sun=7
-        let monday = cal.date(byAdding: .day, value: -(dow - 1), to: cal.startOfDay(for: now)) ?? now
-        return cal.date(byAdding: .weekOfYear, value: offset, to: monday) ?? monday
+        WeekAnchor.weekStart(offset: offset, calendar: cal)
     }
 
     /// ISO weekday: Mon=1 ... Sun=7
     private func isoWeekday(_ date: Date) -> Int {
-        let raw = cal.component(.weekday, from: date)  // Sun=1...Sat=7
-        return raw == 1 ? 7 : raw - 1
+        WeekAnchor.isoWeekday(date, calendar: cal)
     }
 
     private func calculateStreaks() -> (current: Int, longest: Int) {

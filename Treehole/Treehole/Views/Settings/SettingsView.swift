@@ -21,6 +21,8 @@ struct SettingsView: View {
     @State private var showDeleteDataStep2 = false
     @State private var deleteCountdown = 5
     @State private var deleteTimer: Timer?
+    @State private var deleteErrorMessage: String? = nil
+    @State private var showDeleteError = false
 
     // Binding helpers that present setup if no passcode yet
     private var cloudLockBinding: Binding<Bool> {
@@ -260,6 +262,9 @@ struct SettingsView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        // Debug builds only: the developer cheat panel must not
+                        // be reachable in Release/TestFlight builds.
+                        #if DEBUG
                         versionTapCount += 1
                         versionTapTimer?.invalidate()
                         if versionTapCount >= 5 {
@@ -270,6 +275,7 @@ struct SettingsView: View {
                                 versionTapCount = 0
                             }
                         }
+                        #endif
                     }
                     HStack {
                         Text("Treehole")
@@ -285,7 +291,8 @@ struct SettingsView: View {
                     }
                 }
 
-                // Developer Mode (visible only when enabled)
+                // Developer Mode (Debug builds only, visible only when enabled)
+                #if DEBUG
                 if appState.isDeveloperMode {
                     Section {
                         NavigationLink {
@@ -299,6 +306,7 @@ struct SettingsView: View {
                             .foregroundStyle(.orange)
                     }
                 }
+                #endif
 
                 // Danger Zone
                 Section {
@@ -384,6 +392,14 @@ struct SettingsView: View {
                     }
                 )
             }
+            .alert(
+                L10n.t("Deletion Failed", "删除失败"),
+                isPresented: $showDeleteError
+            ) {
+                Button(L10n.t("OK", "好"), role: .cancel) { }
+            } message: {
+                Text(deleteErrorMessage ?? "")
+            }
         }
     }
 
@@ -411,12 +427,27 @@ struct SettingsView: View {
         //    Bypasses RLS and matches by device_id OR apple_user_id, so it
         //    deletes posts even if the user's device_id has rotated since
         //    they posted (e.g. reinstall). AWAIT — do not fire-and-forget.
+        //
+        //    ABORT on failure: once UserDefaults is wiped (step 8), device_id
+        //    rotates and a guest user's posts can never be deleted by anyone.
+        //    Nothing local has been touched yet, so the user can just retry.
         do {
             let count = try await SupabaseService.deleteAllMyPosts()
             print("[DELETE] Supabase deleted \(count) posts")
         } catch {
-            print("[DELETE] deleteAllMyPosts failed: \(error)")
+            print("[DELETE] deleteAllMyPosts failed: \(error) — aborting before any local wipe")
+            deleteErrorMessage = L10n.t(
+                "Your cloud posts could not be deleted (network problem?). Nothing has been deleted — please try again.",
+                "无法删除你的云朵帖子（可能是网络问题）。尚未删除任何数据，请重试。"
+            )
+            showDeleteError = true
+            return
         }
+
+        // 2b. Delete the user's comments and reactions on other people's posts.
+        //     Best effort: these carry no identity beyond the alias, so a
+        //     failure here shouldn't block the rest of the wipe.
+        await SupabaseService.deleteAllMyCommentsAndReactions()
         // Tell our analytics events table to forget us too — best effort.
         // (No dedicated API; the rows stay anonymized by design.)
 
@@ -443,14 +474,11 @@ struct SettingsView: View {
         //    in step 3 hasn't finished pushing yet.
         await wipeCloudKitZone()
 
-        // 5. Delete Keychain
-        KeychainHelper.delete(forKey: "privacyPasscode")
-        print("[DELETE] Keychain cleared")
-
-        // 6. Reset PrivacyLockManager
-        lockManager.isCloudLockEnabled = false
-        lockManager.isJournalLockEnabled = false
-        lockManager.isBiometricEnabled = false
+        // 5+6. Delete passcode from Keychain and reset PrivacyLockManager
+        //      (including hasPasscode, so a stale lock can't demand a
+        //      passcode that no longer exists).
+        lockManager.resetAfterAccountDeletion()
+        print("[DELETE] Keychain + privacy lock cleared")
 
         // 7. Delete photos + audio (local + iCloud ubiquity container)
         let fm = FileManager.default

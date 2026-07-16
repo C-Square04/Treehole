@@ -1,7 +1,7 @@
 # Treehole — Real-Device QA Checklist / 真机 QA 测试清单
 
-Test on a physical iPhone with iOS 18.1+. Run through each item in both English and Chinese modes.
-请在搭载 iOS 18.1+ 的真机上测试。分别在英文和中文模式下完成所有条目。
+Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for the split-view items. Run through each item in both English and Chinese modes.
+请在搭载 iOS 18.1+ 的真机上测试，分栏相关条目另需 iPad（或 iPad 模拟器）。分别在英文和中文模式下完成所有条目。
 
 ---
 
@@ -65,13 +65,25 @@ Test on a physical iPhone with iOS 18.1+. Run through each item in both English 
 - [ ] Journal tab loads and shows entry list or empty state / 日记标签加载并显示条目列表或空白状态
 - [ ] Tapping "Write Entry" opens the editor / 点击"写日记"打开编辑器
 - [ ] Writing text and saving creates a new journal entry / 输入文字并保存后创建新日记条目
-- [ ] Mood selector shows all mood options (happy, sad, calm, etc.) / 心情选择器显示所有心情选项（开心、悲伤、平静等）
+- [ ] Mood selector shows all 16 mood options and toggles between pills and the pleasantness slider / 心情选择器显示全部 16 种心情，并可在胶囊按钮与愉悦度滑条之间切换
+- [ ] Dragging the pleasantness slider updates the selected mood (nearest by valence) / 拖动愉悦度滑条时按愉悦度就近更新所选心情
+- [ ] Opening an OLD entry (made with the former 2D meter) in slider mode and saving WITHOUT touching the slider leaves its mood and coordinates unchanged / 用滑条模式打开旧日记（曾用 2D 心情仪创建）且不动滑条直接保存，其心情与坐标保持不变
+- [ ] Editing an existing entry saves the changes and updates the list / 编辑已有日记后保存，列表随之更新
 - [ ] Attaching a photo from the library works and previews correctly / 从相册附加照片成功并正确预览
-- [ ] Up to 3 photos can be attached per entry / 每条日记最多附加 3 张照片
-- [ ] Entry detail view shows full text, mood, date, and photos / 条目详情视图显示完整文字、心情、日期和照片
+- [ ] Up to 10 photos can be attached per entry (a notice appears if photos are skipped over the limit) / 每条日记最多附加 10 张照片（超出上限被跳过时显示提示）
+- [ ] Recording a voice note attaches it and auto-transcription appears (zh/en) / 录制语音备忘后成功附加，且自动转写出现（中/英）
+- [ ] Recording up to the 5-minute cap auto-stops, KEEPS the take attached, and shows the limit notice / 录音达到 5 分钟上限时自动停止，录音被保留并附加，同时显示上限提示
+- [ ] Saving the entry before transcription finishes still persists the transcript afterwards / 转写完成前保存日记，转写稍后仍会写入该日记
+- [ ] Search finds entries by text, title, transcript, and location name / 搜索可按文字、标题、语音转写和位置名称找到日记
+- [ ] Adding a location tags the entry and auto-fetches the weather (Open-Meteo) / 添加位置后日记带上位置标签并自动获取天气（Open-Meteo）
+- [ ] Changing the event date (distinct from the write date) regroups the entry in the list and stats / 修改事件日期（区别于写作日期）后，日记在列表与统计中重新归组
+- [ ] Per-entry AI summary generates and renders markdown (opt-in) / 单条 AI 摘要可生成并渲染 markdown（需用户开启）
+- [ ] Weekly AI summary appears for the current Monday-anchored week and regenerates after a new entry is added / 每周 AI 摘要按周一起始的当前周显示，新增日记后会重新生成
+- [ ] Entry detail view shows full text, mood, date, photos, voice note, and location/weather / 条目详情视图显示完整文字、心情、日期、照片、语音和位置/天气
 - [ ] Mood calendar strip shows correct mood color for today / 心情周历带显示今日正确的心情颜色
 - [ ] Stats view shows total entries, mood distribution, and streak count / 统计视图显示条目总数、心情分布和连续打卡天数
 - [ ] Week / Month / Year filter switches the stats correctly / 周/月/年筛选器正确切换统计数据
+- [ ] Year view shows a 12-month grid with each month's dominant mood (future months dimmed) / 年视图显示 12 个月网格及每月主导心情（未来月份变暗）
 
 ---
 
@@ -87,7 +99,7 @@ Test on a physical iPhone with iOS 18.1+. Run through each item in both English 
 - [ ] AI Insights toggle disables/enables AI features visibly / AI 洞察开关可见地开关 AI 功能
 - [ ] iCloud sync status shows correct account state (signed in / not signed in) / iCloud 同步状态显示正确的账户状态（已登录/未登录）
 - [ ] "Privacy Policy" link opens correctly / "隐私政策"链接正确打开
-- [ ] Developer debug panel unlocks after 5 taps on the version number / 在版本号上连击 5 次后解锁开发者调试面板
+- [ ] Developer debug panel unlocks after 5 taps on the version number (Debug builds only — absent from TestFlight/Release builds) / 在版本号上连击 5 次后解锁开发者调试面板（仅 Debug 构建——TestFlight/Release 版本中不存在）
 
 ---
 
@@ -114,6 +126,16 @@ Test on a physical iPhone with iOS 18.1+. Run through each item in both English 
 - [ ] Gate page (blurred background) shows before passcode entry / 输入密码前显示闸门页面（模糊背景）
 - [ ] Changing the passcode requires the old passcode first / 更改密码前需先输入旧密码
 - [ ] Removing the passcode disables all privacy locks / 删除密码后所有隐私锁被禁用
+- [ ] Backgrounding the app re-locks all locked sections — returning requires passcode/FaceID again / 应用进入后台后所有已锁区域重新上锁——返回时需再次输入密码/FaceID
+
+---
+
+## iPad Split View / iPad 分栏
+
+- [ ] In landscape, the Journal shows the entry list and detail side by side / 横屏时日记以左右分栏显示列表与详情
+- [ ] Selecting an entry in the list updates the detail column / 在列表中选择日记后详情栏更新
+- [ ] Deleting the entry shown in the detail column clears the detail (no stale/deleted entry rendered) / 删除详情栏中正在显示的日记后详情栏被清空（不渲染已删除的条目）
+- [ ] Rotating between portrait and landscape preserves the current selection / 竖屏与横屏旋转切换后当前选中项保持不变
 
 ---
 
@@ -124,6 +146,8 @@ Test on a physical iPhone with iOS 18.1+. Run through each item in both English 
 - [ ] Backgrounding the app and returning keeps state intact / 将应用切换到后台再返回后，状态保持不变
 - [ ] Force-quitting and relaunching the app restores all local data / 强制退出并重启应用后，所有本地数据恢复
 - [ ] Delete All Data (Settings → Delete All Data) wipes local, iCloud, and server data / "删除所有数据"（设置 → 删除所有数据）清除本地、iCloud 和服务器数据
+- [ ] Delete All Data also removes the user's comments and reactions on other people's posts / "删除所有数据"同时删除用户在他人帖子下的评论与反应
+- [ ] Delete All Data with no network shows an error and deletes NOTHING locally (retry succeeds after reconnecting) / 无网络时"删除所有数据"显示错误且不删除任何本地数据（恢复网络后重试成功）
 - [ ] After Delete All Data, the app restarts cleanly to onboarding / 删除所有数据后，应用干净地重启至新手引导
 - [ ] Push notification for feeding reminder appears after ~4 hours without feeding / 约 4 小时未喂食后出现喂食提醒推送通知
 - [ ] Push notification for watering reminder appears after ~24 hours without watering / 约 24 小时未浇水后出现浇水提醒推送通知

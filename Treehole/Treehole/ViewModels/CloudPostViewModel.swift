@@ -46,9 +46,8 @@ final class CloudPostViewModel {
 
         let mood = draftMood
 
-        // Close sheet IMMEDIATELY — user perceives instant response
-        draftText = ""
-        draftMood = .calm
+        // Close sheet IMMEDIATELY — user perceives instant response.
+        // The draft is cleared only after the server confirms, so a failed insert never loses the text.
         showCreation = false
 
         do {
@@ -61,6 +60,8 @@ final class CloudPostViewModel {
                 language: language
             )
             remotePosts.insert(newPost, at: 0)
+            draftText = ""
+            draftMood = .calm
             didCreatePost = true
             AnalyticsService.track("cloud_posted", properties: ["mood": mood.rawValue])
 
@@ -70,6 +71,7 @@ final class CloudPostViewModel {
                 await generateNPCReplyInBackground(postId: postId, text: text, mood: mood, language: language)
             }
         } catch {
+            // Draft was never cleared — reopening the composer shows the preserved text for retry
             errorMessage = error.localizedDescription
         }
     }

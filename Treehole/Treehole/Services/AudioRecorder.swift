@@ -16,6 +16,11 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     private var tempFileURL: URL?
     private let maxDuration: TimeInterval = 300 // 5 minutes
 
+    // A take that hit the max-duration cap, finalized and held until the UI
+    // calls stopRecording(). Without this, the capped take would be discarded
+    // because isRecording is already false by the time the user taps stop.
+    private var autoStoppedResult: (data: Data, duration: TimeInterval)?
+
     // MARK: - Notification name for max duration reached
     static let maxDurationReachedNotification = Notification.Name("AudioRecorder.maxDurationReached")
 
@@ -36,6 +41,7 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     // MARK: - Recording
 
     func startRecording() throws {
+        autoStoppedResult = nil
         let tmpDir = URL(fileURLWithPath: NSTemporaryDirectory())
         let fileURL = tmpDir.appendingPathComponent(UUID().uuidString + ".m4a")
         tempFileURL = fileURL
@@ -74,6 +80,12 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     }
 
     func stopRecording() -> (data: Data, duration: TimeInterval)? {
+        // A take that hit the 5-minute cap was already finalized — hand it
+        // over instead of discarding it.
+        if let result = autoStoppedResult {
+            autoStoppedResult = nil
+            return result
+        }
         guard let rec = recorder, isRecording else { return nil }
         let duration = elapsed
         rec.stop()
@@ -88,6 +100,7 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     }
 
     func cancelRecording() {
+        autoStoppedResult = nil
         recorder?.stop()
         stopCleanup()
         cleanupTempFile()
@@ -96,8 +109,14 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     // MARK: - Private Helpers
 
     private func autoStop() {
+        let duration = elapsed
         recorder?.stop()
         stopCleanup()
+        // Finalize the capped take now so it survives until the UI asks for it.
+        if let fileURL = tempFileURL, let data = try? Data(contentsOf: fileURL) {
+            autoStoppedResult = (data: data, duration: duration)
+        }
+        cleanupTempFile()
         NotificationCenter.default.post(name: AudioRecorder.maxDurationReachedNotification, object: nil)
     }
 

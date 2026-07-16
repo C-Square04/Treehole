@@ -46,7 +46,9 @@ struct JournalView: View {
                 sidebar
             } detail: {
                 if let entry = selectedEntry {
-                    JournalDetailView(entry: entry)
+                    // dismiss() is a no-op in a split-view detail column —
+                    // clearing the selection is what removes the deleted entry.
+                    JournalDetailView(entry: entry, onDelete: { selectedEntry = nil })
                 } else {
                     ContentUnavailableView(
                         L10n.t("Select an entry", "选择一篇日记"),
@@ -257,16 +259,7 @@ struct JournalView: View {
     // MARK: - Search Filter
 
     private var filteredEntries: [JournalEntry] {
-        let trimmed = searchText.trimmingCharacters(in: .whitespaces)
-        let sorted = entries.sorted { $0.displayDate > $1.displayDate }
-        guard !trimmed.isEmpty else { return sorted }
-        let lowered = trimmed.lowercased()
-        return sorted.filter { entry in
-            entry.text.lowercased().contains(lowered) ||
-            (entry.title?.lowercased().contains(lowered) ?? false) ||
-            (entry.audioTranscript?.lowercased().contains(lowered) ?? false) ||
-            (entry.locationName?.lowercased().contains(lowered) ?? false)
-        }
+        JournalSearch.filter(entries, query: searchText)
     }
 
     // MARK: - Save New Entry
@@ -326,10 +319,10 @@ struct JournalView: View {
         return entries.filter { $0.displayDate > monthAgo }.count
     }
 
+    /// Monday-based, matching MoodWeekStrip and MoodStatsView — the summary
+    /// must describe the same week the user sees highlighted in the strip.
     private var currentWeekStart: Date {
-        var calendar = Calendar.current
-        calendar.firstWeekday = 1 // Sunday
-        return calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())) ?? Date()
+        WeekAnchor.weekStart()
     }
 
     private var latestWeeklySummary: JournalSummary? {
@@ -343,13 +336,19 @@ struct JournalView: View {
     private func maybeGenerateWeeklySummary() {
         guard appState.allowAIJournalAnalysis else { return }
         let weekStart = currentWeekStart
-        let alreadyExists = allSummaries.contains {
+        let existingSummary = allSummaries.first {
             $0.kindRaw == "weekly" &&
             Calendar.current.isDate($0.periodStart, inSameDayAs: weekStart)
         }
-        guard !alreadyExists else { return }
         let weekEntries = thisWeekEntries
         guard weekEntries.count >= 3 else { return }
+        if let existingSummary {
+            // Regenerate only when entries were written AFTER the summary —
+            // otherwise a summary created Tuesday would describe just 3 entries
+            // for the rest of the week.
+            let newestWrite = weekEntries.map(\.createdAt).max() ?? .distantPast
+            guard newestWrite > existingSummary.generatedAt else { return }
+        }
         guard !isGeneratingWeekly else { return }
         isGeneratingWeekly = true
         let language = appState.preferredLanguage
@@ -373,6 +372,10 @@ struct JournalView: View {
                 language: language
             )
             modelContext.insert(summary)
+            // Replace the superseded summary for this week, if any.
+            if let existingSummary {
+                modelContext.delete(existingSummary)
+            }
             try? modelContext.save()
         }
     }
@@ -410,10 +413,7 @@ private struct MoodWeekStrip: View {
 
     /// Returns the Monday of the current week
     private var weekStart: Date {
-        let weekday = calendar.component(.weekday, from: today)
-        // weekday: 1=Sun,2=Mon,...,7=Sat. We want Mon=0
-        let daysFromMonday = (weekday + 5) % 7
-        return calendar.startOfDay(for: calendar.date(byAdding: .day, value: -daysFromMonday, to: today) ?? today)
+        WeekAnchor.weekStart(containing: today, calendar: calendar)
     }
 
     /// 7 days starting from Monday
@@ -566,6 +566,9 @@ struct JournalEntryEditor: View {
     let allowAnyDate: Bool
     let language: String
     let onSave: (EntryDraft) -> Void
+    /// Called after the entry is deleted from inside the editor — the presenter
+    /// (e.g. JournalDetailView) still renders the deleted model otherwise.
+    var onDelete: (() -> Void)? = nil
 
     // Draft state
     @State private var draftText: String = ""
@@ -600,6 +603,11 @@ struct JournalEntryEditor: View {
     @State private var showDeleteConfirm = false
     @State private var showLocationRemoveAlert = false
     @State private var showCameraSheet = false
+    @State private var recordingLimitMessage: String? = nil
+    @State private var photoSkippedMessage: String? = nil
+    // Set before dismiss on save/delete so onDisappear knows whether a
+    // freshly-recorded audio file is orphaned and must be cleaned up.
+    @State private var didFinishEditing = false
 
     private let maxPhotos = 10
     private var isEditMode: Bool { existingEntry != nil }
@@ -661,10 +669,10 @@ struct JournalEntryEditor: View {
                         }
 
                         // Audio chip (only if audio recorded — recording bar is in the bottom inset)
+                        // Duration is optional: old entries may have audio without one.
                         if !audioRecorder.isRecording,
-                           let fn = draftAudioFilename ?? existingAudioFilename,
-                           let dur = draftAudioDuration {
-                            audioChip(filename: fn, duration: dur)
+                           let fn = draftAudioFilename ?? existingAudioFilename {
+                            audioChip(filename: fn, duration: draftAudioDuration)
                                 .padding(.horizontal, TreeholeTheme.spacingSmall)
                         }
 
@@ -683,6 +691,22 @@ struct JournalEntryEditor: View {
 
                         // Permission denied message
                         if let msg = permissionDeniedMessage {
+                            Text(msg)
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.coral)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        }
+
+                        // Recording hit the 5-minute cap
+                        if let msg = recordingLimitMessage {
+                            Text(msg)
+                                .font(.caption)
+                                .foregroundStyle(TreeholeTheme.coral)
+                                .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        }
+
+                        // Photos skipped (over the limit or too large)
+                        if let msg = photoSkippedMessage {
                             Text(msg)
                                 .font(.caption)
                                 .foregroundStyle(TreeholeTheme.coral)
@@ -713,7 +737,10 @@ struct JournalEntryEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.t("Cancel", "取消")) { dismiss() }
+                    Button(L10n.t("Cancel", "取消")) {
+                        discardUnsavedRecording()
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.t("Save", "保存")) { handleSave() }
@@ -747,6 +774,17 @@ struct JournalEntryEditor: View {
                 Text(L10n.t("This action cannot be undone.", "此操作无法撤销。"))
             }
             .onAppear { populateFromExisting() }
+            // A capped take is finalized inside AudioRecorder (isRecording is
+            // already false) — collect it here or it would be lost.
+            .onReceive(NotificationCenter.default.publisher(for: AudioRecorder.maxDurationReachedNotification)) { _ in
+                finishRecording()
+                recordingLimitMessage = L10n.t(
+                    "Recording stopped — 5-minute limit reached.",
+                    "录音已停止——已达到 5 分钟上限。"
+                )
+            }
+            // Covers interactive sheet dismissal (swipe down) as well as Cancel.
+            .onDisappear { discardUnsavedRecording() }
         }
     }
 
@@ -862,7 +900,7 @@ struct JournalEntryEditor: View {
     // MARK: - Audio Chip
 
     @ViewBuilder
-    private func audioChip(filename: String, duration: Double) -> some View {
+    private func audioChip(filename: String, duration: Double?) -> some View {
         HStack(spacing: TreeholeTheme.spacingSmall) {
             Image(systemName: "waveform.circle.fill")
                 .font(.title3)
@@ -871,20 +909,32 @@ struct JournalEntryEditor: View {
                 Text(L10n.t("Voice Note", "语音备注"))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(TreeholeTheme.textPrimary)
-                Text(formatElapsed(duration))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(TreeholeTheme.textLight)
+                if let duration {
+                    Text(formatElapsed(duration))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(TreeholeTheme.textLight)
+                }
             }
             Spacer()
             Button {
                 if draftAudioFilename != nil {
                     AudioStorage.deleteAudio(filename: filename)
                     draftAudioFilename = nil
+                    if existingAudioFilename != nil {
+                        // The new recording had replaced the entry's original
+                        // audio, which is still attached — restore its metadata
+                        // so the chip reflects what will actually be saved.
+                        draftAudioDuration = existingEntry?.audioDurationSeconds
+                        draftAudioTranscript = existingEntry?.audioTranscript
+                    } else {
+                        draftAudioDuration = nil
+                        draftAudioTranscript = nil
+                    }
                 } else {
                     existingAudioFilename = nil
+                    draftAudioDuration = nil
+                    draftAudioTranscript = nil
                 }
-                draftAudioDuration = nil
-                draftAudioTranscript = nil
             } label: {
                 Image(systemName: "trash")
                     .foregroundStyle(TreeholeTheme.coral)
@@ -1120,6 +1170,7 @@ struct JournalEntryEditor: View {
     // MARK: - Save / Edit Logic
 
     private func handleSave() {
+        didFinishEditing = true
         if let existing = existingEntry {
             // Edit mode: update in place
             existing.text = draftText
@@ -1199,15 +1250,34 @@ struct JournalEntryEditor: View {
 
     private func deleteEntry() {
         guard let existing = existingEntry else { return }
+        didFinishEditing = true
         if let filenames = existing.photoFilenames {
             PhotoStorage.deletePhotos(filenames)
         }
         if let audioFilename = existing.audioFilename {
             AudioStorage.deleteAudio(filename: audioFilename)
         }
+        // A replacement recording made in this session isn't on the entry yet.
+        if let draftFn = draftAudioFilename, draftFn != existing.audioFilename {
+            AudioStorage.deleteAudio(filename: draftFn)
+        }
         modelContext.delete(existing)
         try? modelContext.save()
+        onDelete?()
         dismiss()
+    }
+
+    /// Deletes a recording that was saved to permanent storage during this
+    /// editing session but never attached to a saved entry (Cancel or swipe
+    /// dismissal) — otherwise the m4a (local + iCloud copy) is orphaned forever.
+    private func discardUnsavedRecording() {
+        guard !didFinishEditing, let fn = draftAudioFilename else { return }
+        // Never delete audio already attached to a saved entry.
+        guard existingEntry?.audioFilename != fn else { return }
+        AudioStorage.deleteAudio(filename: fn)
+        draftAudioFilename = nil
+        draftAudioDuration = nil
+        draftAudioTranscript = nil
     }
 
     // MARK: - Populate from Existing
@@ -1254,6 +1324,7 @@ struct JournalEntryEditor: View {
             }
         }
         permissionDeniedMessage = nil
+        recordingLimitMessage = nil
         do {
             try audioRecorder.startRecording()
         } catch {
@@ -1264,12 +1335,29 @@ struct JournalEntryEditor: View {
     private func finishRecording() {
         guard let result = audioRecorder.stopRecording() else { return }
         if let filename = AudioStorage.saveAudio(result.data) {
+            // A previous take from this session is being replaced — remove its
+            // file (never the entry's saved audio) so it isn't orphaned.
+            if let oldFn = draftAudioFilename, oldFn != filename, existingEntry?.audioFilename != oldFn {
+                AudioStorage.deleteAudio(filename: oldFn)
+            }
             draftAudioFilename = filename
             draftAudioDuration = result.duration
             Task.detached(priority: .background) {
                 let transcript = await transcribeAudio(data: result.data)
                 await MainActor.run {
-                    draftAudioTranscript = transcript
+                    // Ignore the result if this take was deleted or replaced
+                    // while transcription was still running.
+                    if draftAudioFilename == filename {
+                        draftAudioTranscript = transcript
+                    }
+                    // The editor may already be gone (user saved before
+                    // transcription finished) — persist against the saved
+                    // entry too, keyed by the audio filename.
+                    JournalTranscription.apply(
+                        transcript: transcript,
+                        toEntryWithAudioFilename: filename,
+                        context: modelContext
+                    )
                 }
             }
         }
@@ -1284,25 +1372,13 @@ struct JournalEntryEditor: View {
         }
         defer { try? FileManager.default.removeItem(at: tmpURL) }
 
-        let zhResult = await runSpeechRecognition(url: tmpURL, locale: Locale(identifier: "zh-CN"))
-        let enResult = await runSpeechRecognition(url: tmpURL, locale: Locale(identifier: "en-US"))
-
-        let best: String?
-        switch (zhResult, enResult) {
-        case (let zh?, let en?) where zh.count >= en.count:
-            best = zh
-        case (_, let en?):
-            best = en
-        case (let zh?, _):
-            best = zh
-        default:
-            best = nil
-        }
-        return (best?.isEmpty == false) ? best : nil
+        let zhResult = await runSpeechRecognition(url: tmpURL, locale: JournalTranscription.recognitionLocales[0])
+        let enResult = await runSpeechRecognition(url: tmpURL, locale: JournalTranscription.recognitionLocales[1])
+        return JournalTranscription.pick(zh: zhResult, en: enResult)
     }
 
     private func runSpeechRecognition(url: URL, locale: Locale) async -> String? {
-        guard SFSpeechRecognizer.authorizationStatus() == .authorized else { return nil }
+        guard JournalTranscription.canTranscribe(status: SFSpeechRecognizer.authorizationStatus()) else { return nil }
         guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else { return nil }
         return await withCheckedContinuation { continuation in
             let request = SFSpeechURLRecognitionRequest(url: url)
@@ -1354,9 +1430,14 @@ struct JournalEntryEditor: View {
         isLoadingPhotos = true
         defer { isLoadingPhotos = false }
 
-        let currentCount = existingPhotoFilenames.count + draftPhotoData.count
+        var skippedCount = 0
         for item in items {
-            guard currentCount + draftPhotoData.count < maxPhotos else { break }
+            // Live total — draftPhotoData grows inside the loop, so any
+            // snapshot taken before the loop would double-count it.
+            guard existingPhotoFilenames.count + draftPhotoData.count < maxPhotos else {
+                skippedCount += 1
+                continue
+            }
             if let data = try? await item.loadTransferable(type: Data.self),
                let uiImage = UIImage(data: data) {
                 let maxDimension: CGFloat = 1024
@@ -1371,9 +1452,17 @@ struct JournalEntryEditor: View {
                 }
                 if let jpegData = resized.jpegData(compressionQuality: 0.7), jpegData.count <= 2_000_000 {
                     draftPhotoData.append(jpegData)
+                } else {
+                    skippedCount += 1
                 }
             }
         }
+        photoSkippedMessage = skippedCount > 0
+            ? L10n.t(
+                "\(skippedCount) photo(s) couldn't be added (limit of \(maxPhotos), or file too large).",
+                "\(skippedCount) 张照片未能添加（最多 \(maxPhotos) 张，或文件过大）。"
+            )
+            : nil
         selectedItems = []
     }
 }

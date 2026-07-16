@@ -230,6 +230,8 @@ struct CloudPostDetailView: View {
     }
 
     private func postComment() async {
+        // Keyboard Send bypasses the button's .disabled — guard against a duplicate in-flight submit
+        guard !isPostingComment else { return }
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         isPostingComment = true
@@ -303,6 +305,10 @@ struct ReactionBar: View {
     @State private var localHug: Int = 0
     @State private var localStarlight: Int = 0
 
+    // Reaction types with a network request in flight — taps are ignored until it settles,
+    // otherwise a double-tap races an add against a remove and desyncs from the server
+    @State private var inFlightReactions: Set<String> = []
+
     var body: some View {
         HStack(spacing: TreeholeTheme.spacingSmall) {
             ReactionButton(
@@ -366,6 +372,10 @@ struct ReactionBar: View {
     }
 
     private func toggleReaction(_ type: String) async {
+        guard !inFlightReactions.contains(type) else { return }
+        inFlightReactions.insert(type)
+        defer { inFlightReactions.remove(type) }
+
         let isCurrentlyReacted = myReactions.contains(type)
 
         // Optimistic update

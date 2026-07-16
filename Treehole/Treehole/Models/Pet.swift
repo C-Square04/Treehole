@@ -137,13 +137,14 @@ final class Pet {
         addExperience(10)
     }
 
-    func updateHunger() {
+    func updateHunger(now: Date = Date()) {
+        // Hunger decays 1 point per whole hour since the last checkpoint
         let referenceDate = lastHungerUpdateAt ?? lastFedAt ?? createdAt
-        let hoursSince = Date().timeIntervalSince(referenceDate) / 3600
-        guard hoursSince >= 0.1 else { return }  // Skip if less than 6 minutes
-        let decay = Int(hoursSince)
+        let decay = Int(now.timeIntervalSince(referenceDate) / 3600)
+        guard decay >= 1 else { return }  // Sub-hour remainder keeps accruing toward the next point
         hungerLevel = max(0, hungerLevel - decay)
-        lastHungerUpdateAt = Date()
+        // Advance the checkpoint only by the hours consumed so frequent checks don't drop decay
+        lastHungerUpdateAt = referenceDate.addingTimeInterval(Double(decay) * 3600)
         if hungerLevel < 25 { mood = .sad }
     }
 

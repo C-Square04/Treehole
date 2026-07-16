@@ -21,46 +21,47 @@ struct TreeholeApp: App {
             ChatMessage.self, JournalSummary.self
         ])
 
-        // Helper to delete all SwiftData stores
-        func deleteAllStores() {
+        // Move stores aside instead of deleting — the data may be recoverable
+        // (e.g. by a future app version with a proper migration).
+        func moveStoresAside() {
             let fm = FileManager.default
             if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-                // Delete all .store files and related files
                 if let files = try? fm.contentsOfDirectory(at: appSupport, includingPropertiesForKeys: nil) {
                     for file in files where file.lastPathComponent.contains(".store") {
-                        try? fm.removeItem(at: file)
+                        let backup = appSupport.appendingPathComponent("Backup-" + file.lastPathComponent)
+                        try? fm.removeItem(at: backup)
+                        try? fm.moveItem(at: file, to: backup)
                     }
                 }
             }
         }
 
-        // Try CloudKit first
-        do {
-            let config = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .automatic
-            )
+        func makeContainer(cloudKit: Bool) throws -> ModelContainer {
+            let config = cloudKit
+                ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+                : ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             return try ModelContainer(for: schema, configurations: [config])
-        } catch {
-            print("CloudKit ModelContainer failed: \(error). Deleting stores and retrying...")
-            deleteAllStores()
-            do {
-                let config = ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: false,
-                    cloudKitDatabase: .automatic
-                )
-                return try ModelContainer(for: schema, configurations: [config])
-            } catch {
-                print("CloudKit retry failed: \(error). Falling back to local.")
-                do {
-                    let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-                    return try ModelContainer(for: schema, configurations: [config])
-                } catch {
-                    fatalError("Could not create ModelContainer: \(error)")
-                }
-            }
+        }
+
+        // 1. CloudKit container
+        do { return try makeContainer(cloudKit: true) }
+        catch { print("CloudKit ModelContainer failed: \(error). Retrying...") }
+
+        // 2. Retry once — the failure may be transient (CloudKit hiccup, disk pressure)
+        do { return try makeContainer(cloudKit: true) }
+        catch { print("CloudKit retry failed: \(error). Trying local-only...") }
+
+        // 3. Same store without CloudKit — preserves data if CloudKit setup was the problem
+        do { return try makeContainer(cloudKit: false) }
+        catch { print("Local container failed: \(error). Moving stores aside and starting fresh...") }
+
+        // 4. Last resort: the store itself won't open. Move it aside (never delete)
+        //    and start with a fresh database.
+        moveStoresAside()
+        do { return try makeContainer(cloudKit: true) }
+        catch {
+            do { return try makeContainer(cloudKit: false) }
+            catch { fatalError("Could not create ModelContainer: \(error)") }
         }
     }()
 
@@ -83,6 +84,10 @@ struct TreeholeApp: App {
                         Task {
                             await NotificationService.checkUnreadInteractionsAndNotify()
                         }
+                    } else if newPhase == .background {
+                        // Re-lock protected sections whenever the app leaves the
+                        // foreground, regardless of which screen is showing.
+                        lockManager.lockAll()
                     }
                 }
         }

@@ -13,7 +13,6 @@ struct CloudPostListView: View {
     @Query private var weeklyChallenges: [WeeklyChallenge]
     @State private var viewModel = CloudPostViewModel()
     @State private var economyVM = EconomyViewModel()
-    @State private var didCreatePost = false
     @State private var showMyClouds: Bool = false
     @State private var selectedPost: RemoteCloudPost? = nil
 
@@ -226,19 +225,20 @@ struct CloudPostListView: View {
             }) {
                 GrabbedCloudView(post: $grabbedPost, appState: appState, showGrabAnother: true)
             }
-            .sheet(isPresented: $viewModel.showCreation, onDismiss: {
-                if viewModel.didCreatePost {
-                    viewModel.didCreatePost = false
-                    let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
-                    if let task = dailyTasks.first(where: { $0.type == .post && !$0.isCompleted }) {
-                        economyVM.completeTask(task, economy: economy)
-                    }
-                    economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
-                    try? modelContext.save()
-                    // My Clouds is now a separate page
-                }
-            }) {
+            .sheet(isPresented: $viewModel.showCreation) {
                 CloudPostCreationView(viewModel: viewModel)
+            }
+            .onChange(of: viewModel.didCreatePost) { _, created in
+                // Credit rewards when the server confirms the insert — the sheet's onDismiss
+                // races the network call (and a stale flag would credit a later Cancel)
+                guard created else { return }
+                viewModel.didCreatePost = false
+                let economy = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
+                if let task = dailyTasks.first(where: { $0.type == .post && !$0.isCompleted }) {
+                    economyVM.completeTask(task, economy: economy)
+                }
+                economyVM.incrementChallenge(type: .postStreak, economy: economy, challenges: weeklyChallenges)
+                try? modelContext.save()
             }
             .task {
                 await viewModel.fetchPosts()
@@ -601,7 +601,9 @@ struct GrabbedCloudView: View {
     private func grabAnother() async {
         isGrabbingAnother = true
         do {
-            if let newPost = try await SupabaseService.fetchRandomPost() {
+            // A small pool can return the current post again — .task(id:) wouldn't re-fire,
+            // so resetting state here would leave comments/reactions cleared permanently
+            if let newPost = try await SupabaseService.fetchRandomPost(), newPost.id != post?.id {
                 // Reset state before updating post so .task(id:) fires fresh
                 comments = []
                 commentText = ""
@@ -635,6 +637,8 @@ struct GrabbedCloudView: View {
     }
 
     private func postComment(postId: String) async {
+        // Keyboard Send bypasses the button's .disabled — guard against a duplicate in-flight submit
+        guard !isPostingComment else { return }
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         isPostingComment = true

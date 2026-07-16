@@ -96,6 +96,7 @@ final class Plant {
     var hydrationLevel: Int = 100
     var experience: Int = 0
     var lastWateredAt: Date? = nil
+    var lastHydrationUpdateAt: Date? = nil
     var createdAt: Date = Date()
 
     init() {}
@@ -148,9 +149,16 @@ final class Plant {
         }
     }
 
-    func updateHydration() {
-        guard let lastWatered = lastWateredAt else { return }
-        let daysSinceWatering = Date().timeIntervalSince(lastWatered) / 86400
-        hydrationLevel = max(0, hydrationLevel - Int(daysSinceWatering * 20))
+    // Hydration decays 20 points per day → 1 point per this interval
+    static let hydrationDecayInterval: TimeInterval = 86400 / 20
+
+    func updateHydration(now: Date = Date()) {
+        // Decay from the last checkpoint (not lastWateredAt) so repeated calls are idempotent
+        guard let reference = lastHydrationUpdateAt ?? lastWateredAt else { return }
+        let decay = Int(now.timeIntervalSince(reference) / Self.hydrationDecayInterval)
+        guard decay >= 1 else { return }
+        hydrationLevel = max(0, hydrationLevel - decay)
+        // Advance the checkpoint only by the time consumed; the fractional remainder keeps accruing
+        lastHydrationUpdateAt = reference.addingTimeInterval(Double(decay) * Self.hydrationDecayInterval)
     }
 }

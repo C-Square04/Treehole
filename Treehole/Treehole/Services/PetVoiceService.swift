@@ -4,15 +4,17 @@ import Speech
 
 enum PetVoiceService {
     // MARK: - Audio Player
+    // Playback/cache state is MainActor-isolated: SwiftUI reads it on every row render
+    // while TTS fetch tasks write to it — unsynchronized statics would be a data race.
 
-    private static var audioPlayer: AVAudioPlayer?
-    private static let synthesizer = AVSpeechSynthesizer() // Apple TTS fallback
+    @MainActor private static var audioPlayer: AVAudioPlayer?
+    @MainActor private static let synthesizer = AVSpeechSynthesizer() // Apple TTS fallback
 
     // MARK: - Audio Cache (LRU, max 10)
-    private static var audioCache: [(key: String, data: Data)] = []
+    @MainActor private static var audioCache: [(key: String, data: Data)] = []
     private static let cacheLimit = 10
 
-    private static func cacheAudio(key: String, data: Data) {
+    @MainActor private static func cacheAudio(key: String, data: Data) {
         // Remove existing entry with same key
         audioCache.removeAll { $0.key == key }
         // Add to front (most recent)
@@ -23,7 +25,7 @@ enum PetVoiceService {
         }
     }
 
-    private static func getCachedAudio(key: String) -> Data? {
+    @MainActor private static func getCachedAudio(key: String) -> Data? {
         guard let index = audioCache.firstIndex(where: { $0.key == key }) else { return nil }
         // Move to front (LRU touch)
         let entry = audioCache.remove(at: index)
@@ -32,7 +34,7 @@ enum PetVoiceService {
     }
 
     /// Replay audio for a specific message (from cache)
-    static func replay(messageId: String) {
+    @MainActor static func replay(messageId: String) {
         if let cached = getCachedAudio(key: messageId) {
             do {
                 let session = AVAudioSession.sharedInstance()
@@ -44,7 +46,7 @@ enum PetVoiceService {
     }
 
     /// Check if audio is cached for a message
-    static func hasCachedAudio(messageId: String) -> Bool {
+    @MainActor static func hasCachedAudio(messageId: String) -> Bool {
         audioCache.contains { $0.key == messageId }
     }
 
@@ -61,6 +63,7 @@ enum PetVoiceService {
 
     // MARK: - TTS: Mode-aware
 
+    @MainActor
     static func speak(_ text: String, language: String = "en", emotion: String = "calm", mode: ChatMode = .basic, messageId: String? = nil) {
         let cleanText = stripEmoji(text)
         guard !cleanText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -69,7 +72,7 @@ enum PetVoiceService {
             // Premium: MiniMax natural voice, using user's selected voice if set
             let selectedVoice = UserDefaults.standard.string(forKey: "selectedVoiceId") ?? "apple_default"
             let voiceId: String? = selectedVoice != "apple_default" ? selectedVoice : nil
-            Task {
+            Task { @MainActor in
                 do {
                     let session = AVAudioSession.sharedInstance()
                     try session.setCategory(.playback, mode: .default, options: .duckOthers)
@@ -79,9 +82,9 @@ enum PetVoiceService {
                 }
                 if let audioData = await fetchMiniMaxTTS(text: cleanText, language: language, emotion: emotion, voiceId: voiceId) {
                     if let mid = messageId { cacheAudio(key: mid, data: audioData) }
-                    await MainActor.run { playAudio(audioData) }
+                    playAudio(audioData)
                 } else {
-                    await MainActor.run { speakWithApple(cleanText, language: language) }
+                    speakWithApple(cleanText, language: language)
                 }
             }
         } else {
@@ -140,11 +143,11 @@ enum PetVoiceService {
 
     // MARK: - Audio Playback
 
-    static func playAudioPublic(_ data: Data) {
+    @MainActor static func playAudioPublic(_ data: Data) {
         playAudio(data)
     }
 
-    private static func playAudio(_ data: Data) {
+    @MainActor private static func playAudio(_ data: Data) {
         do {
             audioPlayer = try AVAudioPlayer(data: data)
             audioPlayer?.play()
@@ -156,7 +159,7 @@ enum PetVoiceService {
 
     // MARK: - Apple TTS Trial (for voice selector preview)
 
-    static func speakTrial(_ text: String, language: String) {
+    @MainActor static func speakTrial(_ text: String, language: String) {
         Task { @MainActor in
             do {
                 let session = AVAudioSession.sharedInstance()
@@ -169,7 +172,7 @@ enum PetVoiceService {
 
     // MARK: - Apple TTS Fallback
 
-    private static func speakWithApple(_ text: String, language: String) {
+    @MainActor private static func speakWithApple(_ text: String, language: String) {
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: language == "zh-Hans" ? "zh-CN" : "en-US")
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9
@@ -180,20 +183,20 @@ enum PetVoiceService {
         print("[TTS] Apple TTS fallback")
     }
 
-    static func stopSpeaking() {
+    @MainActor static func stopSpeaking() {
         audioPlayer?.stop()
         audioPlayer = nil
         synthesizer.stopSpeaking(at: .immediate)
     }
 
-    static var isSpeaking: Bool {
+    @MainActor static var isSpeaking: Bool {
         (audioPlayer?.isPlaying ?? false) || synthesizer.isSpeaking
     }
 
     // MARK: - STT (Speech to Text)
 
-    private static var audioEngine: AVAudioEngine?
-    private static var recognitionTask: SFSpeechRecognitionTask?
+    @MainActor private static var audioEngine: AVAudioEngine?
+    @MainActor private static var recognitionTask: SFSpeechRecognitionTask?
 
     static func requestSTTPermission() async -> Bool {
         await withCheckedContinuation { continuation in
@@ -203,6 +206,7 @@ enum PetVoiceService {
         }
     }
 
+    @MainActor
     static func startListening(language: String = "en") async throws -> AsyncStream<String> {
         let locale = Locale(identifier: language == "zh-Hans" ? "zh-CN" : "en-US")
         guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
@@ -243,7 +247,7 @@ enum PetVoiceService {
         }
     }
 
-    static func stopListening() {
+    @MainActor static func stopListening() {
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
         recognitionTask?.cancel()

@@ -2,10 +2,14 @@ import Foundation
 import Observation
 import UserNotifications
 import CloudKit
+import UIKit
 
 @Observable
 final class AppState {
     private var isLoading = false
+
+    /// Retries the device→Apple post migration until the server confirms it.
+    private let postMigration = PostMigrationCoordinator()
 
     /// Real CloudKit account status — populated asynchronously by `refreshCloudKitStatus()`.
     /// `.couldNotDetermine` until the first check returns.
@@ -68,6 +72,9 @@ final class AppState {
         L10n.lang = preferredLanguage
         checkAliasExpiry()
         Task { await refreshCloudKitStatus() }
+        // A migration that failed at sign-in time retries on every launch and
+        // foreground until the server confirms it.
+        Task { await postMigration.retryIfNeeded() }
         NotificationCenter.default.addObserver(
             forName: .CKAccountChanged,
             object: nil,
@@ -75,6 +82,18 @@ final class AppState {
         ) { [weak self] _ in
             Task { await self?.refreshCloudKitStatus() }
         }
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { await self?.retryPendingPostMigration() }
+        }
+    }
+
+    /// Re-attempts a pending device→Apple post migration; no-op when none is pending.
+    func retryPendingPostMigration() async {
+        await postMigration.retryIfNeeded()
     }
 
     // MARK: - iCloud Sync Status
@@ -161,13 +180,12 @@ final class AppState {
         isGuest = false
         hasCompletedOnboarding = true
 
-        // Migrate existing device_id posts to this apple_user_id
-        Task {
-            try? await SupabaseService.migratePostsToAppleUser(
-                deviceId: SupabaseConfig.deviceId,
-                appleUserId: userID
-            )
-        }
+        // Migrate existing device_id posts to this apple_user_id. Marked
+        // pending before the attempt so a failure (offline sign-in, RPC
+        // timeout) retries on the next launch/foreground instead of leaving
+        // the posts orphaned.
+        postMigration.markPending(appleUserId: userID)
+        Task { await postMigration.retryIfNeeded() }
         Task { await refreshCloudKitStatus() }
 
         saveState()
@@ -242,10 +260,11 @@ final class AppState {
 
     private func scheduleAliasRotationReminder() {
         let content = UNMutableNotificationContent()
-        content.title = preferredLanguage == "zh-Hans" ? "别名已更新" : "Alias Updated"
-        content.body = preferredLanguage == "zh-Hans"
-            ? "你的新别名是「\(currentAlias)」，7天后将再次更换。"
-            : "Your new alias is \"\(currentAlias)\". It will change again in 7 days."
+        content.title = L10n.t("Alias Updated", "别名已更新")
+        content.body = L10n.t(
+            "Your new alias is \"\(currentAlias)\". It will change again in 7 days.",
+            "你的新别名是「\(currentAlias)」，7天后将再次更换。"
+        )
         content.sound = .default
 
         // Remove old alias notification before scheduling new one

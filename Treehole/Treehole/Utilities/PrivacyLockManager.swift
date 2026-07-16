@@ -116,8 +116,8 @@ final class PrivacyLockManager {
 
         let context = LAContext()
         let reason = type == .cloud
-            ? "Unlock your private clouds"
-            : "Unlock your journal"
+            ? L10n.t("Unlock your private clouds", "解锁你的私密云朵")
+            : L10n.t("Unlock your journal", "解锁你的日记")
 
         do {
             let success = try await context.evaluatePolicy(
@@ -156,6 +156,20 @@ final class PrivacyLockManager {
     func lockAll() {
         isCloudUnlocked = false
         isJournalUnlocked = false
+    }
+
+    /// Full reset for account deletion: removes the passcode from the Keychain
+    /// and clears every lock setting, including `hasPasscode`, so no screen can
+    /// demand a passcode that no longer exists.
+    func resetAfterAccountDeletion() {
+        KeychainHelper.delete(forKey: "privacyPasscode")
+        hasPasscode = false
+        isCloudLockEnabled = false
+        isJournalLockEnabled = false
+        isBiometricEnabled = false
+        isCloudUnlocked = false
+        isJournalUnlocked = false
+        save()
     }
 
     // Legacy method name kept for compatibility

@@ -8,6 +8,10 @@ struct JournalDetailView: View {
     @Environment(AppState.self) private var appState
     @Query(sort: \JournalSummary.generatedAt, order: .reverse) private var allSummaries: [JournalSummary]
     let entry: JournalEntry
+    /// Called after the entry is deleted (from the toolbar or the edit sheet)
+    /// so the presenting view can clear its selection — dismiss() alone is a
+    /// no-op for a NavigationSplitView detail column on iPad.
+    var onDelete: (() -> Void)? = nil
 
     @State private var showDeleteConfirm = false
     @State private var isGeneratingSummary = false
@@ -22,6 +26,17 @@ struct JournalDetailView: View {
     }
 
     var body: some View {
+        if entry.isDeleted {
+            // The backing model was deleted out from under this view (e.g. via
+            // the edit sheet) — rendering its fields would fault a deleted
+            // SwiftData object. Show nothing and pop.
+            Color.clear.onAppear { dismiss() }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         ZStack {
             TreeholeTheme.warmBackground.ignoresSafeArea()
 
@@ -255,6 +270,12 @@ struct JournalDetailView: View {
                 language: appState.preferredLanguage,
                 onSave: { _ in
                     showEditSheet = false
+                },
+                onDelete: {
+                    // Entry deleted inside the editor — this view must also go.
+                    showEditSheet = false
+                    onDelete?()
+                    dismiss()
                 }
             )
         }
@@ -272,6 +293,7 @@ struct JournalDetailView: View {
                 }
                 modelContext.delete(entry)
                 try? modelContext.save()
+                onDelete?()
                 dismiss()
             }
             Button(L10n.t("Cancel", "取消"), role: .cancel) {}

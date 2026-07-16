@@ -18,6 +18,19 @@ enum TaskType: String, Codable, CaseIterable {
         }
     }
 
+    var titleZH: String {
+        switch self {
+        case .post: "分享一朵云"
+        case .feedPet: "喂养宠物"
+        case .waterPlant: "给植物浇水"
+        case .writeJournal: "写日记"
+        }
+    }
+
+    var localizedTitle: String {
+        L10n.t(title, titleZH)
+    }
+
     var foodReward: Int {
         switch self {
         case .post: 5
@@ -48,6 +61,8 @@ final class Economy {
     var loginStreak: Int = 0
     var lastLoginDate: Date? = nil
     var lastDailyResetDate: Date? = nil
+    // CloudKit requires an inline default on new @Model properties
+    var lastBonusClaimDate: Date? = nil
 
     init() {}
 
@@ -103,9 +118,20 @@ final class Economy {
         lastLoginDate = today
     }
 
-    func grantLoginBonus() {
+    var hasClaimedLoginBonusToday: Bool {
+        guard let claimed = lastBonusClaimDate else { return false }
+        return Calendar.current.isDateInToday(claimed)
+    }
+
+    /// At most one grant per calendar day — the claim date is persisted so
+    /// relaunching the app (or recreating the view) cannot re-grant it.
+    @discardableResult
+    func grantLoginBonus() -> Bool {
+        guard !hasClaimedLoginBonusToday else { return false }
         let bonus = min(25, 5 + loginStreak * 2)
         addFood(bonus)
+        lastBonusClaimDate = Date()
+        return true
     }
 }
 
@@ -138,5 +164,11 @@ final class DailyTask {
     var type: TaskType {
         get { TaskType(rawValue: typeRaw) ?? .post }
         set { typeRaw = newValue.rawValue }
+    }
+
+    /// Display title derived from the task type at render time — the persisted
+    /// `title` is English-only and kept for identity/back-compat.
+    var localizedTitle: String {
+        type.localizedTitle
     }
 }

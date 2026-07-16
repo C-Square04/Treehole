@@ -31,6 +31,18 @@ struct AdaptiveNavigationTests {
         // Verify the type used for split view selection conforms to needed protocols.
         let idType: Any.Type = RemoteCloudPost.ID.self
         #expect(idType == String.self)
+
+        // Decode through the real snake_case column names to prove the
+        // Identifiable id is the server post id (what selection keys off).
+        let json = """
+        {"id":"post-42","author_alias":"Cloud Fox","mood_tag":"calm","text":"hi",\
+        "npc_reply_text":null,"source_language":"en","device_id":"dev-1",\
+        "apple_user_id":null,"created_at":"2026-01-01T00:00:00.000Z","flagged":false}
+        """
+        let post = try JSONDecoder().decode(RemoteCloudPost.self, from: Data(json.utf8))
+        #expect(post.id == "post-42")
+        #expect(post.mood == .calm)
+        #expect(post.authorAlias == "Cloud Fox")
     }
 
     @Test("JournalEntry conforms to Identifiable for split view selection")
@@ -40,11 +52,13 @@ struct AdaptiveNavigationTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: JournalEntry.self, configurations: config)
         let context = ModelContext(container)
-        let entry = JournalEntry(moodTag: .calm, text: "Test")
-        context.insert(entry)
-        // Identifiable conformance: accessing .id should not crash
-        let id = entry.persistentModelID
-        #expect(id != entry.persistentModelID || id == entry.persistentModelID) // trivially true — just checks no crash
+        let first = JournalEntry(moodTag: .calm, text: "First")
+        let second = JournalEntry(moodTag: .happy, text: "Second")
+        context.insert(first)
+        context.insert(second)
+        // Distinct entries must yield distinct selection ids, or selecting one
+        // row in the sidebar could highlight/open another.
+        #expect(first.persistentModelID != second.persistentModelID)
     }
 
     @Test("GrabbedCloudView accepts optional Binding for post")

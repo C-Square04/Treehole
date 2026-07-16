@@ -59,48 +59,37 @@ enum NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
-    // MARK: - Schedule Daily Check-In Reminder at 9 AM (with dynamic unread count)
+    // MARK: - Schedule Daily Check-In Reminder at 9 AM
 
+    // The trigger repeats, so the content must be evergreen: an unread count
+    // fetched at scheduling time would replay the same stale number every
+    // morning. Count-specific messages go through the on-demand
+    // checkUnreadInteractionsAndNotify() path (runs on scene active) instead.
     static func scheduleDailyCheckIn() {
         cancel(type: checkinID)
 
-        // Fetch unread count asynchronously; schedule notification afterward
-        Task.detached {
-            let since = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-            let (commentCount, reactionCount) = await SupabaseService.fetchUnreadCount(since: since)
-            let total = commentCount + reactionCount
+        let content = UNMutableNotificationContent()
+        content.title = L10n.t("Good morning!", "早上好！")
+        content.body = L10n.t(
+            "Take a moment to check in with yourself 💙",
+            "花点时间关注一下自己 💙"
+        )
+        content.sound = .default
 
-            let content = UNMutableNotificationContent()
-            content.title = L10n.t("Good morning!", "早上好！")
+        var dateComponents = DateComponents()
+        dateComponents.hour = 9
+        dateComponents.minute = 0
 
-            if total > 0 {
-                content.body = L10n.t(
-                    "\(total) new clouds are waiting for you ☁️",
-                    "\(total) 条新消息在等你 ☁️"
-                )
-            } else {
-                content.body = L10n.t(
-                    "Take a moment to check in with yourself 💙",
-                    "花点时间关注一下自己 💙"
-                )
-            }
-            content.sound = .default
-
-            var dateComponents = DateComponents()
-            dateComponents.hour = 9
-            dateComponents.minute = 0
-
-            let trigger = UNCalendarNotificationTrigger(
-                dateMatching: dateComponents,
-                repeats: true
-            )
-            let request = UNNotificationRequest(
-                identifier: checkinID,
-                content: content,
-                trigger: trigger
-            )
-            try? await UNUserNotificationCenter.current().add(request)
-        }
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: dateComponents,
+            repeats: true
+        )
+        let request = UNNotificationRequest(
+            identifier: checkinID,
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(request)
     }
 
     // MARK: - Schedule Evening Check-In Reminder at 6 PM

@@ -144,7 +144,7 @@ struct VoiceSelectorView: View {
         if sampleFile == nil {
             // Apple TTS trial (apple_default voice)
             playingVoiceId = voice.id
-            let demoText = lang == "zh-Hans" ? "你好，我一直在这里陪着你！" : "Hello, I'm always here for you!"
+            let demoText = L10n.t("Hello, I'm always here for you!", "你好，我一直在这里陪着你！")
             PetVoiceService.speakTrial(demoText, language: lang)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 playingVoiceId = nil

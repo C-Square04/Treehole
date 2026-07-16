@@ -12,7 +12,7 @@
 # Run a single test class:
 #   make test ONLY=AnalyticsServiceTests
 # Run a single test method:
-#   make test ONLY=AnalyticsServiceTests/testTrackDoesNotCrash
+#   make test ONLY=EconomyViewModelTests/testCompleteTaskGrantsRewardsOnce
 
 DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 PROJECT       := Treehole/Treehole.xcodeproj
@@ -37,7 +37,7 @@ test:
 	  -destination '$(DESTINATION)' \
 	  -only-testing:TreeholeTests $(ONLY_FLAG) \
 	  -quiet 2>&1 \
-	  | grep -E '(Test Case.*(passed|failed)|error:|TEST|BUILD)' \
+	  | grep -E '(Test [Cc]ase.*(passed|failed)|error:|TEST|BUILD)' \
 	  | tail -50
 
 test-fast:
@@ -46,7 +46,7 @@ test-fast:
 	  -destination '$(DESTINATION)' \
 	  -only-testing:TreeholeTests $(ONLY_FLAG) \
 	  -quiet 2>&1 \
-	  | grep -E '(Test Case.*(passed|failed)|error:|TEST)' \
+	  | grep -E '(Test [Cc]ase.*(passed|failed)|error:|TEST)' \
 	  | tail -50
 
 test-full:
@@ -54,7 +54,7 @@ test-full:
 	  -project $(PROJECT) -scheme $(SCHEME) \
 	  -destination '$(DESTINATION)' \
 	  -quiet 2>&1 \
-	  | grep -E '(Test Case.*(passed|failed)|error:|TEST|BUILD)' \
+	  | grep -E '(Test [Cc]ase.*(passed|failed)|error:|TEST|BUILD)' \
 	  | tail -80
 
 test-ui:
@@ -63,7 +63,7 @@ test-ui:
 	  -destination '$(DESTINATION)' \
 	  -only-testing:TreeholeUITests \
 	  -quiet 2>&1 \
-	  | grep -E '(Test Case.*(passed|failed)|error:|TEST)' \
+	  | grep -E '(Test [Cc]ase.*(passed|failed)|error:|TEST)' \
 	  | tail -50
 
 build:

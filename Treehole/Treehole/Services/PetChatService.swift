@@ -96,7 +96,7 @@ enum PetChatService {
         }
 
         // Last resort: scripted response
-        return scriptedFallback(userMessage: userMessage)
+        return scriptedFallback(userMessage: userMessage, language: language)
     }
 
     // Apple Foundation Models (on-device, free) — iOS 26+ only
@@ -173,10 +173,11 @@ enum PetChatService {
         return nil
     }
 
-    // Scripted fallback (offline)
-    private static func scriptedFallback(userMessage: String) -> String {
+    // Scripted fallback (offline) — reply language follows the app language setting,
+    // matching the AI path's system prompt, not the script of the user's message
+    static func scriptedFallback(userMessage: String, language: String) -> String {
         let lower = userMessage.lowercased()
-        let isChinese = userMessage.range(of: "\\p{Han}", options: .regularExpression) != nil
+        let isChinese = language == "zh-Hans"
 
         if lower.contains("sad") || lower.contains("难过") || lower.contains("伤心") {
             return isChinese ? "抱抱你 🤗 我一直在这里陪着你。" : "Sending you a big hug 🤗 I'm always here for you."

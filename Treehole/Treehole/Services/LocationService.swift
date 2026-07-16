@@ -7,7 +7,14 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Private
     private let manager = CLLocationManager()
-    private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
+    // Concurrent fetches can overlap (e.g. double-tap on the location button).
+    // All waiters queue here and are resumed together, so no continuation is
+    // ever silently overwritten and leaked.
+    private var locationContinuations: [CheckedContinuation<CLLocation?, Never>] = []
+    private var timeoutTask: Task<Void, Never>?
+
+    /// Maximum time to wait for CoreLocation before resuming callers with nil.
+    static let locationTimeout: TimeInterval = 10
 
     override init() {
         super.init()
@@ -44,14 +51,19 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
             return nil
         }
 
-        // Fetch location with 10-second timeout
-        let location: CLLocation? = await withCheckedContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume(returning: nil)
-                return
+        // Fetch location with a timeout so callers can never await forever
+        // if CoreLocation stalls and no delegate callback arrives.
+        let location: CLLocation? = await withCheckedContinuation { continuation in
+            locationContinuations.append(continuation)
+            // Only the first waiter starts a request; later callers piggyback
+            // on the in-flight one and share its result.
+            guard locationContinuations.count == 1 else { return }
+            manager.requestLocation()
+            timeoutTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(Self.locationTimeout * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                self?.resumeAllWaiters(with: nil)
             }
-            self.locationContinuation = continuation
-            self.manager.requestLocation()
         }
 
         guard let loc = location else { return nil }
@@ -94,16 +106,28 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         return placemark.name ?? ""
     }
 
+    // MARK: - Continuation Handling
+
+    // Emptying the queue before resuming makes a second call (late delegate
+    // callback after the timeout already fired, or vice versa) a safe no-op.
+    private func resumeAllWaiters(with location: CLLocation?) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        let waiters = locationContinuations
+        locationContinuations = []
+        for continuation in waiters {
+            continuation.resume(returning: location)
+        }
+    }
+
     // MARK: - CLLocationManagerDelegate
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        locationContinuation?.resume(returning: locations.first)
-        locationContinuation = nil
+        resumeAllWaiters(with: locations.first)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        locationContinuation?.resume(returning: nil)
-        locationContinuation = nil
+        resumeAllWaiters(with: nil)
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

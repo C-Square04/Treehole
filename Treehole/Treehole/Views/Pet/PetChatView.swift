@@ -309,9 +309,10 @@ struct PetChatView: View {
     private func sendWelcomeIfNeeded() {
         guard allMessages.isEmpty, let pet = pets.first else { return }
         let lang = appState.preferredLanguage
-        let welcome = lang == "zh-Hans"
-            ? "喵~ 你好！我是\(pet.name)，很高兴见到你 😊 今天心情怎么样？"
-            : "Meow~ Hi there! I'm \(pet.name), so glad to see you 😊 How are you feeling today?"
+        let welcome = L10n.t(
+            "Meow~ Hi there! I'm \(pet.name), so glad to see you 😊 How are you feeling today?",
+            "喵~ 你好！我是\(pet.name)，很高兴见到你 😊 今天心情怎么样？"
+        )
         let msg = ChatMessage(text: welcome, isFromUser: false)
         modelContext.insert(msg)
         try? modelContext.save()

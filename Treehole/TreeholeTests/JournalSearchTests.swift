@@ -10,27 +10,24 @@ import Foundation
 @Suite("Journal Search Tests")
 struct JournalSearchTests {
 
-    // Helper: apply the same filter logic as JournalView.filteredEntries
+    // These tests run against the REAL production filter (JournalSearch.filter,
+    // called by JournalView.filteredEntries) — never a hand-copied duplicate.
     private func filter(entries: [JournalEntry], query: String) -> [JournalEntry] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return entries }
-        let lowered = trimmed.lowercased()
-        return entries.filter { entry in
-            entry.text.lowercased().contains(lowered) ||
-            (entry.title?.lowercased().contains(lowered) ?? false) ||
-            (entry.audioTranscript?.lowercased().contains(lowered) ?? false) ||
-            (entry.locationName?.lowercased().contains(lowered) ?? false)
-        }
+        JournalSearch.filter(entries, query: query)
     }
 
     private func makeEntry(text: String = "",
                            title: String? = nil,
                            transcript: String? = nil,
-                           location: String? = nil) -> JournalEntry {
+                           location: String? = nil,
+                           createdAt: Date = Date(),
+                           entryDate: Date? = nil) -> JournalEntry {
         let entry = JournalEntry(moodTag: .calm, text: text)
         entry.title = title
         entry.audioTranscript = transcript
         entry.locationName = location
+        entry.createdAt = createdAt
+        entry.entryDate = entryDate
         return entry
     }
 
@@ -147,5 +144,38 @@ struct JournalSearchTests {
         ]
         let results = filter(entries: entries, query: "xyzzy")
         #expect(results.isEmpty)
+    }
+
+    // MARK: - Ordering (descending displayDate, like the journal list)
+
+    @Test func testResultsSortedByDisplayDateDescending() {
+        let now = Date()
+        let entries = [
+            makeEntry(text: "oldest", createdAt: now.addingTimeInterval(-3 * 86400)),
+            makeEntry(text: "newest", createdAt: now),
+            makeEntry(text: "middle", createdAt: now.addingTimeInterval(-1 * 86400)),
+        ]
+        let results = filter(entries: entries, query: "")
+        #expect(results.map(\.text) == ["newest", "middle", "oldest"])
+    }
+
+    @Test func testFilteredResultsKeepDescendingOrder() {
+        let now = Date()
+        let entries = [
+            makeEntry(text: "match old", createdAt: now.addingTimeInterval(-2 * 86400)),
+            makeEntry(text: "no hit", createdAt: now.addingTimeInterval(-1 * 86400)),
+            makeEntry(text: "match new", createdAt: now),
+        ]
+        let results = filter(entries: entries, query: "match")
+        #expect(results.map(\.text) == ["match new", "match old"])
+    }
+
+    @Test func testSortUsesEntryDateOverCreatedAt() {
+        let now = Date()
+        // Backdated event: written today but about last week — displayDate wins.
+        let backdated = makeEntry(text: "backdated", createdAt: now, entryDate: now.addingTimeInterval(-7 * 86400))
+        let yesterday = makeEntry(text: "yesterday", createdAt: now.addingTimeInterval(-1 * 86400))
+        let results = filter(entries: [backdated, yesterday], query: "")
+        #expect(results.map(\.text) == ["yesterday", "backdated"])
     }
 }

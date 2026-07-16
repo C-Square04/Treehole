@@ -210,15 +210,12 @@ struct PetHomeView: View {
     }
 
     private func hungerDescription(pet: Pet, lang: String) -> String {
-        if lang == "zh-Hans" {
-            switch pet.hungerLevel {
-            case 75...100: return "满足"
-            case 50..<75: return "还好"
-            case 25..<50: return "饥饿"
-            default: return "极度饥饿"
-            }
+        switch pet.hungerLevel {
+        case 75...100: return L10n.t("Satisfied", "满足")
+        case 50..<75: return L10n.t("Content", "还好")
+        case 25..<50: return L10n.t("Hungry", "饥饿")
+        default: return L10n.t("Starving", "极度饥饿")
         }
-        return pet.hungerDescription
     }
 
     private func showFeedback(_ text: String) {

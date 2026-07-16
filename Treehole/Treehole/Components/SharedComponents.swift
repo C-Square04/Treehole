@@ -162,11 +162,23 @@ private struct MoodSliderView: View {
     /// Continuous slider position. Single source of truth so the slider
     /// remains 100% smooth — we only mirror to the external bindings on commit.
     @State private var sliderValue: Double = 0
-    @State private var didInitFromBinding: Bool = false
+    /// True only while the user is actively touching the slider. Programmatic
+    /// syncs (onAppear, parent populating an existing entry) must NOT commit:
+    /// committing would rewrite an old entry's moodTag via the valence-only
+    /// mapping and wipe its 2D arousal just by opening the editor.
+    @State private var isUserDragging: Bool = false
+    /// True once the user has moved the slider in this session.
+    @State private var hasUserMoved: Bool = false
 
     /// The mood whose valence is closest to the current slider value.
     private var nearestMood: MoodTag {
         MoodTag.nearestByValence(sliderValue)
+    }
+
+    /// Until the user moves the slider, show the entry's actual mood — the
+    /// valence-only remap can differ from a stored tag (e.g. angry vs sad).
+    private var displayedMood: MoodTag {
+        hasUserMoved ? nearestMood : selectedMood
     }
 
     var body: some View {
@@ -186,25 +198,32 @@ private struct MoodSliderView: View {
                 Circle()
                     .fill(TreeholeTheme.softPurple.opacity(0.18))
                     .frame(width: 64, height: 64)
-                Text(nearestMood.emoji)
+                Text(displayedMood.emoji)
                     .font(.system(size: 36))
                     .contentTransition(.opacity)
-                    .animation(.easeInOut(duration: 0.15), value: nearestMood)
+                    .animation(.easeInOut(duration: 0.15), value: displayedMood)
             }
             .frame(height: 130)
 
-            Text(L10n.t(nearestMood.labelEN, nearestMood.labelZH))
+            Text(L10n.t(displayedMood.labelEN, displayedMood.labelZH))
                 .font(.headline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
                 .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.15), value: nearestMood)
+                .animation(.easeInOut(duration: 0.15), value: displayedMood)
 
             // The slider itself — Apple Slider tracks the finger natively
             // and works correctly inside ScrollViews (no gesture conflict).
             VStack(spacing: 4) {
-                Slider(value: $sliderValue, in: -1.0...1.0)
-                    .tint(TreeholeTheme.softPurple)
-                    .padding(.horizontal, TreeholeTheme.spacingSmall)
+                Slider(value: $sliderValue, in: -1.0...1.0) { editing in
+                    isUserDragging = editing
+                    // Commit the final position on drag end — but a touch that
+                    // never moved the thumb must not rewrite the stored mood.
+                    if !editing && hasUserMoved {
+                        commit(sliderValue)
+                    }
+                }
+                .tint(TreeholeTheme.softPurple)
+                .padding(.horizontal, TreeholeTheme.spacingSmall)
 
                 HStack {
                     Text(L10n.t("VERY UNPLEASANT", "非常不愉快"))
@@ -222,19 +241,36 @@ private struct MoodSliderView: View {
         .padding(.horizontal, TreeholeTheme.spacingSmall)
         .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
-        .onAppear {
-            // Initialize from existing custom valence or the selected mood's default.
-            if !didInitFromBinding {
-                sliderValue = customValence ?? selectedMood.defaultValence
-                didInitFromBinding = true
-            }
+        .onAppear { syncFromBindings() }
+        // The parent editor's populateFromExisting() can run AFTER this child's
+        // onAppear — re-sync when the bindings change so the slider reflects
+        // the entry's real mood instead of the placeholder default.
+        .onChange(of: customValence) { _, _ in
+            if !isUserDragging { syncFromBindings() }
+        }
+        .onChange(of: selectedMood) { _, _ in
+            if !isUserDragging { syncFromBindings() }
         }
         .onChange(of: sliderValue) { _, newValue in
-            // Commit on every change — no gesture state to manage, no race.
-            customValence = newValue
-            customArousal = nil  // Slider only controls valence
-            selectedMood = MoodTag.nearestByValence(newValue)
+            // Commit only while the user is touching the slider — programmatic
+            // syncs must never rewrite the entry's stored mood.
+            guard isUserDragging else { return }
+            commit(newValue)
         }
+    }
+
+    /// Mirror the current slider position into the external bindings.
+    /// Only ever called for user-initiated changes.
+    private func commit(_ value: Double) {
+        hasUserMoved = true
+        customValence = value
+        customArousal = nil  // Slider only controls valence
+        selectedMood = MoodTag.nearestByValence(value)
+    }
+
+    /// Pull the slider position from the bindings without committing.
+    private func syncFromBindings() {
+        sliderValue = customValence ?? selectedMood.defaultValence
     }
 }
 

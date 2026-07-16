@@ -84,7 +84,10 @@ struct CartoonCatView: View {
         .scaleEffect(showFeedingAnimation ? 1.1 : breatheScale)
         .onAppear { if !reduceMotion { startAnimations() } }
         .onDisappear { blinkTimer?.invalidate(); blinkTimer = nil }
-        .accessibilityLabel("Your pet companion, feeling \(mood.labelEN)")
+        .accessibilityLabel(L10n.t(
+            "Your pet companion, feeling \(mood.labelEN)",
+            "你的宠物伙伴，现在感觉\(mood.labelZH)"
+        ))
     }
 
     private var catFurGradient: LinearGradient {

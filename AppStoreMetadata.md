@@ -25,9 +25,10 @@ While you process your emotions, your virtual pet and plants grow alongside you.
 • Virtual pet companion that responds to your daily care
 • Plant growing system that rewards consistent check-ins
 • Mood tracking to reflect on your emotional journey
+• Release feelings as drift-bottle clouds — strangers can send a breeze, a hug, or starlight
 • Bilingual support: English & 中文
-• 100% local storage — your data never leaves your device
-• No ads, no tracking, no third-party services
+• Your journal stays private: on your device and in your personal iCloud — never on our servers
+• No ads, no tracking — only what you choose to share as a cloud is ever posted
 
 Your thoughts are yours alone. Treehole keeps them that way.
 
@@ -42,7 +43,7 @@ Your safe space for thoughts and feelings. Feed your pet, grow your plants, writ
 4+
 
 ### Bundle ID
-com.Toki.Treehole
+com.csquare04.Treehole
 
 ### Developer
 Jimmy Chen & Kayli Cheung / Toki Studio
@@ -72,9 +73,10 @@ Jimmy Chen & Kayli Cheung / Toki Studio
 • 虚拟宠物陪伴，随日常互动成长
 • 植物养成系统，坚持打卡获得奖励
 • 情绪追踪，回顾自己的心情历程
+• 把心情放进漂流瓶云朵，陌生人可以送你微风、拥抱或星光
 • 双语支持：English & 中文
-• 100% 本地存储，数据永不离开你的设备
-• 无广告、无追踪、无第三方服务
+• 日记完全私密：只保存在你的设备和个人 iCloud 中，绝不上传到我们的服务器
+• 无广告、无追踪——只有你主动分享的云朵才会被发布
 
 你的心事，只属于你。树洞守护着这份秘密。
 
@@ -84,16 +86,22 @@ Jimmy Chen & Kayli Cheung / Toki Studio
 
 | Data Type | Collected | Linked to Identity | Used for Tracking |
 |-----------|-----------|-------------------|-------------------|
-| No data collected | — | — | — |
+| User Content (cloud posts, comments — only what the user chooses to share) | Yes | No (pseudonymous alias + device ID) | No |
+| Identifiers (random device ID; Apple user ID if signed in) | Yes | No | No |
+| Usage Data (anonymous feature analytics — event names and categorical metadata only, never content text) | Yes | No | No |
 
-All data is stored locally on-device. No data is collected or transmitted.
+Journal entries, photos, voice notes, pet, and plant data are stored on-device
+(SwiftData) and synced only to the user's private iCloud (CloudKit) — the
+developer has no access to them.
 
 ---
 
 ## Review Notes (for App Review team)
 
-- All content is stored locally using SwiftData; no network requests are made.
-- Push notifications are local only (UNUserNotificationCenter), triggered by on-device schedules. No remote notification server is used.
-- The app does not require an account to use. A guest alias is auto-generated on first launch.
-- No third-party SDKs, analytics, or advertising frameworks are integrated.
+- Private data (journal, pet, plants, economy) is stored on-device with SwiftData and synced to the user's private CloudKit database. The developer cannot read it.
+- The anonymous social feature ("clouds") posts user-chosen text to a Supabase backend. Content passes 3-layer moderation: client keyword check, server-side AI moderation (MiniMax via Supabase Edge Functions), and a database trigger.
+- AI features (NPC replies, pet chat, opt-in journal summaries) call Supabase Edge Functions which proxy to MiniMax; no user identity is attached to these requests.
+- Anonymous usage analytics are sent to the developer's Supabase database: event names and categorical metadata only, never journal or post text.
+- Notifications are local only (UNUserNotificationCenter); no remote push server is used.
+- The app does not require an account. A guest alias is auto-generated on first launch; Sign in with Apple is optional (enables cross-device post ownership).
 - Test account: Not required — tap "Continue as Guest" on the welcome screen.

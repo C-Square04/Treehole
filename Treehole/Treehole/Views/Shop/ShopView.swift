@@ -127,8 +127,6 @@ private struct TasksPanel: View {
     let challenges: [WeeklyChallenge]
     let viewModel: EconomyViewModel
 
-    @State private var loginBonusClaimed = false
-
     private var todayTasks: [DailyTask] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -145,21 +143,11 @@ private struct TasksPanel: View {
         }
     }
 
-    private var hasClaimedLoginBonus: Bool {
-        guard let eco = economy else { return true }
-        guard let lastLogin = eco.lastLoginDate else { return false }
-        return Calendar.current.isDateInToday(lastLogin) && loginBonusClaimed
-    }
-
     var body: some View {
         VStack(spacing: TreeholeTheme.spacingMedium) {
             // Login streak card
             if let eco = economy {
-                LoginStreakCard(
-                    economy: eco,
-                    loginBonusClaimed: $loginBonusClaimed,
-                    modelContext: modelContext
-                )
+                LoginStreakCard(economy: eco, modelContext: modelContext)
             }
 
             // Daily task cards
@@ -332,14 +320,11 @@ private struct WeeklyChallengeCard: View {
 
 private struct LoginStreakCard: View {
     let economy: Economy
-    @Binding var loginBonusClaimed: Bool
     let modelContext: ModelContext
 
     private var alreadyClaimed: Bool {
-        guard let lastLogin = economy.lastLoginDate else { return false }
-        // If last login is today AND we've been through checkLoginStreak, bonus was already given
-        // We use loginBonusClaimed local state to track this session's claim
-        return loginBonusClaimed
+        // Persisted on the Economy model — survives tab switches and relaunch
+        economy.hasClaimedLoginBonusToday
     }
 
     private var bonusAmount: Int {
@@ -372,9 +357,9 @@ private struct LoginStreakCard: View {
                     .background(Color.green.opacity(0.25), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
             } else {
                 Button {
-                    economy.grantLoginBonus()
-                    loginBonusClaimed = true
-                    try? modelContext.save()
+                    if economy.grantLoginBonus() {
+                        try? modelContext.save()
+                    }
                 } label: {
                     Text("+\(bonusAmount) 🍖")
                         .font(.subheadline.bold())
@@ -424,7 +409,7 @@ private struct TaskCard: View {
 
             // Title and rewards
             VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
+                Text(task.localizedTitle)
                     .font(.subheadline.bold())
                     .foregroundStyle(task.isCompleted ? TreeholeTheme.textLight : TreeholeTheme.textPrimary)
 

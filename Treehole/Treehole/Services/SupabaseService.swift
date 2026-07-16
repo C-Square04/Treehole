@@ -26,6 +26,30 @@ enum SupabaseConfig {
     }
 }
 
+// MARK: - Timestamp Parsing
+
+// Postgres omits the fractional part of created_at when microseconds are
+// exactly zero, so timestamps arrive both with and without fractional
+// seconds and both shapes must parse. Formatters are cached — allocating an
+// ISO8601DateFormatter per row is wasteful when decoding a feed page.
+enum SupabaseTimestamp {
+    private static let fractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static func parse(_ string: String) -> Date? {
+        fractional.date(from: string) ?? plain.date(from: string)
+    }
+}
+
 // MARK: - Remote Cloud Post (JSON DTO)
 
 struct RemoteCloudPost: Codable, Identifiable {
@@ -65,9 +89,9 @@ struct RemoteCloudPost: Codable, Identifiable {
     }
 
     var date: Date {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: createdAt) ?? Date()
+        // .distantPast (not Date()) so a parse failure is visible instead of
+        // silently rendering an old post as "just now".
+        SupabaseTimestamp.parse(createdAt) ?? .distantPast
     }
 }
 
@@ -132,7 +156,9 @@ enum SupabaseService {
                 if statusCode >= 300 && statusCode < 400 {
                     // Log redirect details
                     let body = String(data: data, encoding: .utf8) ?? "nil"
+                    #if DEBUG
                     print("[API] fetchPosts: REDIRECT \(statusCode) body=\(body.prefix(200))")
+                    #endif
                 }
 
                 if (200..<300).contains(statusCode) {
@@ -143,7 +169,9 @@ enum SupabaseService {
                     } catch {
                         print("[API] fetchPosts: DECODE ERROR: \(error)")
                         let body = String(data: data, encoding: .utf8) ?? "nil"
+                        #if DEBUG
                         print("[API] fetchPosts: raw body=\(body.prefix(300))")
+                        #endif
                         lastError = error
                     }
                 } else {
@@ -188,7 +216,9 @@ enum SupabaseService {
 
         guard let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8)
+            #if DEBUG
             print("[API] createPost: ERROR body=\(errorBody ?? "nil")")
+            #endif
             if let errorBody, let errorData = errorBody.data(using: .utf8),
                let errorJson = try? JSONDecoder().decode(SupabaseErrorBody.self, from: errorData) {
                 throw SupabaseError.serverError(statusCode, errorJson.userMessage)
@@ -218,7 +248,10 @@ enum SupabaseService {
         if let appleId = SupabaseConfig.appleUserID {
             request.addValue(appleId, forHTTPHeaderField: "x-apple-user-id")
         }
-        request.addValue("return=minimal", forHTTPHeaderField: "Prefer")
+        // return=representation: PostgREST answers 2xx even when the filter/RLS
+        // matched zero rows, so the deleted rows must come back to verify the
+        // delete actually happened.
+        request.addValue("return=representation", forHTTPHeaderField: "Prefer")
 
         print("[API] deletePost id=\(id)")
         let (data, response) = try await session.data(for: request)
@@ -226,8 +259,15 @@ enum SupabaseService {
         print("[API] deletePost status=\(statusCode)")
         guard (200...204).contains(statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? "nil"
+            #if DEBUG
             print("[API] deletePost ERROR body=\(body)")
+            #endif
             throw SupabaseError.serverError(statusCode, nil)
+        }
+        let deletedRows = (try? JSONSerialization.jsonObject(with: data)) as? [Any] ?? []
+        guard !deletedRows.isEmpty else {
+            print("[API] deletePost: no rows deleted (RLS refused or post gone)")
+            throw SupabaseError.serverError(nil, L10n.t("This cloud could not be deleted.", "无法删除这朵云。"))
         }
     }
 
@@ -364,7 +404,9 @@ enum SupabaseService {
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
         let body = String(data: data, encoding: .utf8) ?? "nil"
+        #if DEBUG
         print("[API] fetchRandomPost: status=\(statusCode) bytes=\(data.count) body=\(body.prefix(200))")
+        #endif
         guard (200...204).contains(statusCode) else {
             throw SupabaseError.serverError(statusCode, nil)
         }
@@ -500,7 +542,9 @@ enum SupabaseService {
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
         let body = String(data: data, encoding: .utf8) ?? "nil"
+        #if DEBUG
         print("[API] deleteAllMyPosts: status=\(statusCode) body=\(body)")
+        #endif
         guard (200...204).contains(statusCode) else {
             throw SupabaseError.serverError(statusCode, nil)
         }
@@ -509,6 +553,33 @@ enum SupabaseService {
             return count
         }
         return 0
+    }
+
+    // MARK: - Bulk delete own comments and reactions (account deletion)
+    //
+    // Best effort: removes the rows this device left on OTHER people's posts.
+    // Uses the same x-device-id header contract as deleteComment, so the RLS
+    // policy scopes the delete to rows owned by this device.
+    static func deleteAllMyCommentsAndReactions() async {
+        for table in ["cloud_comments", "cloud_reactions"] {
+            let urlString = "\(SupabaseConfig.restURL)/\(table)?device_id=eq.\(SupabaseConfig.deviceId)"
+            guard let url = URL(string: urlString) else { continue }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "DELETE"
+            request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+            request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+            request.addValue(SupabaseConfig.deviceId, forHTTPHeaderField: "x-device-id")
+            request.addValue("return=minimal", forHTTPHeaderField: "Prefer")
+
+            do {
+                let (_, response) = try await session.data(for: request)
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                print("[API] deleteAllMy \(table): status=\(statusCode)")
+            } catch {
+                print("[API] deleteAllMy \(table) failed: \(error)")
+            }
+        }
     }
 
     // MARK: - Fetch own posts
@@ -815,9 +886,9 @@ struct RemoteComment: Codable, Identifiable {
     }
 
     var date: Date {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: createdAt) ?? Date()
+        // .distantPast (not Date()) so a parse failure is visible instead of
+        // silently rendering an old comment as "just now".
+        SupabaseTimestamp.parse(createdAt) ?? .distantPast
     }
 }
 
@@ -938,11 +1009,13 @@ enum SupabaseError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidURL: "Invalid URL"
+        case .invalidURL: L10n.t("Invalid URL", "无效的链接")
         case .serverError(let code, let detail):
-            if let code { "Server error (\(code))\(detail.map { ": \($0)" } ?? "")" }
-            else { "Server error" }
-        case .noData: "No data returned"
+            if let code { L10n.t("Server error (\(code))", "服务器错误（\(code)）") + (detail.map { ": \($0)" } ?? "") }
+            // Detail without a code is already a user-facing localized message.
+            else if let detail { detail }
+            else { L10n.t("Server error", "服务器错误") }
+        case .noData: L10n.t("No data returned", "未返回数据")
         case .moderation(let reason): reason
         }
     }

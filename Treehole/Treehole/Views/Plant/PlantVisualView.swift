@@ -37,7 +37,10 @@ struct PlantVisualView: View {
                 isGrowing = true
             }
         }
-        .accessibilityLabel("Plant at \(growthStage.labelEN) stage, hydration \(hydrationLevel)%")
+        .accessibilityLabel(L10n.t(
+            "Plant at \(growthStage.labelEN) stage, hydration \(hydrationLevel)%",
+            "植物处于\(growthStage.labelZH)阶段，水分\(hydrationLevel)%"
+        ))
     }
 }
 

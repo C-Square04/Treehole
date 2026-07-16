@@ -149,7 +149,8 @@ struct MyCloudsView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                // .swipeActions only works inside a List — use a context menu on the card instead
+                .contextMenu {
                     Button(role: .destructive) {
                         postToDelete = post
                         showDeleteConfirmation = true

@@ -18,6 +18,7 @@ struct PlantGardenView: View {
     @State private var plantToDelete: Plant?
     @State private var showDeleteConfirm = false
     @State private var economyVM = EconomyViewModel()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let maxPlants = 5
 
@@ -60,6 +61,7 @@ struct PlantGardenView: View {
                             .font(.title3)
                     }
                     .disabled(plants.count >= maxPlants)
+                    .accessibilityLabel(L10n.t("Add plant", "添加植物"))
                 }
             }
             .sheet(isPresented: $showAddSheet) {
@@ -124,8 +126,12 @@ struct PlantGardenView: View {
                         plant: plant,
                         isSelected: plant.id == (selectedPlant?.id ?? plants.first?.id)
                     ) {
-                        withAnimation(.spring(response: 0.3)) {
+                        if reduceMotion {
                             selectedPlantID = plant.id
+                        } else {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedPlantID = plant.id
+                            }
                         }
                     } onDelete: {
                         plantToDelete = plant
@@ -279,11 +285,20 @@ struct PlantGardenView: View {
     }
 
     private func showFeedback(_ text: String) {
-        withAnimation(.spring(response: 0.3)) {
+        // Reduce Motion: swap the spring/move transition for a plain state change
+        if reduceMotion {
             feedbackText = text
+        } else {
+            withAnimation(.spring(response: 0.3)) {
+                feedbackText = text
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation { feedbackText = nil }
+            if reduceMotion {
+                feedbackText = nil
+            } else {
+                withAnimation { feedbackText = nil }
+            }
         }
     }
 }
@@ -325,6 +340,8 @@ private struct PlantThumbnailButton: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(plant.name)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .contextMenu {
             Button(role: .destructive) {
                 onDelete()
@@ -398,6 +415,8 @@ private struct AddPlantSheet: View {
                                             }
                                         }
                                         .buttonStyle(.plain)
+                                        .accessibilityLabel(lang == "zh-Hans" ? species.labelZH : species.labelEN)
+                                        .accessibilityAddTraits(selectedSpecies == species ? [.isSelected] : [])
                                     }
                                 }
                                 .padding(.horizontal)

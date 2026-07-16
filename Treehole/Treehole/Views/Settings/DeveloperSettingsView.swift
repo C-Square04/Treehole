@@ -58,6 +58,7 @@ struct DeveloperSettingsView: View {
                         }
                         Slider(value: $petHunger, in: 0...100, step: 1)
                             .tint(.orange)
+                            .accessibilityLabel(L10n.t("Hunger", "饥饿"))
                             .onChange(of: petHunger) { _, newValue in
                                 pet.hungerLevel = Int(newValue)
                                 trySave()
@@ -74,6 +75,7 @@ struct DeveloperSettingsView: View {
                         }
                         Slider(value: $petEnergy, in: 0...100, step: 1)
                             .tint(.blue)
+                            .accessibilityLabel(L10n.t("Energy", "能量"))
                             .onChange(of: petEnergy) { _, newValue in
                                 pet.energy = Int(newValue)
                                 trySave()
@@ -119,6 +121,7 @@ struct DeveloperSettingsView: View {
                         }
                         Slider(value: $plantHydration, in: 0...100, step: 1)
                             .tint(.cyan)
+                            .accessibilityLabel(L10n.t("Hydration", "水分"))
                             .onChange(of: plantHydration) { _, newValue in
                                 plant.hydrationLevel = Int(newValue)
                                 trySave()

@@ -136,6 +136,8 @@ struct CloudPostListView: View {
                         .disabled(isGrabbing)
                         .glassCard()
                         .padding(.horizontal)
+                        .accessibilityLabel(L10n.t("Grab a Cloud", "抓一朵云"))
+                        .accessibilityHint(L10n.t("Shows a cloud from a stranger", "显示一朵来自陌生人的云"))
 
                         // Secondary: Send a Cloud button
                         Button {
@@ -154,6 +156,8 @@ struct CloudPostListView: View {
                         }
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
                         .padding(.horizontal)
+                        .accessibilityLabel(L10n.t("Send a Cloud", "放飞一朵云"))
+                        .accessibilityHint(L10n.t("Opens the cloud composer", "打开云朵编辑器"))
 
                         // Error display
                         if let error = grabError {
@@ -198,6 +202,7 @@ struct CloudPostListView: View {
                             .font(.title3)
                             .foregroundStyle(TreeholeTheme.coral)
                     }
+                    .accessibilityLabel(L10n.t("Send a Cloud", "放飞一朵云"))
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -215,6 +220,7 @@ struct CloudPostListView: View {
                             }
                         }
                     }
+                    .accessibilityLabel(L10n.t("My Clouds", "我的云朵"))
                 }
             }
             .navigationDestination(isPresented: $showMyClouds) {
@@ -257,7 +263,17 @@ struct CloudPostListView: View {
         isGrabbing = true
         grabError = nil
         do {
-            if let post = try await SupabaseService.fetchRandomPost() {
+            // The random pick can land on a reported/blocked post — retry a few
+            // times before giving up so hidden content never reaches the screen
+            var post: RemoteCloudPost? = nil
+            for _ in 0..<3 {
+                guard let candidate = try await SupabaseService.fetchRandomPost() else { break }
+                if !HiddenPostsStore.shared.isHidden(candidate) {
+                    post = candidate
+                    break
+                }
+            }
+            if let post {
                 if horizontalSizeClass == .regular {
                     selectedPost = post
                 } else {
@@ -349,6 +365,7 @@ private struct OwnCloudCard: View {
                     .foregroundStyle(TreeholeTheme.textLight)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(L10n.t("Delete cloud", "删除云朵"))
         }
         .padding(TreeholeTheme.spacingSmall)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
@@ -377,6 +394,10 @@ struct GrabbedCloudView: View {
     @State private var isPostingComment: Bool = false
     @State private var commentError: String? = nil
     @State private var isGrabbingAnother: Bool = false
+
+    // UGC moderation (App Review guideline 1.2)
+    @State private var showReportDialog = false
+    @State private var moderationConfirmation: String? = nil
 
     // Reactions
     @State private var reactionCounts: ReactionCounts? = nil
@@ -532,6 +553,7 @@ struct GrabbedCloudView: View {
                                         }
                                     }
                                     .disabled(commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPostingComment)
+                                    .accessibilityLabel(L10n.t("Send comment", "发送评论"))
                                 }
                                 .padding(TreeholeTheme.spacingSmall)
                                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
@@ -560,6 +582,8 @@ struct GrabbedCloudView: View {
                                 }
                                 .disabled(isGrabbingAnother)
                                 .glassCard()
+                                .accessibilityLabel(L10n.t("Grab Another Cloud", "再抓一朵云"))
+                                .accessibilityHint(L10n.t("Shows a different cloud from a stranger", "显示另一朵来自陌生人的云"))
                             }
 
                             Spacer(minLength: TreeholeTheme.spacingXL)
@@ -575,6 +599,21 @@ struct GrabbedCloudView: View {
                     showHugEffect: showHugEffect,
                     showStarlightEffect: showStarlightEffect
                 )
+
+                // Moderation confirmation banner (auto-dismisses the view shortly after)
+                if let confirmation = moderationConfirmation {
+                    VStack {
+                        Text(confirmation)
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, TreeholeTheme.spacingSmall)
+                            .padding(.vertical, 6)
+                            .background(TreeholeTheme.softPurple.opacity(0.9), in: Capsule())
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
             .navigationTitle(L10n.t("A Cloud from...", "一朵来自...的云"))
             .navigationBarTitleDisplayMode(.inline)
@@ -586,6 +625,41 @@ struct GrabbedCloudView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(TreeholeTheme.textLight)
                     }
+                    .accessibilityLabel(L10n.t("Close", "关闭"))
+                }
+                if let currentPost = post, !currentPost.isOwn {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Button {
+                                showReportDialog = true
+                            } label: {
+                                Label(L10n.t("Report Cloud", "举报云朵"), systemImage: "flag")
+                            }
+                            Button(role: .destructive) {
+                                blockAuthor(currentPost)
+                            } label: {
+                                Label(L10n.t("Hide Clouds from This Author", "隐藏此作者的云朵"), systemImage: "hand.raised")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(TreeholeTheme.textLight)
+                        }
+                        .accessibilityLabel(L10n.t("More options", "更多选项"))
+                        .accessibilityHint(L10n.t("Report this cloud or hide its author", "举报这朵云或隐藏其作者"))
+                    }
+                }
+            }
+            .confirmationDialog(
+                L10n.t("Why are you reporting this cloud?", "你为什么要举报这朵云？"),
+                isPresented: $showReportDialog,
+                titleVisibility: .visible
+            ) {
+                ForEach(CloudReportReason.allCases, id: \.rawValue) { reason in
+                    Button(reason.label) {
+                        if let currentPost = post {
+                            reportPost(currentPost, reason: reason)
+                        }
+                    }
                 }
             }
             .task(id: post?.id) {
@@ -596,20 +670,54 @@ struct GrabbedCloudView: View {
         }
     }
 
+    // MARK: - Moderation
+
+    private func reportPost(_ currentPost: RemoteCloudPost, reason: CloudReportReason) {
+        // Best-effort server report; local hide never waits on the network
+        Task { await SupabaseService.reportPost(id: currentPost.id, reason: reason.rawValue) }
+        HiddenPostsStore.shared.hidePost(id: currentPost.id)
+        confirmAndDismiss(L10n.t("Thanks — this cloud is hidden for you.", "谢谢 — 这朵云已为你隐藏。"))
+        AnalyticsService.track("cloud_reported", properties: ["reason": reason.rawValue])
+    }
+
+    private func blockAuthor(_ currentPost: RemoteCloudPost) {
+        HiddenPostsStore.shared.blockAuthor(deviceId: currentPost.deviceId)
+        confirmAndDismiss(L10n.t("Clouds from this author are now hidden for you.", "已为你隐藏此作者的云朵。"))
+        AnalyticsService.track("cloud_author_blocked")
+    }
+
+    private func confirmAndDismiss(_ message: String) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            moderationConfirmation = message
+        }
+        // Brief beat so the confirmation is readable before the view goes away.
+        // Clearing the binding also empties the iPad detail pane, where dismiss()
+        // is a no-op; in the sheet presentation dismiss() closes it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            post = nil
+            dismiss()
+        }
+    }
+
     // MARK: - Actions
 
     private func grabAnother() async {
         isGrabbingAnother = true
         do {
             // A small pool can return the current post again — .task(id:) wouldn't re-fire,
-            // so resetting state here would leave comments/reactions cleared permanently
-            if let newPost = try await SupabaseService.fetchRandomPost(), newPost.id != post?.id {
-                // Reset state before updating post so .task(id:) fires fresh
-                comments = []
-                commentText = ""
-                reactionCounts = nil
-                myReactions = []
-                post = newPost
+            // so resetting state here would leave comments/reactions cleared permanently.
+            // Hidden/blocked posts are skipped the same way (retry, keep the current one).
+            for _ in 0..<3 {
+                guard let newPost = try await SupabaseService.fetchRandomPost() else { break }
+                if newPost.id != post?.id && !HiddenPostsStore.shared.isHidden(newPost) {
+                    // Reset state before updating post so .task(id:) fires fresh
+                    comments = []
+                    commentText = ""
+                    reactionCounts = nil
+                    myReactions = []
+                    post = newPost
+                    break
+                }
             }
         } catch {
             // Silently ignore — user can try again

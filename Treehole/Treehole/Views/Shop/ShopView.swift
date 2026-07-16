@@ -115,6 +115,9 @@ private struct CurrencyItem: View {
                 .foregroundStyle(TreeholeTheme.textSecondary)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(value)")
     }
 }
 
@@ -313,6 +316,7 @@ private struct WeeklyChallengeCard: View {
         .padding(TreeholeTheme.spacingMedium)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
         .opacity(challenge.isCompleted ? 0.75 : 1.0)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -444,6 +448,7 @@ private struct TaskCard: View {
         .padding(TreeholeTheme.spacingMedium)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))
         .opacity(task.isCompleted ? 0.7 : 1.0)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -592,6 +597,10 @@ private struct FoodPackCard: View {
                 .buttonStyle(.borderedProminent)
                 .tint(canAfford ? TreeholeTheme.coral : TreeholeTheme.textLight)
                 .disabled(!canAfford)
+                .accessibilityLabel(L10n.t(
+                    "Buy \(name) for \(tokenCost) tokens",
+                    "用 \(tokenCost) 个装饰币购买\(name)"
+                ))
             }
         }
         .glassCard()

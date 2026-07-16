@@ -47,17 +47,21 @@ struct MoodStatsView: View {
     private let cal = Calendar.current
 
     var body: some View {
+        // All derived data in ONE pass — the sections previously each ran
+        // their own full scan (5+ per body evaluation, re-run for every
+        // frame of the period-switch animation).
+        let stats = makeStats()
         ZStack {
             TreeholeTheme.warmBackground.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: TreeholeTheme.spacingLarge) {
-                    placesMapSection
+                    placesMapSection(located: stats.located)
                     periodPickerSection
                     subPeriodScroller
-                    calendarSection
-                    distributionSection
-                    streakSection
+                    calendarSection(stats: stats)
+                    distributionSection(counts: stats.moodCounts)
+                    streakSection(streaks: stats.streaks)
                 }
                 .padding(.horizontal, TreeholeTheme.spacingMedium)
                 .padding(.vertical, TreeholeTheme.spacingSmall)
@@ -69,12 +73,8 @@ struct MoodStatsView: View {
 
     // MARK: - Places Map Section
 
-    private var entriesWithLocation: [JournalEntry] {
-        allEntries.filter { $0.latitude != nil && $0.longitude != nil }
-    }
-
     @ViewBuilder
-    private var placesMapSection: some View {
+    private func placesMapSection(located: [JournalEntry]) -> some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
             HStack {
                 Image(systemName: "map.fill")
@@ -84,7 +84,6 @@ struct MoodStatsView: View {
                     .foregroundStyle(TreeholeTheme.textPrimary)
             }
 
-            let located = entriesWithLocation
             if located.isEmpty {
                 Text(L10n.t(
                     "Add a location to your next entry to see it here",
@@ -143,6 +142,7 @@ struct MoodStatsView: View {
                                 )
                         }
                         .id(item.id)
+                        .accessibilityAddTraits(isSelected(item.id) ? [.isSelected] : [])
                     }
                 }
                 .padding(.horizontal, TreeholeTheme.spacingMedium)
@@ -187,26 +187,26 @@ struct MoodStatsView: View {
 
     // MARK: - Calendar Section
 
-    private var calendarSection: some View {
+    private func calendarSection(stats: StatsSnapshot) -> some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
             Text(L10n.t("Average Mood", "情绪概览"))
                 .font(.headline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
-            calendarGrid
+            calendarGrid(stats: stats)
         }
         .glassCard()
     }
 
     @ViewBuilder
-    private var calendarGrid: some View {
+    private func calendarGrid(stats: StatsSnapshot) -> some View {
         if selectedPeriod == .year {
-            yearGrid
+            yearGrid(moodByMonth: stats.dominantMoodByMonth)
         } else {
-            dayGrid
+            dayGrid(moodByDay: stats.dominantMoodByDay)
         }
     }
 
-    private var dayGrid: some View {
+    private func dayGrid(moodByDay: [Date: MoodTag]) -> some View {
         VStack(spacing: 6) {
             // Weekday headers Mon–Sun
             HStack(spacing: 6) {
@@ -218,7 +218,9 @@ struct MoodStatsView: View {
                 }
             }
 
-            let days = buildCalendarDays()
+            let days = selectedPeriod == .week
+                ? buildWeekDays(moodByDay: moodByDay)
+                : buildMonthDays(moodByDay: moodByDay)
             let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(days) { day in
@@ -229,8 +231,8 @@ struct MoodStatsView: View {
     }
 
     /// Year mode: 12 month cells, each showing the month's dominant mood.
-    private var yearGrid: some View {
-        let months = buildYearMonths()
+    private func yearGrid(moodByMonth: [Date: MoodTag]) -> some View {
+        let months = buildYearMonths(moodByMonth: moodByMonth)
         let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
         return LazyVGrid(columns: columns, spacing: TreeholeTheme.spacingSmall) {
             ForEach(months) { month in
@@ -277,6 +279,20 @@ struct MoodStatsView: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cellAccessibilityLabel(day, dateFormat: .dateTime.month(.wide).day()))
+    }
+
+    /// One VoiceOver element per calendar cell: "April 5, Happy" / "April 5, no entry".
+    /// Out-of-period filler cells produce an empty label (skipped by VoiceOver).
+    private func cellAccessibilityLabel(_ day: CalendarDay, dateFormat: Date.FormatStyle) -> String {
+        guard day.isInPeriod, let date = day.date else { return "" }
+        let dateStr = date.formatted(dateFormat)
+        let todayPrefix = day.isToday ? L10n.t("Today, ", "今天，") : ""
+        if let mood = day.mood {
+            return todayPrefix + dateStr + ", " + L10n.t(mood.labelEN, mood.labelZH)
+        }
+        return todayPrefix + dateStr + ", " + L10n.t("no entry", "无日记")
     }
 
     @ViewBuilder
@@ -306,22 +322,13 @@ struct MoodStatsView: View {
             .frame(width: 36, height: 36)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cellAccessibilityLabel(month, dateFormat: .dateTime.month(.wide)))
     }
 
     // MARK: - Calendar Day Building
 
-    private func buildCalendarDays() -> [CalendarDay] {
-        switch selectedPeriod {
-        case .week:
-            return buildWeekDays()
-        case .month:
-            return buildMonthDays()
-        case .year:
-            return buildYearMonths()
-        }
-    }
-
-    private func buildMonthDays() -> [CalendarDay] {
+    private func buildMonthDays(moodByDay: [Date: MoodTag]) -> [CalendarDay] {
         let target = cal.date(byAdding: .month, value: selectedMonthOffset, to: Date()) ?? Date()
         guard
             let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: target)),
@@ -329,7 +336,6 @@ struct MoodStatsView: View {
         else { return [] }
 
         let today = cal.startOfDay(for: Date())
-        let moodMap = moodMapForPeriod
 
         let leading = isoWeekday(monthStart) - 1
         var days: [CalendarDay] = []
@@ -344,7 +350,7 @@ struct MoodStatsView: View {
             days.append(CalendarDay(
                 id: dayNum,
                 date: date,
-                mood: moodMap[dayStart],
+                mood: moodByDay[dayStart],
                 isToday: dayStart == today,
                 isInPeriod: true
             ))
@@ -358,10 +364,9 @@ struct MoodStatsView: View {
         return days
     }
 
-    private func buildWeekDays() -> [CalendarDay] {
+    private func buildWeekDays(moodByDay: [Date: MoodTag]) -> [CalendarDay] {
         let start = weekStart(offset: selectedWeekOffset)
         let today = cal.startOfDay(for: Date())
-        let moodMap = moodMapForPeriod
 
         return (0..<7).map { offset in
             guard let date = cal.date(byAdding: .day, value: offset, to: start) else {
@@ -371,7 +376,7 @@ struct MoodStatsView: View {
             return CalendarDay(
                 id: offset,
                 date: date,
-                mood: moodMap[dayStart],
+                mood: moodByDay[dayStart],
                 isToday: dayStart == today,
                 isInPeriod: true
             )
@@ -380,26 +385,16 @@ struct MoodStatsView: View {
 
     /// One CalendarDay per month of the selected year, mood = dominant mood
     /// across all of that month's entries. Future months are out-of-period.
-    private func buildYearMonths() -> [CalendarDay] {
+    private func buildYearMonths(moodByMonth: [Date: MoodTag]) -> [CalendarDay] {
         let range = currentDateRange
         let currentMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date()))
-
-        var byMonth: [Date: [MoodTag]] = [:]
-        for entry in filteredEntries {
-            guard let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: entry.displayDate)) else { continue }
-            byMonth[monthStart, default: []].append(entry.moodTag)
-        }
-        let dominant = byMonth.mapValues { moods -> MoodTag in
-            let freq = moods.reduce(into: [MoodTag: Int]()) { $0[$1, default: 0] += 1 }
-            return freq.max(by: { $0.value < $1.value })?.key ?? moods[0]
-        }
 
         return (0..<12).compactMap { m in
             guard let monthStart = cal.date(byAdding: .month, value: m, to: range.start) else { return nil }
             return CalendarDay(
                 id: m + 1,
                 date: monthStart,
-                mood: dominant[monthStart],
+                mood: moodByMonth[monthStart],
                 isToday: monthStart == currentMonthStart,
                 isInPeriod: monthStart <= Date()
             )
@@ -408,13 +403,12 @@ struct MoodStatsView: View {
 
     // MARK: - Distribution Section
 
-    private var distributionSection: some View {
+    private func distributionSection(counts: [MoodTag: Int]) -> some View {
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
             Text(L10n.t("Mood Distribution", "情绪分布"))
                 .font(.headline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
 
-            let counts = moodCounts
             let maxCount = counts.values.max() ?? 1
             let sorted = MoodTag.allCases
                 .filter { (counts[$0] ?? 0) > 0 }
@@ -444,9 +438,8 @@ struct MoodStatsView: View {
 
     // MARK: - Streak Section
 
-    private var streakSection: some View {
-        let streaks = calculateStreaks()
-        return VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
+    private func streakSection(streaks: (current: Int, longest: Int)) -> some View {
+        VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
             Text(L10n.t("Writing Streaks", "写作连续天数"))
                 .font(.headline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
@@ -472,9 +465,50 @@ struct MoodStatsView: View {
 
     // MARK: - Data Helpers
 
-    private var filteredEntries: [JournalEntry] {
+    /// Everything the sections derive from the entry list, built in one pass.
+    private struct StatsSnapshot {
+        let located: [JournalEntry]
+        let dominantMoodByDay: [Date: MoodTag]
+        let dominantMoodByMonth: [Date: MoodTag]
+        let moodCounts: [MoodTag: Int]
+        let streaks: (current: Int, longest: Int)
+    }
+
+    private func makeStats() -> StatsSnapshot {
         let range = currentDateRange
-        return allEntries.filter { $0.displayDate >= range.start && $0.displayDate < range.end }
+        var located: [JournalEntry] = []
+        var moodsByDay: [Date: [MoodTag]] = [:]
+        var moodsByMonth: [Date: [MoodTag]] = [:]
+        var counts: [MoodTag: Int] = [:]
+        var entryDays = Set<Date>()
+
+        for entry in allEntries {
+            if entry.latitude != nil && entry.longitude != nil {
+                located.append(entry)
+            }
+            let date = entry.displayDate
+            entryDays.insert(cal.startOfDay(for: date))    // streaks span ALL entries
+            guard date >= range.start && date < range.end else { continue }
+            let mood = entry.moodTag
+            counts[mood, default: 0] += 1
+            moodsByDay[cal.startOfDay(for: date), default: []].append(mood)
+            if let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: date)) {
+                moodsByMonth[monthStart, default: []].append(mood)
+            }
+        }
+
+        return StatsSnapshot(
+            located: located,
+            dominantMoodByDay: moodsByDay.mapValues(Self.dominantMood),
+            dominantMoodByMonth: moodsByMonth.mapValues(Self.dominantMood),
+            moodCounts: counts,
+            streaks: calculateStreaks(entryDays: entryDays)
+        )
+    }
+
+    nonisolated private static func dominantMood(_ moods: [MoodTag]) -> MoodTag {
+        let freq = moods.reduce(into: [MoodTag: Int]()) { $0[$1, default: 0] += 1 }
+        return freq.max(by: { $0.value < $1.value })?.key ?? moods[0]
     }
 
     private var currentDateRange: (start: Date, end: Date) {
@@ -498,23 +532,6 @@ struct MoodStatsView: View {
         }
     }
 
-    /// Map: start-of-day -> dominant MoodTag for the current filtered period
-    private var moodMapForPeriod: [Date: MoodTag] {
-        var dict: [Date: [MoodTag]] = [:]
-        for entry in filteredEntries {
-            let day = cal.startOfDay(for: entry.displayDate)
-            dict[day, default: []].append(entry.moodTag)
-        }
-        return dict.mapValues { moods in
-            let freq = moods.reduce(into: [MoodTag: Int]()) { $0[$1, default: 0] += 1 }
-            return freq.max(by: { $0.value < $1.value })?.key ?? moods[0]
-        }
-    }
-
-    private var moodCounts: [MoodTag: Int] {
-        filteredEntries.reduce(into: [MoodTag: Int]()) { $0[$1.moodTag, default: 0] += 1 }
-    }
-
     private func weekStart(offset: Int) -> Date {
         WeekAnchor.weekStart(offset: offset, calendar: cal)
     }
@@ -524,9 +541,9 @@ struct MoodStatsView: View {
         WeekAnchor.isoWeekday(date, calendar: cal)
     }
 
-    private func calculateStreaks() -> (current: Int, longest: Int) {
+    private func calculateStreaks(entryDays: Set<Date>) -> (current: Int, longest: Int) {
         let today = cal.startOfDay(for: Date())
-        let days = Set(allEntries.map { cal.startOfDay(for: $0.displayDate) }).sorted()
+        let days = entryDays.sorted()
 
         guard !days.isEmpty else { return (0, 0) }
 
@@ -623,6 +640,9 @@ private struct MoodBarRow: View {
                 .foregroundStyle(TreeholeTheme.textSecondary)
                 .frame(width: 24, alignment: .trailing)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.t(mood.labelEN, mood.labelZH))
+        .accessibilityValue(L10n.t("\(count) entries", "\(count) 条日记"))
     }
 }
 
@@ -654,6 +674,7 @@ private struct StreakCard: View {
         .frame(maxWidth: .infinity)
         .padding(TreeholeTheme.spacingSmall)
         .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -731,6 +752,11 @@ private struct PlacesMapView: View {
                             .frame(width: 18, height: 18)
                             .overlay(Circle().stroke(.white, lineWidth: 2))
                             .shadow(radius: 3)
+                            .accessibilityLabel(L10n.t(
+                                "\(entry.moodTag.labelEN) entry, \(entry.formattedDate)",
+                                "\(entry.moodTag.labelZH)日记，\(entry.formattedDate)"
+                            ))
+                            .accessibilityAddTraits(.isButton)
                     }
                     .tag(entry)
                 }

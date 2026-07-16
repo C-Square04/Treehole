@@ -47,6 +47,7 @@ struct JournalDetailView: View {
                     VStack(spacing: TreeholeTheme.spacingTight) {
                         Text(entry.moodTag.emoji)
                             .font(.system(size: 64))
+                            .accessibilityHidden(true)  // moodLabel below carries the meaning
                         Text(moodLabel)
                             .font(.title2.bold())
                             .foregroundStyle(TreeholeTheme.textPrimary)
@@ -133,13 +134,10 @@ struct JournalDetailView: View {
                             let columns = Array(repeating: GridItem(.flexible(), spacing: TreeholeTheme.spacingSmall), count: 3)
                             LazyVGrid(columns: columns, spacing: TreeholeTheme.spacingSmall) {
                                 ForEach(filenames, id: \.self) { filename in
-                                    if let image = PhotoStorage.loadImage(filename) {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(height: 100)
-                                            .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
-                                    }
+                                    AsyncThumbnailView(filename: filename)
+                                        .frame(height: 100)
+                                        .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
+                                        .accessibilityLabel(L10n.t("Journal photo", "日记照片"))
                                 }
                             }
                         }
@@ -169,6 +167,7 @@ struct JournalDetailView: View {
                                         .font(.subheadline)
                                         .foregroundStyle(TreeholeTheme.coral)
                                 }
+                                .accessibilityLabel(L10n.t("Delete voice note", "删除语音备注"))
                             }
 
                             if let audioURL = AudioStorage.loadAudioURL(filename: audioFilename) {
@@ -236,6 +235,9 @@ struct JournalDetailView: View {
                                 mapItem.openInMaps()
                             }
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityHint(L10n.t("Opens the location in Maps", "在地图中打开该位置"))
                     }
 
                     Spacer(minLength: TreeholeTheme.spacingXL)
@@ -253,6 +255,7 @@ struct JournalDetailView: View {
                     Image(systemName: "pencil")
                         .foregroundStyle(TreeholeTheme.softPurple)
                 }
+                .accessibilityLabel(L10n.t("Edit entry", "编辑日记"))
             }
             ToolbarItem(placement: .destructiveAction) {
                 Button {
@@ -261,6 +264,7 @@ struct JournalDetailView: View {
                     Image(systemName: "trash")
                         .foregroundStyle(TreeholeTheme.coral)
                 }
+                .accessibilityLabel(L10n.t("Delete entry", "删除日记"))
             }
         }
         .sheet(isPresented: $showEditSheet) {

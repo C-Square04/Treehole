@@ -5,8 +5,18 @@ struct PetChatView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    @Query(sort: \ChatMessage.createdAt, order: .forward) private var allMessages: [ChatMessage]
+    /// Newest 20 messages, newest first — chat history grows without bound,
+    /// so the view must never materialize all of it. Reversed for display.
+    @Query private var recentMessages: [ChatMessage]
     @Query private var pets: [Pet]
+
+    init() {
+        var descriptor = FetchDescriptor<ChatMessage>(
+            sortBy: [SortDescriptor(\ChatMessage.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 20
+        _recentMessages = Query(descriptor)
+    }
 
     @State private var inputText = ""
     @State private var isThinking = false
@@ -18,9 +28,10 @@ struct PetChatView: View {
     @State private var errorMessage: String?
     @State private var chatMode: ChatMode = .basic
     @State private var showClearConfirm = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var messages: [ChatMessage] {
-        Array(allMessages.suffix(20))
+        recentMessages.reversed()
     }
 
     private var pet: Pet? {
@@ -61,6 +72,7 @@ struct PetChatView: View {
                             Image(systemName: "waveform.circle")
                                 .foregroundStyle(TreeholeTheme.softPurple)
                         }
+                        .accessibilityLabel(L10n.t("Voice selection", "声线选择"))
                         Menu {
                             Button {
                                 ttsEnabled.toggle()
@@ -80,6 +92,7 @@ struct PetChatView: View {
                             Image(systemName: "ellipsis.circle")
                                 .foregroundStyle(TreeholeTheme.softPurple)
                         }
+                        .accessibilityLabel(L10n.t("More options", "更多选项"))
                     }
                 }
             }
@@ -93,7 +106,10 @@ struct PetChatView: View {
             }
             .confirmationDialog(L10n.t("Clear all chat history?", "清除所有聊天记录？"), isPresented: $showClearConfirm, titleVisibility: .visible) {
                 Button(L10n.t("Clear", "清除"), role: .destructive) {
-                    for msg in allMessages {
+                    // The live query is capped at 20 — clearing must fetch
+                    // the full history explicitly.
+                    let all = (try? modelContext.fetch(FetchDescriptor<ChatMessage>())) ?? []
+                    for msg in all {
                         modelContext.delete(msg)
                     }
                     try? modelContext.save()
@@ -148,7 +164,9 @@ struct PetChatView: View {
                 }
                 .padding(TreeholeTheme.spacingMedium)
             }
-            .onChange(of: allMessages.count) { _, _ in
+            // Keyed on the newest message id, not count — count pins at the
+            // fetch limit once history exceeds it and would stop firing.
+            .onChange(of: recentMessages.first?.id) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .onChange(of: isSpeaking) { _, _ in
@@ -169,8 +187,11 @@ struct PetChatView: View {
                     Circle()
                         .fill(TreeholeTheme.softPurple)
                         .frame(width: 8, height: 8)
-                        .scaleEffect(isThinking ? 1.2 : 0.8)
-                        .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15), value: isThinking)
+                        .scaleEffect(isThinking && !reduceMotion ? 1.2 : 0.8)
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.15),
+                            value: isThinking
+                        )
                 }
             }
             .padding(.horizontal, 14)
@@ -180,13 +201,16 @@ struct PetChatView: View {
         }
         .padding(.horizontal, TreeholeTheme.spacingMedium)
         .padding(.bottom, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.t("Pet is typing", "宠物正在输入"))
     }
 
     private var speakingIndicator: some View {
         HStack(spacing: 6) {
             Image(systemName: "speaker.wave.2.fill")
                 .foregroundStyle(TreeholeTheme.softPurple)
-                .symbolEffect(.variableColor.iterative)
+                .symbolEffect(.variableColor.iterative, isActive: !reduceMotion)
+                .accessibilityHidden(true)
             Text(L10n.t("Pet is speaking...", "宠物正在说话..."))
                 .font(.caption)
                 .foregroundStyle(TreeholeTheme.textSecondary)
@@ -208,6 +232,8 @@ struct PetChatView: View {
                     .background(chatMode == .basic ? TreeholeTheme.skyBlue.opacity(0.3) : Color.clear,
                                 in: Capsule())
             }
+            .accessibilityLabel(L10n.t("Basic mode", "基础模式"))
+            .accessibilityAddTraits(chatMode == .basic ? [.isSelected] : [])
 
             Button {
                 chatMode = .premium
@@ -218,7 +244,7 @@ struct PetChatView: View {
                     Text(appState.isSubscribed
                         ? L10n.t("1 🍖/msg", "1 🍖/条")
                         : L10n.t("10 🍖/msg", "10 🍖/条"))
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 12)
@@ -226,6 +252,8 @@ struct PetChatView: View {
                 .background(chatMode == .premium ? TreeholeTheme.warmGold.opacity(0.3) : Color.clear,
                             in: Capsule())
             }
+            .accessibilityLabel(L10n.t("Premium mode", "高级模式"))
+            .accessibilityAddTraits(chatMode == .premium ? [.isSelected] : [])
 
             Spacer()
         }
@@ -249,10 +277,13 @@ struct PetChatView: View {
                         Image(systemName: isListening ? "waveform" : "mic.fill")
                             .foregroundStyle(isListening ? .white : TreeholeTheme.softPurple)
                             .font(.system(size: 16))
-                            .symbolEffect(.variableColor.iterative, isActive: isListening)
+                            .symbolEffect(.variableColor.iterative, isActive: isListening && !reduceMotion)
                     }
                 }
                 .disabled((pet?.hungerLevel ?? 0) == 0)
+                .accessibilityLabel(isListening
+                    ? L10n.t("Stop listening and send", "停止聆听并发送")
+                    : L10n.t("Voice input", "语音输入"))
 
                 // Text field
                 ZStack(alignment: .leading) {
@@ -284,6 +315,7 @@ struct PetChatView: View {
                         }
                 }
                 .disabled(!canSend)
+                .accessibilityLabel(L10n.t("Send message", "发送消息"))
             }
             .padding(.horizontal, TreeholeTheme.spacingMedium)
             .padding(.vertical, TreeholeTheme.spacingSmall)
@@ -307,7 +339,7 @@ struct PetChatView: View {
     }
 
     private func sendWelcomeIfNeeded() {
-        guard allMessages.isEmpty, let pet = pets.first else { return }
+        guard recentMessages.isEmpty, let pet = pets.first else { return }
         let lang = appState.preferredLanguage
         let welcome = L10n.t(
             "Meow~ Hi there! I'm \(pet.name), so glad to see you 😊 How are you feeling today?",
@@ -352,8 +384,9 @@ struct PetChatView: View {
         // Show typing indicator
         isThinking = true
 
-        // Build history for context
-        let history = allMessages.suffix(10).map { msg -> (role: String, content: String) in
+        // Build history for context — newest-first query, so the last 10 in
+        // chronological order are prefix(10) reversed.
+        let history = recentMessages.prefix(10).reversed().map { msg -> (role: String, content: String) in
             (role: msg.isFromUser ? "user" : "assistant", content: msg.text)
         }
 
@@ -475,10 +508,11 @@ struct ChatBubbleView: View {
                                     .foregroundStyle(TreeholeTheme.softPurple)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(L10n.t("Play message audio", "播放消息语音"))
                         }
                         Spacer()
                         Text(L10n.t(message.mode.labelEN, message.mode.labelZH))
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.trailing, 4)

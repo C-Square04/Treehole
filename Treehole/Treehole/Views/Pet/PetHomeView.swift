@@ -13,6 +13,7 @@ struct PetHomeView: View {
     @State private var feedbackText: String?
     @State private var showInsufficientFood = false
     @State private var showChat = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -187,6 +188,8 @@ struct PetHomeView: View {
                                     .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel(lang == "zh-Hans" ? theme.labelZH : theme.labelEN)
+                                .accessibilityAddTraits(pet.homeTheme == theme ? [.isSelected] : [])
                             }
                         }
                     }
@@ -219,9 +222,18 @@ struct PetHomeView: View {
     }
 
     private func showFeedback(_ text: String) {
-        withAnimation(.spring(response: 0.3)) { feedbackText = text }
+        // Reduce Motion: swap the spring/move transition for a plain state change
+        if reduceMotion {
+            feedbackText = text
+        } else {
+            withAnimation(.spring(response: 0.3)) { feedbackText = text }
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation { feedbackText = nil; showInsufficientFood = false }
+            if reduceMotion {
+                feedbackText = nil; showInsufficientFood = false
+            } else {
+                withAnimation { feedbackText = nil; showInsufficientFood = false }
+            }
         }
     }
 }

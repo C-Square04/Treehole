@@ -20,10 +20,14 @@ struct AudioPlayerView: View {
                     .font(.title2)
                     .foregroundStyle(TreeholeTheme.skyBlue)
             }
+            .accessibilityLabel(isPlaying
+                ? L10n.t("Pause voice note", "暂停语音备注")
+                : L10n.t("Play voice note", "播放语音备注"))
 
             ProgressView(value: progress, total: 1.0)
                 .progressViewStyle(.linear)
                 .tint(TreeholeTheme.skyBlue)
+                .accessibilityLabel(L10n.t("Playback progress", "播放进度"))
 
             Text(formatDuration(totalDuration))
                 .font(.caption.monospacedDigit())

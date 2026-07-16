@@ -31,6 +31,7 @@ struct MyCloudsView: View {
                         Image(systemName: "lock.fill")
                             .foregroundStyle(TreeholeTheme.softPurple)
                     }
+                    .accessibilityLabel(L10n.t("Lock My Clouds", "锁定我的云朵"))
                 }
             }
         }

@@ -78,6 +78,10 @@ struct SettingsView: View {
                             Text("\(appState.daysUntilAliasExpiry)d")
                                 .font(.caption)
                                 .foregroundStyle(TreeholeTheme.textLight)
+                                .accessibilityLabel(L10n.t(
+                                    "Alias changes in \(appState.daysUntilAliasExpiry) days",
+                                    "别名将在 \(appState.daysUntilAliasExpiry) 天后更换"
+                                ))
                         }
                     }
 
@@ -432,10 +436,13 @@ struct SettingsView: View {
         //    rotates and a guest user's posts can never be deleted by anyone.
         //    Nothing local has been touched yet, so the user can just retry.
         do {
-            let count = try await SupabaseService.deleteAllMyPosts()
+            // deleteAllMyData wipes posts + comments + reactions in one RPC;
+            // until the server migration is applied it transparently falls
+            // back to delete_my_posts + client-side comment/reaction cleanup.
+            let count = try await SupabaseService.deleteAllMyData()
             print("[DELETE] Supabase deleted \(count) posts")
         } catch {
-            print("[DELETE] deleteAllMyPosts failed: \(error) — aborting before any local wipe")
+            print("[DELETE] deleteAllMyData failed: \(error) — aborting before any local wipe")
             deleteErrorMessage = L10n.t(
                 "Your cloud posts could not be deleted (network problem?). Nothing has been deleted — please try again.",
                 "无法删除你的云朵帖子（可能是网络问题）。尚未删除任何数据，请重试。"
@@ -443,11 +450,6 @@ struct SettingsView: View {
             showDeleteError = true
             return
         }
-
-        // 2b. Delete the user's comments and reactions on other people's posts.
-        //     Best effort: these carry no identity beyond the alias, so a
-        //     failure here shouldn't block the rest of the wipe.
-        await SupabaseService.deleteAllMyCommentsAndReactions()
         // Tell our analytics events table to forget us too — best effort.
         // (No dedicated API; the rows stay anonymized by design.)
 

@@ -555,6 +555,95 @@ enum SupabaseService {
         return 0
     }
 
+    // MARK: - Full account wipe via delete_my_data RPC (with fallback)
+    //
+    // delete_my_data (posts + comments + reactions, incl. rows under rotated
+    // device_ids) requires the pending Supabase migration in
+    // supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql.
+    // Until it is applied, PostgREST answers 404 for the unknown function and
+    // we fall back to delete_my_posts + client-side comment/reaction cleanup.
+    @discardableResult
+    static func deleteAllMyData() async throws -> Int {
+        let urlString = "\(SupabaseConfig.restURL)/rpc/delete_my_data"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+        struct DeleteRequest: Codable {
+            let requestingDeviceId: String
+            let requestingAppleUserId: String?
+            enum CodingKeys: String, CodingKey {
+                case requestingDeviceId = "requesting_device_id"
+                case requestingAppleUserId = "requesting_apple_user_id"
+            }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(DeleteRequest(
+            requestingDeviceId: SupabaseConfig.deviceId,
+            requestingAppleUserId: SupabaseConfig.appleUserID
+        ))
+
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let body = String(data: data, encoding: .utf8) ?? "nil"
+        print("[API] deleteAllMyData: status=\(statusCode)")
+
+        if statusCode == 404 {
+            // Function not deployed yet — legacy two-step wipe.
+            let count = try await deleteAllMyPosts()
+            await deleteAllMyCommentsAndReactions()
+            return count
+        }
+        guard (200...204).contains(statusCode) else {
+            throw SupabaseError.serverError(statusCode, nil)
+        }
+        return Int(body.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+    }
+
+    // MARK: - Report a post (UGC moderation, App Review guideline 1.2)
+    //
+    // Inserts into post_reports (see the pending migration). Best effort by
+    // design: the caller hides the post locally regardless, so a failure here
+    // never blocks the user-protective action.
+    static func reportPost(id: String, reason: String) async {
+        let urlString = "\(SupabaseConfig.restURL)/post_reports"
+        guard let url = URL(string: urlString) else { return }
+
+        struct ReportRequest: Codable {
+            let postId: String
+            let reporterDeviceId: String
+            let reason: String
+            enum CodingKeys: String, CodingKey {
+                case postId = "post_id"
+                case reporterDeviceId = "reporter_device_id"
+                case reason
+            }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("return=minimal", forHTTPHeaderField: "Prefer")
+
+        do {
+            request.httpBody = try JSONEncoder().encode(ReportRequest(
+                postId: id,
+                reporterDeviceId: SupabaseConfig.deviceId,
+                reason: reason
+            ))
+            let (_, response) = try await session.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            print("[API] reportPost: status=\(statusCode)")
+        } catch {
+            print("[API] reportPost failed: \(error)")
+        }
+    }
+
     // MARK: - Bulk delete own comments and reactions (account deletion)
     //
     // Best effort: removes the rows this device left on OTHER people's posts.

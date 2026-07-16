@@ -4,6 +4,16 @@ import Observation
 
 @MainActor @Observable
 final class CloudPostViewModel {
+    // Network seam — LiveCloudPostAPI in production, a mock in unit tests
+    @ObservationIgnored private let api: any CloudPostAPI
+
+    // Handle to the post-insert AI pipeline; held so tests can await it deterministically
+    @ObservationIgnored private(set) var npcReplyTask: Task<Void, Never>?
+
+    init(api: any CloudPostAPI = LiveCloudPostAPI()) {
+        self.api = api
+    }
+
     var draftText: String = ""
     var draftMood: MoodTag = .calm
     var showCreation: Bool = false
@@ -24,7 +34,7 @@ final class CloudPostViewModel {
         isLoading = true
         errorMessage = nil
         do {
-            remotePosts = try await SupabaseService.fetchPosts(limit: 50)
+            remotePosts = try await api.fetchPosts(limit: 50)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -52,7 +62,7 @@ final class CloudPostViewModel {
 
         do {
             // Step 1: Insert post WITHOUT NPC reply (instant DB write)
-            let newPost = try await SupabaseService.createPost(
+            let newPost = try await api.createPost(
                 authorAlias: authorAlias,
                 moodTag: mood,
                 text: text,
@@ -67,7 +77,7 @@ final class CloudPostViewModel {
 
             // Step 2: AI moderation + NPC reply in background (non-blocking)
             let postId = newPost.id
-            Task {
+            npcReplyTask = Task {
                 await generateNPCReplyInBackground(postId: postId, text: text, mood: mood, language: language)
             }
         } catch {
@@ -80,7 +90,7 @@ final class CloudPostViewModel {
 
     func deletePost(id: String) async {
         do {
-            try await SupabaseService.deletePost(id: id)
+            try await api.deletePost(id: id)
             remotePosts.removeAll { $0.id == id }
         } catch {
             errorMessage = error.localizedDescription
@@ -96,8 +106,10 @@ final class CloudPostViewModel {
 
     private func generateNPCReplyInBackground(postId: String, text: String, mood: MoodTag, language: String) async {
         do {
-            async let moderationTask = SupabaseService.moderateWithAI(text: text, language: language)
-            async let npcTask = SupabaseService.generateAINPCReply(text: text, mood: mood.rawValue, language: language)
+            // Hoisted so the async let child tasks capture a Sendable local, not MainActor self
+            let api = self.api
+            async let moderationTask = api.moderateWithAI(text: text, language: language)
+            async let npcTask = api.generateAINPCReply(text: text, mood: mood.rawValue, language: language)
 
             let (moderation, npcReply) = try await (moderationTask, npcTask)
 
@@ -105,7 +117,7 @@ final class CloudPostViewModel {
                 // AI flagged — remove from feed and DB
                 remotePosts.removeAll { $0.id == postId }
                 errorMessage = moderation.reason
-                try? await SupabaseService.deletePost(id: postId)
+                try? await api.deletePost(id: postId)
             } else if let index = remotePosts.firstIndex(where: { $0.id == postId }) {
                 // Update local post with NPC reply
                 let old = remotePosts[index]
@@ -116,7 +128,7 @@ final class CloudPostViewModel {
                     flagged: old.flagged
                 )
                 remotePosts[index] = withReply
-                try? await SupabaseService.updatePostNPCReply(id: postId, npcReply: npcReply)
+                try? await api.updatePostNPCReply(id: postId, npcReply: npcReply)
             }
         } catch {
             // AI failed — post stays without NPC reply

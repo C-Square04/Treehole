@@ -17,6 +17,7 @@ struct LoginPromptView: View {
                     Image(systemName: "person.crop.circle.badge.plus")
                         .font(.system(size: 64))
                         .foregroundStyle(TreeholeTheme.coral)
+                        .accessibilityHidden(true)
 
                     // Title
                     VStack(spacing: TreeholeTheme.spacingTight) {
@@ -97,9 +98,14 @@ private struct BenefitRow: View {
         HStack(spacing: TreeholeTheme.spacingSmall) {
             Image(systemName: icon)
                 .foregroundStyle(color)
+                // The icon carries meaning (benefit vs. warning) — voice it
+                .accessibilityLabel(icon.contains("xmark")
+                    ? L10n.t("Warning", "注意")
+                    : L10n.t("Benefit", "优势"))
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
         }
+        .accessibilityElement(children: .combine)
     }
 }

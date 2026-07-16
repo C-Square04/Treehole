@@ -8,6 +8,7 @@ struct PrivacyLockView: View {
     let title: String
     @Environment(PrivacyLockManager.self) private var lockManager
     @State private var showPasscodeEntry = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -24,7 +25,8 @@ struct PrivacyLockView: View {
                     Image(systemName: "lock.shield.fill")
                         .font(.system(size: 72))
                         .foregroundStyle(TreeholeTheme.softPurple)
-                        .symbolEffect(.pulse, options: .repeating)
+                        .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
+                        .accessibilityHidden(true)
 
                     VStack(spacing: TreeholeTheme.spacingTight) {
                         Text(title)
@@ -142,6 +144,12 @@ private struct PasscodeEntryView: View {
                     .animation(.easeInOut(duration: 0.15), value: dotsRed)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.t("Passcode", "密码"))
+        .accessibilityValue(L10n.t(
+            "\(enteredDigits.count) of \(passcodeLength) digits entered",
+            "已输入 \(enteredDigits.count) / \(passcodeLength) 位"
+        ))
     }
 
     // MARK: - Number Pad
@@ -166,6 +174,10 @@ private struct PasscodeEntryView: View {
                         Task { await triggerBiometric() }
                     }
                     .opacity(isAuthenticating ? 0.5 : 1)
+                    .accessibilityLabel(L10n.t(
+                        "Unlock with \(lockManager.biometricType.label)",
+                        "使用\(lockManager.biometricType.label)解锁"
+                    ))
                 } else {
                     Color.clear.frame(width: 72, height: 72)
                 }
@@ -177,6 +189,7 @@ private struct PasscodeEntryView: View {
                 DigitButton(icon: "delete.left", iconColor: TreeholeTheme.coral) {
                     deleteDigit()
                 }
+                .accessibilityLabel(L10n.t("Delete digit", "删除数字"))
             }
         }
     }
@@ -378,6 +391,12 @@ struct PasscodeSetupView: View {
                     .animation(.easeInOut(duration: 0.15), value: dotsRed)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.t("Passcode", "密码"))
+        .accessibilityValue(L10n.t(
+            "\(enteredDigits.count) of \(passcodeLength) digits entered",
+            "已输入 \(enteredDigits.count) / \(passcodeLength) 位"
+        ))
     }
 
     private var numberPad: some View {
@@ -393,6 +412,7 @@ struct PasscodeSetupView: View {
                 Color.clear.frame(width: 72, height: 72)
                 DigitButton(label: "0") { appendDigit(0) }
                 DigitButton(icon: "delete.left", iconColor: TreeholeTheme.coral) { deleteDigit() }
+                    .accessibilityLabel(L10n.t("Delete digit", "删除数字"))
             }
         }
     }
@@ -568,6 +588,12 @@ struct PasscodeChangeView: View {
                     .animation(.easeInOut(duration: 0.15), value: dotsRed)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.t("Passcode", "密码"))
+        .accessibilityValue(L10n.t(
+            "\(enteredDigits.count) of \(passcodeLength) digits entered",
+            "已输入 \(enteredDigits.count) / \(passcodeLength) 位"
+        ))
     }
 
     private var numberPad: some View {
@@ -583,6 +609,7 @@ struct PasscodeChangeView: View {
                 Color.clear.frame(width: 72, height: 72)
                 DigitButton(label: "0") { appendDigit(0) }
                 DigitButton(icon: "delete.left", iconColor: TreeholeTheme.coral) { deleteDigit() }
+                    .accessibilityLabel(L10n.t("Delete digit", "删除数字"))
             }
         }
     }

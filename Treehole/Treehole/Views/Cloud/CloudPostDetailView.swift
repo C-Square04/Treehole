@@ -7,6 +7,10 @@ struct CloudPostDetailView: View {
     var viewModel: CloudPostViewModel
     @State private var showDeleteConfirmation = false
 
+    // UGC moderation (App Review guideline 1.2)
+    @State private var showReportDialog = false
+    @State private var moderationConfirmation: String? = nil
+
     // Comments
     @State private var comments: [RemoteComment] = []
     @State private var commentText: String = ""
@@ -161,6 +165,7 @@ struct CloudPostDetailView: View {
                                 }
                             }
                             .disabled(commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPostingComment)
+                            .accessibilityLabel(L10n.t("Send comment", "发送评论"))
                         }
                         .padding(TreeholeTheme.spacingSmall)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
@@ -175,6 +180,21 @@ struct CloudPostDetailView: View {
                 showHugEffect: showHugEffect,
                 showStarlightEffect: showStarlightEffect
             )
+
+            // Moderation confirmation banner (auto-dismisses the view shortly after)
+            if let confirmation = moderationConfirmation {
+                VStack {
+                    Text(confirmation)
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, TreeholeTheme.spacingSmall)
+                        .padding(.vertical, 6)
+                        .background(TreeholeTheme.softPurple.opacity(0.9), in: Capsule())
+                    Spacer()
+                }
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -185,6 +205,7 @@ struct CloudPostDetailView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(TreeholeTheme.textLight)
                 }
+                .accessibilityLabel(L10n.t("Close", "关闭"))
             }
             if post.isOwn {
                 ToolbarItem(placement: .destructiveAction) {
@@ -193,6 +214,27 @@ struct CloudPostDetailView: View {
                     } label: {
                         Image(systemName: "trash")
                     }
+                    .accessibilityLabel(L10n.t("Delete cloud", "删除云朵"))
+                }
+            } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            showReportDialog = true
+                        } label: {
+                            Label(L10n.t("Report Cloud", "举报云朵"), systemImage: "flag")
+                        }
+                        Button(role: .destructive) {
+                            blockAuthor()
+                        } label: {
+                            Label(L10n.t("Hide Clouds from This Author", "隐藏此作者的云朵"), systemImage: "hand.raised")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(TreeholeTheme.textLight)
+                    }
+                    .accessibilityLabel(L10n.t("More options", "更多选项"))
+                    .accessibilityHint(L10n.t("Report this cloud or hide its author", "举报这朵云或隐藏其作者"))
                 }
             }
         }
@@ -204,9 +246,48 @@ struct CloudPostDetailView: View {
                 }
             }
         }
+        .confirmationDialog(
+            L10n.t("Why are you reporting this cloud?", "你为什么要举报这朵云？"),
+            isPresented: $showReportDialog,
+            titleVisibility: .visible
+        ) {
+            ForEach(CloudReportReason.allCases, id: \.rawValue) { reason in
+                Button(reason.label) {
+                    reportPost(reason: reason)
+                }
+            }
+        }
         .task {
             await loadComments()
             await loadReactions()
+        }
+    }
+
+    // MARK: - Moderation
+
+    private func reportPost(reason: CloudReportReason) {
+        // Best-effort server report; local hide never waits on the network
+        Task { await SupabaseService.reportPost(id: post.id, reason: reason.rawValue) }
+        HiddenPostsStore.shared.hidePost(id: post.id)
+        viewModel.remotePosts.removeAll { $0.id == post.id }
+        confirmAndDismiss(L10n.t("Thanks — this cloud is hidden for you.", "谢谢 — 这朵云已为你隐藏。"))
+        AnalyticsService.track("cloud_reported", properties: ["reason": reason.rawValue])
+    }
+
+    private func blockAuthor() {
+        HiddenPostsStore.shared.blockAuthor(deviceId: post.deviceId)
+        viewModel.remotePosts = HiddenPostsStore.shared.filter(viewModel.remotePosts)
+        confirmAndDismiss(L10n.t("Clouds from this author are now hidden for you.", "已为你隐藏此作者的云朵。"))
+        AnalyticsService.track("cloud_author_blocked")
+    }
+
+    private func confirmAndDismiss(_ message: String) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            moderationConfirmation = message
+        }
+        // Brief beat so the confirmation is readable before the view goes away
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            dismiss()
         }
     }
 
@@ -491,6 +572,9 @@ private struct ReactionButton: View {
         .frame(maxWidth: .infinity)
         .animation(.spring(response: 0.25, dampingFraction: 0.5), value: pressed)
         .animation(.easeInOut(duration: 0.2), value: isActive)
+        .accessibilityLabel(count > 0 ? "\(label), \(count)" : label)
+        .accessibilityHint(L10n.t("Sends this reaction to the cloud", "向这朵云发送此互动"))
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 

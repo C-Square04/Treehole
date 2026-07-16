@@ -38,6 +38,8 @@ struct OnboardingFlowView: View {
 // MARK: - Page 1: Welcome
 
 private struct WelcomePage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(spacing: TreeholeTheme.spacingXL) {
             Spacer()
@@ -45,7 +47,8 @@ private struct WelcomePage: View {
             Image(systemName: "cloud.sun.fill")
                 .font(.system(size: 80))
                 .foregroundStyle(TreeholeTheme.warmGold, TreeholeTheme.skyBlue)
-                .symbolEffect(.pulse)
+                .symbolEffect(.pulse, isActive: !reduceMotion)
+                .accessibilityHidden(true)
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
                 Text(L10n.t("Welcome to Treehole", "欢迎来到树洞"))
@@ -128,6 +131,7 @@ private struct FeatureRow: View {
                 .font(.title2)
                 .foregroundStyle(color)
                 .frame(width: 36)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
@@ -151,6 +155,7 @@ private struct PrivacyPage: View {
             Image(systemName: "theatermasks.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(TreeholeTheme.softPurple)
+                .accessibilityHidden(true)
 
             VStack(spacing: TreeholeTheme.spacingSmall) {
                 Text(L10n.t("You're Completely Anonymous", "完全匿名"))
@@ -189,6 +194,7 @@ private struct PrivacyBullet: View {
             Image(systemName: icon)
                 .foregroundStyle(TreeholeTheme.softPurple)
                 .frame(width: 28)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
@@ -209,6 +215,7 @@ private struct GetStartedPage: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 64))
                 .foregroundStyle(TreeholeTheme.warmGold)
+                .accessibilityHidden(true)
 
             Text(L10n.t("Ready to Begin?", "准备好了吗？"))
                 .font(.title.bold())

@@ -136,6 +136,7 @@ struct JournalView: View {
                         } else {
                             if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
                                 // MARK: - Compact Stats Row (only shown outside search)
+                                let counts = recentCounts
                                 HStack(spacing: TreeholeTheme.spacingMedium) {
                                     MiniStat(
                                         label: L10n.t("Total", "总计"),
@@ -145,13 +146,13 @@ struct JournalView: View {
                                     )
                                     MiniStat(
                                         label: L10n.t("This Week", "本周"),
-                                        value: "\(thisWeekCount)",
+                                        value: "\(counts.week)",
                                         icon: "calendar",
                                         color: TreeholeTheme.skyBlue
                                     )
                                     MiniStat(
                                         label: L10n.t("This Month", "本月"),
-                                        value: "\(thisMonthCount)",
+                                        value: "\(counts.month)",
                                         icon: "calendar.badge.clock",
                                         color: TreeholeTheme.coral
                                     )
@@ -210,12 +211,14 @@ struct JournalView: View {
                     Image(systemName: "chart.bar.fill")
                         .foregroundStyle(TreeholeTheme.softPurple)
                 }
+                .accessibilityLabel(L10n.t("Mood Stats", "情绪统计"))
             }
             ToolbarItem(placement: .primaryAction) {
                 Button { showNewEntry = true } label: {
                     Image(systemName: "square.and.pencil")
                         .foregroundStyle(TreeholeTheme.coral)
                 }
+                .accessibilityLabel(L10n.t("New Entry", "新日记"))
             }
             if lockManager.isJournalLockEnabled {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -225,6 +228,7 @@ struct JournalView: View {
                         Image(systemName: "lock.fill")
                             .foregroundStyle(TreeholeTheme.softPurple)
                     }
+                    .accessibilityLabel(L10n.t("Lock journal now", "立即锁定日记"))
                 }
             }
         }
@@ -309,14 +313,20 @@ struct JournalView: View {
 
     // MARK: - Stats
 
-    private var thisWeekCount: Int {
-        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        return entries.filter { $0.displayDate > weekAgo }.count
-    }
-
-    private var thisMonthCount: Int {
-        let monthAgo = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
-        return entries.filter { $0.displayDate > monthAgo }.count
+    /// Both counters in one pass — the sidebar re-renders on every keystroke
+    /// and entry mutation, so two full filters per render add up.
+    private var recentCounts: (week: Int, month: Int) {
+        let now = Date()
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
+        let monthAgo = Calendar.current.date(byAdding: .month, value: -1, to: now) ?? now
+        var week = 0
+        var month = 0
+        for entry in entries {
+            let date = entry.displayDate
+            if date > weekAgo { week += 1 }
+            if date > monthAgo { month += 1 }
+        }
+        return (week, month)
     }
 
     /// Monday-based, matching MoodWeekStrip and MoodStatsView — the summary
@@ -423,11 +433,28 @@ private struct MoodWeekStrip: View {
         }
     }
 
+    // DateFormatter allocation is expensive (~ms each) and the strip
+    // re-renders on every search keystroke — create once per language.
+    private static let dayMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMMM"
+        return formatter
+    }()
+    private static let shortWeekdayEN = weekdayFormatter(format: "EEE", locale: "en_US")
+    private static let shortWeekdayZH = weekdayFormatter(format: "EEE", locale: "zh_Hans")
+    private static let fullWeekdayEN = weekdayFormatter(format: "EEEE", locale: "en_US")
+    private static let fullWeekdayZH = weekdayFormatter(format: "EEEE", locale: "zh_Hans")
+
+    private static func weekdayFormatter(format: String, locale: String) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = format
+        formatter.locale = Locale(identifier: locale)
+        return formatter
+    }
+
     /// Formatted date header: "Today, 4 April"
     private var headerText: String {
-        let dayFormatter = DateFormatter()
-        dayFormatter.dateFormat = "d MMMM"
-        return L10n.t("Today, \(dayFormatter.string(from: today))", "今天，\(chineseDateString(today))")
+        L10n.t("Today, \(Self.dayMonthFormatter.string(from: today))", "今天，\(chineseDateString(today))")
     }
 
     private func chineseDateString(_ date: Date) -> String {
@@ -438,15 +465,7 @@ private struct MoodWeekStrip: View {
 
     /// Short weekday label (Mon, Tue, ...)
     private func shortWeekdayLabel(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = L10n.t("EEE", "EEE")
-        formatter.locale = Locale(identifier: L10n.lang == "zh-Hans" ? "zh_Hans" : "en_US")
-        return formatter.string(from: date)
-    }
-
-    /// First entry's mood for a given calendar day, if any
-    private func mood(for date: Date) -> MoodTag? {
-        entries.first { calendar.isDate($0.displayDate, inSameDayAs: date) }?.moodTag
+        (L10n.lang == "zh-Hans" ? Self.shortWeekdayZH : Self.shortWeekdayEN).string(from: date)
     }
 
     private func isToday(_ date: Date) -> Bool {
@@ -454,6 +473,8 @@ private struct MoodWeekStrip: View {
     }
 
     var body: some View {
+        // One pass over all entries instead of a full scan per day cell.
+        let moodByDay = MoodByDay.firstMoodPerDay(entries: entries, calendar: calendar)
         VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
             Text(headerText)
                 .font(.subheadline.weight(.semibold))
@@ -474,7 +495,7 @@ private struct MoodWeekStrip: View {
                                     .frame(width: 36, height: 36)
                             }
 
-                            if let moodTag = mood(for: day) {
+                            if let moodTag = moodByDay[calendar.startOfDay(for: day)] {
                                 Text(moodTag.emoji)
                                     .font(.title3)
                             } else {
@@ -486,10 +507,23 @@ private struct MoodWeekStrip: View {
                         .frame(width: 36, height: 36)
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(dayAccessibilityLabel(day, moodByDay: moodByDay))
                 }
             }
         }
         .glassCard()
+    }
+
+    /// e.g. "Monday, Happy" / "Monday, no entry" — one element per day for VoiceOver
+    private func dayAccessibilityLabel(_ day: Date, moodByDay: [Date: MoodTag]) -> String {
+        let formatter = L10n.lang == "zh-Hans" ? Self.fullWeekdayZH : Self.fullWeekdayEN
+        let weekday = formatter.string(from: day)
+        let todayPrefix = isToday(day) ? L10n.t("Today, ", "今天，") : ""
+        if let moodTag = moodByDay[calendar.startOfDay(for: day)] {
+            return todayPrefix + weekday + ", " + L10n.t(moodTag.labelEN, moodTag.labelZH)
+        }
+        return todayPrefix + weekday + ", " + L10n.t("no entry", "无日记")
     }
 }
 
@@ -556,11 +590,24 @@ private struct JournalEntryCard: View {
     }
 }
 
+// MARK: - Draft Photo
+
+/// A photo added during this editing session. Identity is stable (UUID) so
+/// deleting one photo doesn't re-identify — and re-decode — the ones after
+/// it, and the thumbnail is decoded once at append time instead of
+/// UIImage(data:) in the cell body on every render.
+private struct DraftPhoto: Identifiable {
+    let id = UUID()
+    let data: Data
+    let thumbnail: UIImage?
+}
+
 // MARK: - Journal Entry Editor
 
 struct JournalEntryEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let existingEntry: JournalEntry?
     let allowAnyDate: Bool
@@ -576,7 +623,7 @@ struct JournalEntryEditor: View {
     @State private var draftMood: MoodTag = .calm
     @State private var draftMoodValence: Double? = nil
     @State private var draftMoodArousal: Double? = nil
-    @State private var draftPhotoData: [Data] = []
+    @State private var draftPhotos: [DraftPhoto] = []
     @State private var existingPhotoFilenames: [String] = []
     @State private var removedPhotoFilenames: [String] = []
     @State private var draftAudioFilename: String? = nil
@@ -663,7 +710,7 @@ struct JournalEntryEditor: View {
                             .padding(.horizontal, TreeholeTheme.spacingSmall)
 
                         // Photo grid (only if photos exist)
-                        if !existingPhotoFilenames.isEmpty || !draftPhotoData.isEmpty {
+                        if !existingPhotoFilenames.isEmpty || !draftPhotos.isEmpty {
                             photoGridSection
                                 .padding(.horizontal, TreeholeTheme.spacingSmall)
                         }
@@ -756,8 +803,7 @@ struct JournalEntryEditor: View {
             }
             .sheet(isPresented: $showCameraSheet) {
                 CameraPicker { data in
-                    guard existingPhotoFilenames.count + draftPhotoData.count < maxPhotos else { return }
-                    draftPhotoData.append(data)
+                    Task { await appendDraftPhoto(jpegData: data) }
                 }
                 .ignoresSafeArea()
             }
@@ -798,7 +844,7 @@ struct JournalEntryEditor: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(TreeholeTheme.textPrimary)
                 Spacer()
-                let total = existingPhotoFilenames.count + draftPhotoData.count
+                let total = existingPhotoFilenames.count + draftPhotos.count
                 Text(L10n.t("\(total)/\(maxPhotos)", "\(total)/\(maxPhotos)"))
                     .font(.caption)
                     .foregroundStyle(TreeholeTheme.textLight)
@@ -809,13 +855,9 @@ struct JournalEntryEditor: View {
                 // Existing photos
                 ForEach(existingPhotoFilenames, id: \.self) { filename in
                     ZStack(alignment: .topTrailing) {
-                        if let image = PhotoStorage.loadImage(filename) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 120)
-                                .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
-                        }
+                        AsyncThumbnailView(filename: filename)
+                            .frame(height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
                         Button {
                             if let idx = existingPhotoFilenames.firstIndex(of: filename) {
                                 removedPhotoFilenames.append(filename)
@@ -827,27 +869,29 @@ struct JournalEntryEditor: View {
                                 .foregroundStyle(.white)
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
+                        .accessibilityLabel(L10n.t("Remove photo", "移除照片"))
                         .offset(x: 6, y: -6)
                     }
                 }
                 // New photos
-                ForEach(Array(draftPhotoData.enumerated()), id: \.offset) { index, data in
+                ForEach(draftPhotos) { photo in
                     ZStack(alignment: .topTrailing) {
-                        if let uiImage = UIImage(data: data) {
-                            Image(uiImage: uiImage)
+                        if let thumbnail = photo.thumbnail {
+                            Image(uiImage: thumbnail)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(height: 120)
                                 .clipShape(RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
                         }
                         Button {
-                            draftPhotoData.remove(at: index)
+                            draftPhotos.removeAll { $0.id == photo.id }
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 20))
                                 .foregroundStyle(.white)
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
+                        .accessibilityLabel(L10n.t("Remove photo", "移除照片"))
                         .offset(x: 6, y: -6)
                     }
                 }
@@ -863,13 +907,16 @@ struct JournalEntryEditor: View {
             Circle()
                 .fill(Color.red)
                 .frame(width: 10, height: 10)
-                .symbolEffect(.pulse, isActive: true)
+                .symbolEffect(.pulse, isActive: !reduceMotion)
+                .accessibilityHidden(true)
 
             Image(systemName: "waveform")
                 .foregroundStyle(TreeholeTheme.coral)
-                .symbolEffect(.variableColor.iterative, isActive: true)
+                .symbolEffect(.variableColor.iterative, isActive: !reduceMotion)
+                .accessibilityHidden(true)
 
             Text(formatElapsed(audioRecorder.elapsed))
+                .accessibilityLabel(L10n.t("Recording", "录音中") + ", " + formatElapsed(audioRecorder.elapsed))
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(TreeholeTheme.textPrimary)
 
@@ -892,6 +939,7 @@ struct JournalEntryEditor: View {
                 Image(systemName: "xmark.circle")
                     .foregroundStyle(TreeholeTheme.textSecondary)
             }
+            .accessibilityLabel(L10n.t("Cancel recording", "取消录音"))
         }
         .padding(TreeholeTheme.spacingSmall)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerMedium))
@@ -939,6 +987,7 @@ struct JournalEntryEditor: View {
                 Image(systemName: "trash")
                     .foregroundStyle(TreeholeTheme.coral)
             }
+            .accessibilityLabel(L10n.t("Delete voice note", "删除语音备注"))
         }
         .padding(TreeholeTheme.spacingSmall)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
@@ -968,6 +1017,7 @@ struct JournalEntryEditor: View {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(TreeholeTheme.textLight)
             }
+            .accessibilityLabel(L10n.t("Remove location", "移除位置"))
         }
         .padding(.horizontal, TreeholeTheme.spacingSmall)
         .padding(.vertical, 8)
@@ -1005,6 +1055,7 @@ struct JournalEntryEditor: View {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(TreeholeTheme.textLight)
             }
+            .accessibilityLabel(L10n.t("Remove event date", "移除事件日期"))
         }
         .padding(.horizontal, TreeholeTheme.spacingSmall)
         .padding(.vertical, 8)
@@ -1069,21 +1120,23 @@ struct JournalEntryEditor: View {
                 } label: {
                     toolbarIcon(systemName: "camera", active: false)
                 }
-                .disabled(existingPhotoFilenames.count + draftPhotoData.count >= maxPhotos)
+                .disabled(existingPhotoFilenames.count + draftPhotos.count >= maxPhotos)
+                .accessibilityLabel(L10n.t("Take photo", "拍照"))
             }
 
             // Photos picker
             PhotosPicker(
                 selection: $selectedItems,
-                maxSelectionCount: maxPhotos - existingPhotoFilenames.count - draftPhotoData.count,
+                maxSelectionCount: maxPhotos - existingPhotoFilenames.count - draftPhotos.count,
                 matching: .images
             ) {
                 toolbarIcon(
                     systemName: "photo.on.rectangle",
-                    active: !draftPhotoData.isEmpty || !existingPhotoFilenames.isEmpty
+                    active: !draftPhotos.isEmpty || !existingPhotoFilenames.isEmpty
                 )
             }
-            .disabled(existingPhotoFilenames.count + draftPhotoData.count >= maxPhotos)
+            .disabled(existingPhotoFilenames.count + draftPhotos.count >= maxPhotos)
+            .accessibilityLabel(L10n.t("Add photos", "添加照片"))
 
             // Mic
             Button {
@@ -1100,6 +1153,7 @@ struct JournalEntryEditor: View {
                     active: draftAudioFilename != nil || existingAudioFilename != nil
                 )
             }
+            .accessibilityLabel(L10n.t("Record voice note", "录制语音备注"))
 
             // Location
             Button {
@@ -1122,6 +1176,9 @@ struct JournalEntryEditor: View {
                     )
                 }
             }
+            .accessibilityLabel(draftLocationName != nil
+                ? L10n.t("Remove location", "移除位置")
+                : L10n.t("Add location", "添加位置"))
 
             // Calendar / event date
             Button {
@@ -1130,6 +1187,7 @@ struct JournalEntryEditor: View {
                 let hasDate = draftEntryDate != nil && !Calendar.current.isDateInToday(draftEntryDate!)
                 toolbarIcon(systemName: "calendar", active: hasDate)
             }
+            .accessibilityLabel(L10n.t("Event date", "事件日期"))
 
             // Ellipsis / more menu — only shown in edit mode (only contains Delete for now)
             if isEditMode {
@@ -1142,6 +1200,7 @@ struct JournalEntryEditor: View {
                 } label: {
                     toolbarIcon(systemName: "ellipsis", active: false)
                 }
+                .accessibilityLabel(L10n.t("More options", "更多选项"))
             }
         }
         .padding(.horizontal, TreeholeTheme.spacingSmall)
@@ -1183,8 +1242,8 @@ struct JournalEntryEditor: View {
                 PhotoStorage.deletePhotos([fn])
             }
             var allFilenames = existingPhotoFilenames
-            for data in draftPhotoData {
-                if let fn = PhotoStorage.savePhoto(data) {
+            for photo in draftPhotos {
+                if let fn = PhotoStorage.savePhoto(photo.data) {
                     allFilenames.append(fn)
                 }
             }
@@ -1231,7 +1290,7 @@ struct JournalEntryEditor: View {
             draft.mood = draftMood
             draft.moodValence = draftMoodValence
             draft.moodArousal = draftMoodArousal
-            draft.photoData = draftPhotoData
+            draft.photoData = draftPhotos.map(\.data)
             draft.audioFilename = draftAudioFilename
             draft.audioDuration = draftAudioDuration
             draft.audioTranscript = draftAudioTranscript
@@ -1432,29 +1491,23 @@ struct JournalEntryEditor: View {
 
         var skippedCount = 0
         for item in items {
-            // Live total — draftPhotoData grows inside the loop, so any
+            // Live total — draftPhotos grows inside the loop, so any
             // snapshot taken before the loop would double-count it.
-            guard existingPhotoFilenames.count + draftPhotoData.count < maxPhotos else {
+            guard existingPhotoFilenames.count + draftPhotos.count < maxPhotos else {
                 skippedCount += 1
                 continue
             }
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let uiImage = UIImage(data: data) {
-                let maxDimension: CGFloat = 1024
-                let resized: UIImage
-                if max(uiImage.size.width, uiImage.size.height) > maxDimension {
-                    let scale = maxDimension / max(uiImage.size.width, uiImage.size.height)
-                    let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
-                    let renderer = UIGraphicsImageRenderer(size: newSize)
-                    resized = renderer.image { _ in uiImage.draw(in: CGRect(origin: .zero, size: newSize)) }
-                } else {
-                    resized = uiImage
-                }
-                if let jpegData = resized.jpegData(compressionQuality: 0.7), jpegData.count <= 2_000_000 {
-                    draftPhotoData.append(jpegData)
-                } else {
-                    skippedCount += 1
-                }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            // Decode + downsample + re-encode off the MainActor; only the
+            // final append touches view state.
+            switch await PhotoImportPipeline.processPickedPhoto(data) {
+            case .imported(let jpeg, let thumbnail):
+                draftPhotos.append(DraftPhoto(data: jpeg, thumbnail: thumbnail))
+            case .skipped:
+                skippedCount += 1
+            case nil:
+                // Undecodable item — silently ignored, as before.
+                break
             }
         }
         photoSkippedMessage = skippedCount > 0
@@ -1464,6 +1517,18 @@ struct JournalEntryEditor: View {
             )
             : nil
         selectedItems = []
+    }
+
+    /// Camera capture path: the picker already delivers a capped JPEG —
+    /// decode its grid thumbnail off the MainActor, then append.
+    private func appendDraftPhoto(jpegData: Data) async {
+        guard existingPhotoFilenames.count + draftPhotos.count < maxPhotos else { return }
+        let thumbnail = await PhotoImportPipeline.decodedThumbnail(
+            data: jpegData,
+            maxPixelSize: PhotoThumbnailLoader.gridThumbnailMaxPixel
+        )
+        guard existingPhotoFilenames.count + draftPhotos.count < maxPhotos else { return }
+        draftPhotos.append(DraftPhoto(data: jpegData, thumbnail: thumbnail))
     }
 }
 
@@ -1535,15 +1600,18 @@ private struct AIInsightsCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isGenerating)
+                        .accessibilityLabel(L10n.t("Regenerate insights", "重新生成洞察"))
                     }
                     Image(systemName: "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(TreeholeTheme.textLight)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .accessibilityHidden(true)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isExpanded ? L10n.t("Expanded", "已展开") : L10n.t("Collapsed", "已收起"))
 
             if isExpanded {
                 if isGenerating {
@@ -1643,10 +1711,12 @@ private struct AIWeeklySummaryCard: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(TreeholeTheme.textLight)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .accessibilityHidden(true)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isExpanded ? L10n.t("Expanded", "已展开") : L10n.t("Collapsed", "已收起"))
 
             if isExpanded {
                 Text(renderMarkdown(summary.summary))
@@ -1699,5 +1769,6 @@ private struct MiniStat: View {
                 .foregroundStyle(TreeholeTheme.textLight)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 }

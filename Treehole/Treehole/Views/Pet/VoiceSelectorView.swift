@@ -177,6 +177,7 @@ private struct VoiceRow: View {
     var isLocked: Bool = false
 
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 12) {
@@ -188,6 +189,11 @@ private struct VoiceRow: View {
             }
             .buttonStyle(.plain)
             .disabled(isLocked)
+            .accessibilityLabel(L10n.t(
+                "Select \(voice.nameEN) voice",
+                "选择\(voice.nameZH)声线"
+            ))
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
 
             // Voice name
             VStack(alignment: .leading, spacing: 2) {
@@ -227,10 +233,14 @@ private struct VoiceRow: View {
                     Image(systemName: isPlaying ? "speaker.wave.2.fill" : "play.fill")
                         .foregroundStyle(isPlaying ? .white : TreeholeTheme.softPurple)
                         .font(.system(size: 13))
-                        .symbolEffect(.variableColor.iterative, isActive: isPlaying)
+                        .symbolEffect(.variableColor.iterative, isActive: isPlaying && !reduceMotion)
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(L10n.t(
+                "Preview \(voice.nameEN) voice",
+                "试听\(voice.nameZH)声线"
+            ))
         }
         .contentShape(Rectangle())
     }

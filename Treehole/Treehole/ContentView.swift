@@ -3,12 +3,20 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
-        if appState.hasCompletedOnboarding {
-            MainTabView()
-        } else {
-            OnboardingFlowView()
+        Group {
+            if appState.hasCompletedOnboarding {
+                MainTabView()
+            } else {
+                OnboardingFlowView()
+            }
+        }
+        .onAppear {
+            #if DEBUG
+            UITestSupport.applyLaunchOverridesIfNeeded(context: modelContext)
+            #endif
         }
     }
 }

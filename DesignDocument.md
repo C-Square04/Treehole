@@ -88,6 +88,14 @@
 - Management page listing the user's own posts
 - Delete option removes from Supabase
 
+**Reporting & hiding (post-publish UGC moderation, App Review guideline 1.2):**
+- On any stranger's cloud (never on the user's own posts), an ellipsis menu offers two actions:
+  - **Report Cloud** — a confirmation dialog with four reason choices (`harmful` / `spam` / `hateful` / `other`, defined by `CloudReportReason`). The chosen reason is sent best-effort to the `post_reports` table via `SupabaseService.reportPost`; the post is **always hidden locally and immediately**, whether or not the upload succeeds (offline, migration not yet applied, server error — the user-protective action never waits on the network).
+  - **Hide Clouds from This Author** — blocks the author by device id; every cloud from that author is hidden from then on.
+- Both actions show a confirmation banner and dismiss the cloud (sheet on iPhone, detail column on iPad).
+- `HiddenPostsStore` (`Utilities/HiddenPostsStore.swift`) persists hidden post ids and blocked author device ids in UserDefaults — hides survive relaunch.
+- Grab flows respect the store: "Grab a Cloud" / "Grab Another" retry up to 3 fetches, skipping any hidden or blocked candidate, before falling back to the "no clouds out there" message.
+
 ---
 
 ### 3.2 Virtual Pet (虚拟宠物)
@@ -429,11 +437,12 @@ All properties carry inline defaults (a CloudKit requirement for `@Model` classe
 
 `ChatMode` (plain enum, not persisted) models the pet-chat tiers: `.basic` (on-device/scripted reply, Apple TTS, 1 hunger) vs `.premium` (MiniMax AI via `pet-chat`, MiniMax TTS via `pet-tts`, 10 hunger).
 
-**Service layer** (`Services/`, 7 files):
+**Service layer** (`Services/`, 8 files):
 
 | Service | Responsibility |
 |---|---|
-| `SupabaseService` | All Supabase REST / RPC / Edge Function calls (posts, comments, reactions, moderation, NPC replies, journal summaries, account deletion) |
+| `SupabaseService` | All Supabase REST / RPC / Edge Function calls (posts, comments, reactions, moderation, NPC replies, journal summaries, post reports, account deletion) |
+| `CloudPostAPI` | Protocol seam over the cloud-post network calls — view models depend on the protocol, tests inject fakes, `LiveCloudPostAPI` forwards to `SupabaseService` |
 | `PetChatService` | Pet chat replies — `pet-chat` Edge Function (premium) with a scripted offline fallback selected by app language |
 | `PetVoiceService` | Pet TTS — `pet-tts` Edge Function (MiniMax voices) + AVSpeechSynthesizer fallback, audio caching (main-actor isolated) |
 | `WeatherService` | Open-Meteo current-weather fetch for journal entries |
@@ -441,7 +450,7 @@ All properties carry inline defaults (a CloudKit requirement for `@Model` classe
 | `AnalyticsService` | Fire-and-forget anonymous events to the `analytics_events` table |
 | `AudioRecorder` | Voice-note recording with a 5-minute cap (capped takes are finalized and attached) |
 
-Supporting utilities (`Utilities/`, 8 files): `L10n`, `NotificationService`, `PhotoStorage`, `AudioStorage`, `PrivacyLockManager`, `WeekAnchor` (Monday-anchored week math), `JournalSearch`, `JournalTranscription`.
+Supporting utilities (`Utilities/`, 11 files): `L10n`, `NotificationService`, `PhotoStorage`, `AudioStorage`, `PrivacyLockManager`, `WeekAnchor` (Monday-anchored week math), `JournalSearch`, `JournalTranscription`, `HiddenPostsStore` (UserDefaults-persisted hidden post ids + blocked author device ids for report/hide), `PhotoThumbnailLoader` (async cached downsampled thumbnails), `MoodByDay` (one-pass day→mood lookup).
 
 ### 4.2 Supabase PostgreSQL Schema
 
@@ -499,8 +508,23 @@ Supporting utilities (`Utilities/`, 8 files): `L10n`, `NotificationService`, `Ph
 | event / properties | text / jsonb | never contains user content text |
 | created_at | timestamptz | |
 
+**Table: `post_reports`** *(pending migration — see below)*
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | auto-generated |
+| post_id | uuid FK → cloud_posts | on delete cascade |
+| reporter_device_id | text | anonymous reporter identity |
+| reason | text | `harmful` / `spam` / `hateful` / `other` (CloudReportReason raw values) |
+| created_at | timestamptz | default now() |
+| UNIQUE | (post_id, reporter_device_id) | one report per device per post — bounds spam-reporting |
+
+RLS: anonymous clients may only **insert** reports — never read, update, or delete.
+
 **View: `post_reaction_counts`**
 Aggregates `cloud_reactions` grouped by `post_id` and `reaction_type`.
+
+**View: `reported_posts_summary`** *(pending migration — see below)*
+Reported posts joined with their report counts and last-reported timestamps, ranked by report count — the manual review queue for deleting offending posts.
 
 **Edge Functions:**
 - `moderate-post`: Accepts post content, calls MiniMax M2.7-highspeed moderation API, returns allow/reject + reason. Called by client before insert.
@@ -511,7 +535,9 @@ Aggregates `cloud_reactions` grouped by `post_id` and `reaction_type`.
 
 **RPCs (SECURITY DEFINER):** `get_random_post`, `get_my_posts`, `get_my_unread_count`, `migrate_posts_to_apple_user`, `delete_my_posts` — all match on `device_id` OR `apple_user_id`.
 
-> **Pending migration:** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` adds a `delete_my_data` RPC that extends account deletion to the user's comments and reactions server-side. It must be reviewed and run in the Supabase SQL editor; the client should then switch to `rpc/delete_my_data`.
+> **Pending migration #1:** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` adds a `delete_my_data` RPC that extends account deletion to the user's comments and reactions server-side. It must be reviewed and run in the Supabase SQL editor. The client already calls `rpc/delete_my_data` first and transparently falls back to `delete_my_posts` + client-side cleanup while the function is missing (PostgREST 404).
+>
+> **Pending migration #2:** `supabase/migrations/20260717_post_reports.sql` creates the `post_reports` table and the `reported_posts_summary` review view behind the in-app "Report Cloud" button. Until it is run, report uploads fail silently — the reporter's local hide still always works. After running it, review `reported_posts_summary` periodically and delete offending posts.
 
 ---
 
@@ -608,6 +634,13 @@ Client polls / receives updated post
 - All Supabase communication uses HTTPS/TLS.
 - Supabase anon key is stored in the app bundle (standard practice); RLS policies enforce data access rules on the server.
 
+### 6.6 UGC Moderation & User Reporting
+
+The UGC safety story has two halves:
+
+- **Pre-publish:** the 3-layer moderation pipeline (client keyword filter → MiniMax AI → PostgreSQL trigger, §5.2) blocks unsafe content before it ever reaches other users.
+- **Post-publish (App Review guideline 1.2):** users can report any stranger's cloud (four reason categories) or block an author entirely (see §3.1). The protective action is **local-first**: the reported/blocked content disappears for that user instantly and permanently (persisted via `HiddenPostsStore`), independent of network state. The report itself is uploaded best-effort to `post_reports` (insert-only RLS — reporters can never read others' reports), and the developer reviews `reported_posts_summary` periodically to delete offending posts for everyone.
+
 ---
 
 ## 7. Economy System Design
@@ -678,6 +711,7 @@ Data Layer (SwiftData / Supabase REST / Keychain / iCloud)
 - Views are purely declarative; no business logic.
 - ViewModels hold all state and orchestrate service calls.
 - Services are stateless utilities injected via `@Environment` or passed directly.
+- Cloud-post network calls go through the `CloudPostAPI` protocol (`Services/CloudPostAPI.swift`) — a dependency-injection seam so view models are testable against fakes, with `LiveCloudPostAPI` forwarding to `SupabaseService` in production.
 - `AppState` (@Observable, preferences persisted via UserDefaults) is the single source of truth for global state (auth, onboarding, language).
 
 ### 8.2 Navigation
@@ -735,12 +769,12 @@ Economy system, shop, daily tasks, weekly challenges, login streaks, 5 plant spe
 Apple Sign-In, CloudKit sync, Privacy Lock (passcode + biometrics), drift bottle reactions (breeze / hug / starlight), My Clouds management, Supabase social layer, MiniMax AI moderation + NPC replies, journal photos (iCloud), mood statistics page, developer debug panel.
 
 ### Phase 4 — CURRENT
-**Shipped so far:** journal redesign (floating toolbar editor, voice notes + transcription, search, edit, location + weather, two dates, iPad adaptive split view), 16-mood system with pills / 1D pleasantness slider, real Year mood statistics view, per-entry + Monday-anchored weekly AI summaries (`summarize-journal`), pet chat with TTS voice selection (`pet-chat` / `pet-tts`), no-repeat cloud grabbing (`grabbed_posts`), anonymous analytics (`analytics_events`), account-deletion hardening (abort-on-failure + comment/reaction cleanup), privacy-lock re-lock on backgrounding, daily-login-bonus persistence + CloudKit dedupe. Test suite: 310 unit tests (Swift Testing) + 22 UI tests (XCTest).
+**Shipped so far:** journal redesign (floating toolbar editor, voice notes + transcription, search, edit, location + weather, two dates, iPad adaptive split view), 16-mood system with pills / 1D pleasantness slider, real Year mood statistics view, per-entry + Monday-anchored weekly AI summaries (`summarize-journal`), pet chat with TTS voice selection (`pet-chat` / `pet-tts`), no-repeat cloud grabbing (`grabbed_posts`), anonymous analytics (`analytics_events`), account-deletion hardening (abort-on-failure + comment/reaction cleanup, `delete_my_data` RPC with transparent fallback), privacy-lock re-lock on backgrounding, daily-login-bonus persistence + CloudKit dedupe, cloud report/hide/block UGC moderation UI (`post_reports` + `HiddenPostsStore`, App Review 1.2), accessibility pass (VoiceOver labels/traits across all screens, Dynamic Type conversions, Reduce Motion gating), `CloudPostAPI` DI seam for testable cloud networking, deterministic rewrite of the 3 formerly flaky UI tests. Test suite: 338 unit tests (Swift Testing) + 22 UI tests (XCTest) = 360 total.
 
 **Remaining:**
 - UI polish pass aligned to Figma design specs
 - Animation refinement (pet, plant, cloud transitions)
-- Accessibility audit (VoiceOver, Dynamic Type, Reduce Motion)
+- On-device manual accessibility verification (VoiceOver sweeps, Reduce Motion, Dynamic Type AX5 — see TESTING_CHECKLIST.md; the code-side pass has shipped)
 - Performance profiling (SwiftData query costs, main-thread work)
 - Additional AI features (enhanced NPC personas, mood-aware replies)
 
@@ -787,6 +821,7 @@ Treehole（树洞）是一款安全、匿名的情绪出口与温柔自我关怀
 - "抓一朵云"随机浏览，微风/拥抱/星光三种反应（每设备每帖每类型限一次）
 - 评论功能，AI NPC 回复（MiniMax M2.7-highspeed）
 - 我的云朵管理（查看/删除自己的帖子）
+- 举报与隐藏（发布后 UGC 审核，App Review 1.2）：陌生人云朵的菜单提供"举报云朵"（4 种理由：有害/垃圾/仇恨/其他，尽力上报到 `post_reports`）与"隐藏此作者的云朵"（按作者 device_id 屏蔽）；无论上报是否成功，**本地隐藏立即且永久生效**（`HiddenPostsStore` 持久化于 UserDefaults），抓云时自动跳过已隐藏/已屏蔽的帖子（最多重试 3 次）
 
 ### 虚拟宠物
 - 卡通猫，心情动画，喂食/抚摸/休息三种互动
@@ -822,7 +857,7 @@ Treehole（树洞）是一款安全、匿名的情绪出口与温柔自我关怀
 4 页：欢迎 → 功能介绍 → 隐私与别名说明 → 开始（Apple 登录或游客）
 
 ### 设置
-账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态、隐私政策、完整账户删除（云端清除失败时安全中止，同时删除评论/反应）、调试面板（仅 Debug 构建）
+账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态、隐私政策、完整账户删除（云端清除失败时安全中止，同时删除评论/反应；优先调用 `delete_my_data` RPC，迁移执行前自动回退到 `delete_my_posts` + 客户端清理）、调试面板（仅 Debug 构建）
 
 ### 身份验证
 Apple Sign-In（stable apple_user_id），游客模式（device_id），设备迁移至账户
@@ -859,9 +894,11 @@ L10n.t() 贯穿全局，运行时切换语言，中英字符串完全同步
 - `grabbed_posts`：按用户记录已抓取的云朵，避免重复
 - `analytics_events`：匿名分析事件
 - `npc_reply_templates`：NPC 回复模板
+- `post_reports`：用户举报（post_id、reporter_device_id、reason，每设备每帖限一次；匿名客户端仅可插入）——**待执行迁移**
 - `post_reaction_counts`：反应数聚合视图
+- `reported_posts_summary`：被举报帖子按举报次数排序的审阅视图——**待执行迁移**
 
-**RPC：** `get_random_post`、`get_my_posts`、`get_my_unread_count`、`migrate_posts_to_apple_user`、`delete_my_posts`（均为 SECURITY DEFINER，匹配 device_id 或 apple_user_id）。**待执行迁移：** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` 新增 `delete_my_data`（连同评论/反应一并删除）——需在 Supabase SQL 编辑器审阅并执行后，将客户端切换到该 RPC。
+**RPC：** `get_random_post`、`get_my_posts`、`get_my_unread_count`、`migrate_posts_to_apple_user`、`delete_my_posts`（均为 SECURITY DEFINER，匹配 device_id 或 apple_user_id）。**待执行迁移 #1：** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` 新增 `delete_my_data`（连同评论/反应一并删除）——需在 Supabase SQL 编辑器审阅并执行；客户端已优先调用该 RPC，函数缺失时（PostgREST 404）自动回退到 `delete_my_posts` + 客户端清理。**待执行迁移 #2：** `supabase/migrations/20260717_post_reports.sql` 创建 `post_reports` 表与 `reported_posts_summary` 审阅视图——执行前举报上传静默失败（本地隐藏始终生效），执行后请定期审阅该视图并删除违规帖子。
 
 Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 
@@ -888,6 +925,7 @@ Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 - Supabase RLS 确保用户只能删除自己的帖子
 - 最小化 PII：不向 Supabase 传输真实姓名或邮箱
 - 全程 HTTPS/TLS 通信
+- UGC 审核双保险：发布前三层审核管道 + 发布后用户举报/屏蔽（本地优先——被举报/屏蔽内容对该用户立即消失，与网络状态无关；举报尽力上报到 `post_reports`，开发者定期审阅 `reported_posts_summary` 删除违规帖子）
 
 ## 经济系统设计
 
@@ -908,5 +946,5 @@ Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | Phase 1 | 核心闭环 | 已完成 |
 | Phase 2 | 经济系统、任务、双语、通知 | 已完成 |
 | Phase 3 | Apple 登录、CloudKit、隐私锁、反应、漂流瓶社交 | 已完成 |
-| Phase 4 | 已交付：日记改版（语音/搜索/位置天气/双日期/iPad 分栏）、16 心情 + 愉悦度滑条、年视图、AI 摘要、宠物聊天 + TTS、不重复抓云、匿名分析、账户删除加固；进行中：UI 精修、动效、无障碍 | 当前阶段 |
+| Phase 4 | 已交付：日记改版（语音/搜索/位置天气/双日期/iPad 分栏）、16 心情 + 愉悦度滑条、年视图、AI 摘要、宠物聊天 + TTS、不重复抓云、匿名分析、账户删除加固（`delete_my_data` + 透明回退）、云朵举报/隐藏/屏蔽（App Review 1.2）、无障碍代码整改（VoiceOver/动态字体/减弱动态效果）、`CloudPostAPI` 依赖注入接缝、3 个不稳定 UI 测试确定性重写（测试：338 单元 + 22 UI = 360）；进行中：UI 精修、动效、真机无障碍人工验证 | 当前阶段 |
 | Phase 5 | App Store 上架、TestFlight 公测、IAP | 规划中 |

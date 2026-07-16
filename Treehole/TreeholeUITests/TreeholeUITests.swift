@@ -7,22 +7,30 @@ final class TreeholeUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["--uitesting"]
+        // --uitest-reset-state puts pet + economy in a known mid-range state
+        // (Debug-only hook in UITestSupport) so persisted SwiftData from
+        // earlier tests/runs can't disable the controls under test.
+        app.launchArguments = ["--uitesting", "--uitest-reset-state"]
         app.launch()
 
-        // If onboarding appears, swipe through pages and tap "Continue as Guest"
-        let guestButton = app.buttons["Continue as Guest"]
-        if !guestButton.exists {
-            // Swipe left 3 times to reach the last onboarding page
-            let screen = app.windows.firstMatch
-            for _ in 0..<3 {
-                screen.swipeLeft()
+        // Handle onboarding ONLY when it is actually showing (no tab bar).
+        // Blind-swiping on the main UI is what used to open the cloud composer:
+        // a horizontal swipe across the centered "Send a Cloud" button fires it
+        // (SwiftUI buttons claim horizontal drags inside vertical scroll views),
+        // and the stray sheet then broke every element query that followed.
+        if !app.tabBars.firstMatch.waitForExistence(timeout: 5) {
+            let guestButton = app.buttons.matching(NSPredicate(format:
+                "label == 'Continue as Guest' OR label == '以访客身份继续'"
+            )).firstMatch
+            // Swipe through the onboarding pages until the last page's button shows
+            for _ in 0..<4 where !guestButton.exists {
+                app.windows.firstMatch.swipeLeft()
                 Thread.sleep(forTimeInterval: 0.3)
             }
-        }
-        if guestButton.waitForExistence(timeout: 3) {
-            guestButton.tap()
-            Thread.sleep(forTimeInterval: 1)
+            if guestButton.waitForExistence(timeout: 3) {
+                guestButton.tap()
+            }
+            _ = app.tabBars.firstMatch.waitForExistence(timeout: 5)
         }
     }
 
@@ -50,6 +58,37 @@ final class TreeholeUITests: XCTestCase {
         let settingsLink = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Settings' OR label CONTAINS[c] '设置'")).firstMatch
         if settingsLink.waitForExistence(timeout: 5) { settingsLink.tap() }
         Thread.sleep(forTimeInterval: 1)
+    }
+
+    // MARK: - Determinism Helpers
+
+    /// Polls `condition` until it returns true or `timeout` elapses.
+    /// XCUIElement queries re-resolve on each access, so conditions stay live.
+    @discardableResult
+    private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return condition()
+    }
+
+    /// tap() hard-fails on elements below the fold — scroll until hittable first.
+    private func scrollUntilHittable(_ element: XCUIElement, in scrollView: XCUIElement, maxSwipes: Int = 6) {
+        var swipes = 0
+        while !element.isHittable && swipes < maxSwipes {
+            scrollView.swipeUp()
+            swipes += 1
+        }
+    }
+
+    private func attachScreenshot(named name: String, of application: XCUIApplication? = nil) {
+        let screenshot = (application ?? app).screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     // MARK: - Tab Navigation
@@ -365,81 +404,155 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testPetFeedCostsFood() throws {
-        // Navigate to Pet tab — exact EN label (works in English mode) with ZH fallback
-        let petTab = app.tabBars.buttons["Pet"]
-        XCTAssertTrue(petTab.waitForExistence(timeout: 5), "Pet tab should exist")
+        let petTab = app.tabBars.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Pet' OR label CONTAINS '宠物'"
+        )).firstMatch
+        XCTAssertTrue(petTab.waitForExistence(timeout: 10), "Pet tab should exist in EN or ZH")
         petTab.tap()
 
-        // Wait for the Pet view to fully load — it has a NavigationStack with a title and action buttons.
-        // Check for navigation bar, any static text in the pet view, or a scroll view.
+        // The pet is created on first appearance ("Loading..." → content ScrollView),
+        // so wait on the scroll view — it only exists once the pet content rendered.
         let petScrollView = app.scrollViews.firstMatch
-        let petNavBarEN = app.navigationBars["Pet"]
-        let petStaticText = app.staticTexts.matching(NSPredicate(format:
-            "label CONTAINS[c] 'Pet' OR label CONTAINS '宠物' OR label CONTAINS[c] 'Home Theme' OR label CONTAINS '主题'"
+        XCTAssertTrue(petScrollView.waitForExistence(timeout: 15), "Pet content scroll view should load")
+
+        // Feed button label: "Feed (5 🍖)" + food balance line "🍖 N" (EN) / "喂食 (5 🍖)" (ZH).
+        // Scoped to the scroll view so the tab bar can never match.
+        let feedButton = petScrollView.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Feed' OR label CONTAINS '喂食'"
         )).firstMatch
-        let petNavLoaded = petScrollView.waitForExistence(timeout: 8) || petNavBarEN.exists || petStaticText.exists
-        XCTAssertTrue(petNavLoaded, "Pet tab should load and show content (scroll view, nav bar, or pet content)")
+        XCTAssertTrue(feedButton.waitForExistence(timeout: 10), "Feed button should exist on Pet tab")
 
-        let screenshot1 = app.screenshot()
-        let attachment1 = XCTAttachment(screenshot: screenshot1)
-        attachment1.name = "Pet Tab Loaded"
-        attachment1.lifetime = .keepAlways
-        add(attachment1)
+        // The action row sits below the fold on smaller screens and tap() on a
+        // non-hittable element fails — scroll it into view first.
+        scrollUntilHittable(feedButton, in: petScrollView)
+        attachScreenshot(named: "Pet Tab Loaded")
 
-        // Try to find and optionally tap the feed button — may be disabled if food = 0 or hunger = 100
-        // Button label: "Feed (5 🍖)" (EN) or "喂食 (5 🍖)" (ZH), potentially combined with emoji text
-        let feedButton = app.buttons.matching(NSPredicate(format:
-            "label CONTAINS '🍖' OR label CONTAINS[c] 'Feed' OR label CONTAINS '喂食'"
-        )).firstMatch
-        if feedButton.waitForExistence(timeout: 5) && feedButton.isEnabled {
-            feedButton.tap()
-            _ = feedButton.waitForExistence(timeout: 3)
-
-            let screenshot2 = app.screenshot()
-            let attachment2 = XCTAttachment(screenshot: screenshot2)
-            attachment2.name = "Pet After Feed"
-            attachment2.lifetime = .keepAlways
-            add(attachment2)
+        guard feedButton.isEnabled else {
+            // Hunger is 100/100 from persisted state — feeding is disabled by design.
+            // Existence + disabled state is the correct observable outcome here.
+            attachScreenshot(named: "Pet Feed Disabled (hunger full)")
+            return
         }
+        XCTAssertTrue(feedButton.isHittable, "Feed button should be hittable after scrolling")
+
+        let labelBefore = feedButton.label
+        feedButton.tap()
+
+        // Persisted economy decides the outcome: either 5 food is spent (the
+        // "🍖 N" balance line inside the button label changes), the transient
+        // "+30 Hunger, +10 XP" feedback appears, the button disables (hunger
+        // hit 100), or "Not enough food!" shows. Any of these proves feeding
+        // is wired to the food economy.
+        let insufficientFeedback = app.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Not enough food' OR label CONTAINS '食物不足'"
+        )).firstMatch
+        let successFeedback = app.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS '+30'"
+        )).firstMatch
+        let observedOutcome = waitUntil(timeout: 6) {
+            feedButton.label != labelBefore
+                || successFeedback.exists
+                || insufficientFeedback.exists
+                || !feedButton.isEnabled
+        }
+        attachScreenshot(named: "Pet After Feed")
+        XCTAssertTrue(observedOutcome, "Feeding should spend food (button balance changes) or report insufficient food")
     }
 
     // MARK: - Garden Multi-Plant
 
     @MainActor
     func testAddSecondPlant() throws {
-        // Navigate to Garden tab — accept both EN ("Garden") and ZH ("花园"/"植物") tab labels
         let gardenTab = app.tabBars.buttons.matching(NSPredicate(format:
-            "label CONTAINS[c] 'Garden' OR label CONTAINS '花园' OR label CONTAINS '植物'"
+            "label CONTAINS[c] 'Garden' OR label CONTAINS '花园'"
         )).firstMatch
         XCTAssertTrue(gardenTab.waitForExistence(timeout: 10), "Garden tab should exist in EN or ZH")
         gardenTab.tap()
 
-        // If empty state shows "Plant a Seed" (EN) or "播种" (ZH), tap it to create first plant
+        // The garden renders one of two states depending on persisted SwiftData:
+        // empty ("Plant a Seed") or plant detail (Water button). Wait for either
+        // instead of assuming a fixed 3s window for the empty state.
+        // "Plant a Seed" (with " a ") never matches the sheet's "Plant Seed" confirm.
         let plantSeedButton = app.buttons.matching(NSPredicate(format:
-            "label CONTAINS[c] 'Plant a Seed' OR label CONTAINS[c] 'Seed' OR label CONTAINS[c] '播种'"
+            "label CONTAINS[c] 'Plant a Seed' OR label == '播种'"
         )).firstMatch
-        if plantSeedButton.waitForExistence(timeout: 3) {
+        let waterButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Water Plant' OR label CONTAINS '浇水'"
+        )).firstMatch
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { plantSeedButton.exists || waterButton.exists },
+            "Garden should show either the empty state or an existing plant"
+        )
+
+        // Ensure the first plant exists.
+        if plantSeedButton.exists && !waterButton.exists {
             plantSeedButton.tap()
-            // Confirm dialog varies: "Plant Seed" / "Confirm" / "确认" / "播种"
-            let confirmButton = app.buttons.matching(NSPredicate(format:
-                "label CONTAINS[c] 'Plant Seed' OR label CONTAINS[c] 'Confirm' OR label CONTAINS '确认' OR label CONTAINS[c] 'Plant'"
-            )).firstMatch
-            if confirmButton.waitForExistence(timeout: 5) {
-                confirmButton.tap()
-            }
+            confirmAddPlantSheet()
+        }
+        XCTAssertTrue(waterButton.waitForExistence(timeout: 10), "Garden should show a plant with a Water button")
+
+        let thumbnailsBefore = plantThumbnailCount()
+        attachScreenshot(named: "Garden Before Second Plant")
+
+        // Add a second plant. Both add affordances (selector "Add" thumbnail and
+        // the toolbar plus) open the same sheet and are gone/disabled once the
+        // garden holds the max of 5 plants — state persists between runs, so
+        // both branches are expected and both verify multiple plants.
+        let addButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Add' OR label CONTAINS '添加'"
+        )).firstMatch
+        if addButton.waitForExistence(timeout: 3) && addButton.isEnabled && addButton.isHittable {
+            addButton.tap()
+            confirmAddPlantSheet()
+            XCTAssertTrue(
+                waitUntil(timeout: 10) { self.plantThumbnailCount() >= thumbnailsBefore + 1 },
+                "Adding a plant should grow the selector from \(thumbnailsBefore) thumbnails"
+            )
+        } else {
+            // Garden is full (5/5): multiple plants are already present.
+            XCTAssertGreaterThanOrEqual(thumbnailsBefore, 2,
+                "With the add affordance unavailable the garden must already hold multiple plants")
         }
 
-        // Verify Garden tab shows plant content — Water button (EN) or 浇水 (ZH)
-        let waterButton = app.buttons.matching(NSPredicate(format:
-            "label CONTAINS[c] 'Water' OR label CONTAINS '浇水'"
-        )).firstMatch
-        XCTAssertTrue(waterButton.waitForExistence(timeout: 10), "Garden should show plant content (Water button in EN or ZH)")
+        XCTAssertTrue(waterButton.waitForExistence(timeout: 5), "Selected plant should still show its Water button")
+        attachScreenshot(named: "Garden With Second Plant")
+    }
 
-        let screenshot = app.screenshot()
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = "Garden With Plant"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+    /// Taps "Plant Seed" in the add-plant sheet and waits for the sheet to dismiss.
+    private func confirmAddPlantSheet() {
+        let confirmQuery = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Plant Seed' OR label CONTAINS '播种'"
+        ))
+        XCTAssertTrue(confirmQuery.firstMatch.waitForExistence(timeout: 8), "Add-plant sheet should show its Plant Seed button")
+        // In ZH the empty-state button behind the sheet is also labeled "播种" —
+        // pick the hittable match (the sheet's own button), scrolling the sheet
+        // if the button sits below its fold.
+        var confirmButton = confirmQuery.allElementsBoundByIndex.first(where: { $0.isHittable })
+        if confirmButton == nil {
+            app.swipeUp()
+            confirmButton = confirmQuery.allElementsBoundByIndex.first(where: { $0.isHittable })
+        }
+        guard let confirmButton else {
+            XCTFail("Plant Seed button never became hittable in the add-plant sheet")
+            return
+        }
+        confirmButton.tap()
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { confirmQuery.count == 0 },
+            "Add-plant sheet should dismiss after planting"
+        )
+    }
+
+    /// Number of plant thumbnails in the garden selector. Thumbnails are buttons
+    /// labeled with the plant's name (species default) and emoji; only call this
+    /// while the add-plant sheet is closed (its species picker would also match).
+    private func plantThumbnailCount() -> Int {
+        let speciesPredicate = NSPredicate(format:
+            "label CONTAINS 'Sunflower' OR label CONTAINS 'Rose' OR label CONTAINS 'Tulip' OR label CONTAINS 'Cactus' OR label CONTAINS 'Fern' " +
+            "OR label CONTAINS '向日葵' OR label CONTAINS '玫瑰' OR label CONTAINS '郁金香' OR label CONTAINS '仙人掌' OR label CONTAINS '蕨类' " +
+            "OR label CONTAINS '🌻' OR label CONTAINS '🌹' OR label CONTAINS '🌷' OR label CONTAINS '🌵'"
+        )
+        return app.buttons.matching(speciesPredicate).count
     }
 
     @MainActor
@@ -495,54 +608,83 @@ final class TreeholeUITests: XCTestCase {
 
     @MainActor
     func testJournalShowsStats() throws {
-        // Navigate to Journal tab — exact EN label (works in English mode) with ZH fallback
-        let journalTab = app.tabBars.buttons["Journal"]
-        XCTAssertTrue(journalTab.waitForExistence(timeout: 5), "Journal tab should exist")
+        let journalTab = app.tabBars.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Journal' OR label CONTAINS '日记'"
+        )).firstMatch
+        XCTAssertTrue(journalTab.waitForExistence(timeout: 10), "Journal tab should exist in EN or ZH")
         journalTab.tap()
 
-        // Wait for the Journal view to load — the view has a ScrollView so assert on that.
-        // Also accept the navigation bar, any write button, or any static text with "Journal"/"日记".
         let journalScrollView = app.scrollViews.firstMatch
-        let journalNavBarEN = app.navigationBars["Journal"]
-        let journalStaticText = app.staticTexts.matching(NSPredicate(format:
-            "label CONTAINS[c] 'Journal' OR label CONTAINS '日记' OR label CONTAINS[c] 'Write Entry' OR label CONTAINS '写日记'"
+        XCTAssertTrue(journalScrollView.waitForExistence(timeout: 10), "Journal tab should load its scroll view")
+        attachScreenshot(named: "Journal Loaded")
+
+        // The stats row (Total / This Week / This Month) renders only when at
+        // least one entry exists. Entries persist between runs, so either branch
+        // is a valid starting state — create an entry if there are none yet.
+        let totalStat = app.staticTexts.matching(NSPredicate(format:
+            "label == 'Total' OR label == '总计'"
         )).firstMatch
-        let journalNavLoaded = journalScrollView.waitForExistence(timeout: 8) || journalNavBarEN.exists || journalStaticText.exists
-        XCTAssertTrue(journalNavLoaded, "Journal tab should load and show content (scroll view, nav bar, or write button)")
+        if !totalStat.waitForExistence(timeout: 3) {
+            try createJournalEntry(text: "Stats test entry")
+        }
 
-        let screenshot0 = app.screenshot()
-        let attachment0 = XCTAttachment(screenshot: screenshot0)
-        attachment0.name = "Journal Loaded"
-        attachment0.lifetime = .keepAlways
-        add(attachment0)
-
-        // Optionally try to create/view an entry — no required assertion beyond tab loading
-        let writeEntryButton = app.buttons["Write Entry"]
-        let pencilButton = app.buttons.matching(NSPredicate(format:
-            "label CONTAINS[c] 'square and pencil' OR label CONTAINS[c] 'pencil'"
+        XCTAssertTrue(totalStat.waitForExistence(timeout: 10), "Journal stats row should show the Total stat")
+        let weekStat = app.staticTexts.matching(NSPredicate(format:
+            "label == 'This Week' OR label == '本周'"
         )).firstMatch
+        XCTAssertTrue(weekStat.waitForExistence(timeout: 5), "Journal stats row should show the This Week stat")
+        attachScreenshot(named: "Journal Stats Visible")
+    }
 
-        if writeEntryButton.waitForExistence(timeout: 2) {
+    /// Creates a journal entry through the editor sheet. Skips (never flakes) when
+    /// the simulator has a hardware keyboard connected and typing is impossible.
+    private func createJournalEntry(text: String) throws {
+        // Empty state exposes "Write Entry"; the toolbar compose icon is the fallback.
+        let writeEntryButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'Write Entry' OR label CONTAINS '写日记'"
+        )).firstMatch
+        let composeButton = app.buttons.matching(NSPredicate(format:
+            "label CONTAINS[c] 'pencil' OR identifier CONTAINS[c] 'pencil' OR label CONTAINS[c] 'compose'"
+        )).firstMatch
+        if writeEntryButton.waitForExistence(timeout: 3) && writeEntryButton.isHittable {
             writeEntryButton.tap()
-        } else if pencilButton.waitForExistence(timeout: 2) {
-            pencilButton.tap()
+        } else {
+            XCTAssertTrue(composeButton.waitForExistence(timeout: 5), "A compose affordance should exist on the Journal tab")
+            composeButton.tap()
         }
 
         let textEditor = app.textViews.firstMatch
-        if textEditor.waitForExistence(timeout: 3) {
-            textEditor.tap()
-            textEditor.typeText("Stats test entry")
-            let saveButton = app.buttons["Save"]
-            if saveButton.waitForExistence(timeout: 2) && saveButton.isEnabled {
-                saveButton.tap()
-            }
+        XCTAssertTrue(textEditor.waitForExistence(timeout: 8), "Entry editor should open with a text editor")
+        if !textEditor.isHittable {
+            app.swipeUp()
         }
+        textEditor.tap()
 
-        let screenshot = app.screenshot()
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = "Journal After Entry Attempt"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        // typeText hard-fails without keyboard focus — verify the software
+        // keyboard actually appeared (a connected hardware keyboard suppresses
+        // it) and retry the tap once before deciding.
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 3) {
+            textEditor.tap()
+        }
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
+            let cancelButton = app.buttons.matching(NSPredicate(format:
+                "label == 'Cancel' OR label == '取消'"
+            )).firstMatch
+            if cancelButton.exists { cancelButton.tap() }
+            throw XCTSkip("Software keyboard unavailable (hardware keyboard connected?) — cannot type an entry. Disable 'Connect Hardware Keyboard' on the simulator.")
+        }
+        textEditor.typeText(text)
+
+        let saveButton = app.buttons.matching(NSPredicate(format:
+            "label == 'Save' OR label == '保存'"
+        )).firstMatch
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "Save button should exist in the entry editor")
+        XCTAssertTrue(waitUntil(timeout: 5) { saveButton.isEnabled }, "Save should enable once the entry has text")
+        saveButton.tap()
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !saveButton.exists },
+            "Entry editor sheet should dismiss after saving"
+        )
     }
 
     // MARK: - Cloud Drift Bottle

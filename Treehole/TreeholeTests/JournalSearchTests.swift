@@ -178,4 +178,28 @@ struct JournalSearchTests {
         let results = filter(entries: [backdated, yesterday], query: "")
         #expect(results.map(\.text) == ["yesterday", "backdated"])
     }
+
+    // Pins the already-sorted fast path: input in @Query order (descending
+    // createdAt) must come back unchanged.
+    @Test func testAlreadyDescendingInputKeepsOrder() {
+        let now = Date()
+        let entries = [
+            makeEntry(text: "newest", createdAt: now),
+            makeEntry(text: "middle", createdAt: now.addingTimeInterval(-1 * 86400)),
+            makeEntry(text: "oldest", createdAt: now.addingTimeInterval(-2 * 86400)),
+        ]
+        let results = filter(entries: entries, query: "")
+        #expect(results.map(\.text) == ["newest", "middle", "oldest"])
+    }
+
+    @Test func testEqualDisplayDatesKeepRelativeOrder() {
+        let now = Date()
+        let entries = [
+            makeEntry(text: "first", createdAt: now),
+            makeEntry(text: "second", createdAt: now),
+            makeEntry(text: "third", createdAt: now),
+        ]
+        let results = filter(entries: entries, query: "")
+        #expect(results.map(\.text) == ["first", "second", "third"])
+    }
 }

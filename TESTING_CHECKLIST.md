@@ -30,6 +30,12 @@ Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for t
 - [ ] "My Clouds" tab shows only posts created by the current user / "我的云朵"仅显示当前用户发布的帖子
 - [ ] Deleting own post removes it from "My Clouds" immediately / 删除自己的帖子后立即从"我的云朵"中消失
 - [ ] Other users' posts cannot be deleted / 无法删除其他用户的帖子
+- [ ] (iPhone) Reporting a cloud from the grabbed-cloud sheet (ellipsis menu → "Report Cloud" → pick a reason) shows the confirmation banner and closes the sheet / （iPhone）在抓到的云朵弹层中举报（省略号菜单 →"举报云朵"→ 选择理由）后显示确认横幅并关闭弹层
+- [ ] (iPad) Reporting a cloud from the split-view detail column shows the banner and clears the detail pane / （iPad）在分栏详情列中举报云朵后显示横幅并清空详情栏
+- [ ] A reported cloud never reappears via "Grab a Cloud" / "Grab Another", including after force-quit and relaunch / 被举报的云朵不会再通过"抓一朵云"/"再抓一朵"出现，强制退出并重启后依然保持隐藏
+- [ ] Reporting works offline too — the cloud is hidden locally even if the report upload fails / 离线状态下举报同样生效——即使举报上传失败，云朵也会在本地被隐藏
+- [ ] "Hide Clouds from This Author" hides the cloud and future grabs skip all clouds from that author / "隐藏此作者的云朵"隐藏当前云朵，之后抓云会跳过该作者的所有云朵
+- [ ] The report/hide menu never appears on the user's own clouds (My Clouds detail) / 举报/隐藏菜单绝不会出现在用户自己的云朵上（"我的云朵"详情）
 
 ---
 
@@ -139,6 +145,22 @@ Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for t
 
 ---
 
+## Accessibility / 无障碍
+
+Run with VoiceOver (Settings → Accessibility → VoiceOver), Reduce Motion, and Dynamic Type as noted per item.
+按各条目说明分别开启 VoiceOver（设置 → 辅助功能 → 旁白）、减弱动态效果与动态字体后测试。
+
+- [ ] VoiceOver sweep of the journal editor: all 6 floating-toolbar buttons announce their purpose (Take photo, Add photos, Record voice note, Add/Remove location, Event date, More options) / VoiceOver 巡查日记编辑器：浮动工具栏 6 个按钮均播报用途（拍照、添加照片、录制语音、添加/移除位置、事件日期、更多选项）
+- [ ] VoiceOver sweep of the mood picker in BOTH styles: pills announce mood name + selected state (expanded and collapsed), the slider announces "Mood pleasantness" with the current mood as its value, and the style-toggle button announces switch to slider/grid / VoiceOver 巡查两种样式的心情选择器：胶囊按钮播报心情名称 + 选中状态（展开与收起两种形态）、滑条播报"心情愉悦度"及当前心情值、样式切换按钮播报切换到滑条/网格
+- [ ] VoiceOver on the mood week strip and stats calendar: each day cell reads as a single element with day + mood (e.g. "Today, Monday, Happy") or "no entry" / VoiceOver 下心情周历带与统计日历：每个日期格作为单一元素播报日期 + 心情（如"今天，周一，开心"）或"无日记"
+- [ ] VoiceOver on passcode screens: the dot row announces "N of 4 digits entered" as digits are typed, and the biometric (Face ID/Touch ID) and delete keys are named / VoiceOver 下密码界面：输入数字时圆点行播报"已输入 N/4 位"，生物识别键（Face ID/Touch ID）与删除键均有名称
+- [ ] VoiceOver on stranger clouds: the ellipsis menu announces "More options" and the report/hide actions are reachable / VoiceOver 下陌生人云朵：省略号菜单播报"更多选项"，举报/隐藏操作可达
+- [ ] Shop buy buttons announce the full action, e.g. "Buy Small Pack for 1 tokens" / 商店购买按钮播报完整操作，如"用 1 代币购买小食包"
+- [ ] With Reduce Motion ON, these are all static: pet idle bounce/tail, plant sway, lock-screen and welcome-page pulse, chat typing dots, recording-bar pulse, feed/water feedback transitions / 开启"减弱动态效果"后以下动画全部静止：宠物待机弹跳/尾巴、植物摇摆、锁屏与欢迎页脉冲、聊天输入指示点、录音条脉冲、喂食/浇水反馈过渡
+- [ ] At Dynamic Type AX5 (largest accessibility size): mood pill labels, slider captions (VERY UNPLEASANT/PLEASANT), and pet-chat mode captions scale without clipping or overlap / 动态字体调至 AX5（最大辅助功能字号）时：心情胶囊标签、滑条两端说明（非常不愉快/愉快）与宠物聊天模式说明文字正常缩放，无裁切或重叠
+
+---
+
 ## Edge Cases / 边缘情况
 
 - [ ] App behaves gracefully with no internet connection (offline mode) / 无网络连接时应用优雅降级（离线模式）
@@ -147,6 +169,7 @@ Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for t
 - [ ] Force-quitting and relaunching the app restores all local data / 强制退出并重启应用后，所有本地数据恢复
 - [ ] Delete All Data (Settings → Delete All Data) wipes local, iCloud, and server data / "删除所有数据"（设置 → 删除所有数据）清除本地、iCloud 和服务器数据
 - [ ] Delete All Data also removes the user's comments and reactions on other people's posts / "删除所有数据"同时删除用户在他人帖子下的评论与反应
+- [ ] Delete All Data works BOTH before and after the `delete_my_data` migration is applied — before: the client transparently falls back to `delete_my_posts` + client-side cleanup; after: the single RPC wipes posts, comments, and reactions server-side / "删除所有数据"在 `delete_my_data` 迁移执行前后都能工作——执行前：客户端透明回退到 `delete_my_posts` + 客户端清理；执行后：单个 RPC 在服务端一并清除帖子、评论与反应
 - [ ] Delete All Data with no network shows an error and deletes NOTHING locally (retry succeeds after reconnecting) / 无网络时"删除所有数据"显示错误且不删除任何本地数据（恢复网络后重试成功）
 - [ ] After Delete All Data, the app restarts cleanly to onboarding / 删除所有数据后，应用干净地重启至新手引导
 - [ ] Push notification for feeding reminder appears after ~4 hours without feeding / 约 4 小时未喂食后出现喂食提醒推送通知

@@ -81,6 +81,9 @@ struct MoodPicker: View {
                                     in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerSmall))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(style == "pills"
+                    ? L10n.t("Switch to mood slider", "切换到情绪滑块")
+                    : L10n.t("Switch to mood grid", "切换到情绪网格"))
             }
 
             if style == "pills" {
@@ -132,7 +135,7 @@ private struct MoodPillsView: View {
                         Text(mood.emoji)
                             .font(.title3)
                         Text(L10n.t(mood.labelEN, mood.labelZH))
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                             .foregroundStyle(selectedMood == mood ? .white : TreeholeTheme.textPrimary)
@@ -147,6 +150,8 @@ private struct MoodPillsView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(L10n.t(mood.labelEN, mood.labelZH))
+                .accessibilityAddTraits(selectedMood == mood ? [.isSelected] : [])
             }
         }
     }
@@ -204,6 +209,7 @@ private struct MoodSliderView: View {
                     .animation(.easeInOut(duration: 0.15), value: displayedMood)
             }
             .frame(height: 130)
+            .accessibilityHidden(true)  // Decorative — the mood label + slider carry the state
 
             Text(L10n.t(displayedMood.labelEN, displayedMood.labelZH))
                 .font(.headline)
@@ -224,14 +230,16 @@ private struct MoodSliderView: View {
                 }
                 .tint(TreeholeTheme.softPurple)
                 .padding(.horizontal, TreeholeTheme.spacingSmall)
+                .accessibilityLabel(L10n.t("Mood pleasantness", "情绪愉悦度"))
+                .accessibilityValue(L10n.t(displayedMood.labelEN, displayedMood.labelZH))
 
                 HStack {
                     Text(L10n.t("VERY UNPLEASANT", "非常不愉快"))
-                        .font(.system(size: 10).weight(.semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(TreeholeTheme.textLight)
                     Spacer()
                     Text(L10n.t("VERY PLEASANT", "非常愉快"))
-                        .font(.system(size: 10).weight(.semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(TreeholeTheme.textLight)
                 }
                 .padding(.horizontal, TreeholeTheme.spacingSmall)
@@ -295,6 +303,7 @@ struct StatBadge: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -333,6 +342,7 @@ struct EmptyStateView: View {
             Image(systemName: icon)
                 .font(.system(size: 48))
                 .foregroundStyle(TreeholeTheme.softPurple)
+                .accessibilityHidden(true)
             Text(title)
                 .font(.title3.bold())
                 .foregroundStyle(TreeholeTheme.textPrimary)

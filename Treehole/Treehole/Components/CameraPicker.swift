@@ -5,7 +5,7 @@ import UIKit
 /// SwiftUI's `PhotosPicker` cannot access the camera, so this is required for in-app photo capture.
 struct CameraPicker: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
-    let onImagePicked: (Data) -> Void
+    let onImagePicked: @MainActor (Data) -> Void
 
     static var isAvailable: Bool {
         UIImagePickerController.isSourceTypeAvailable(.camera)
@@ -36,9 +36,14 @@ struct CameraPicker: UIViewControllerRepresentable {
             _ picker: UIImagePickerController,
             didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
-            if let image = info[.originalImage] as? UIImage,
-               let data = image.jpegData(compressionQuality: 0.85) {
-                parent.onImagePicked(data)
+            // Full camera resolution would bypass the 1024px/JPEG cap the
+            // PhotosPicker path enforces — downsample off the main thread.
+            if let image = info[.originalImage] as? UIImage {
+                let onImagePicked = parent.onImagePicked
+                Task {
+                    guard let data = await PhotoImportPipeline.downsampledJPEG(from: image) else { return }
+                    onImagePicked(data)
+                }
             }
             parent.dismiss()
         }

@@ -25,6 +25,10 @@ struct SettingsView: View {
     @State private var showDeleteError = false
     @State private var isDeleting = false
 
+    // Hidden clouds management (UGC moderation)
+    @State private var showUnhidePostsConfirmation = false
+    @State private var showUnblockAuthorsConfirmation = false
+
     // Binding helpers that present setup if no passcode yet
     private var cloudLockBinding: Binding<Bool> {
         Binding(
@@ -222,6 +226,47 @@ struct SettingsView: View {
                     .foregroundStyle(TreeholeTheme.textLight)
                 }
 
+                // Hidden clouds (UGC moderation) — only shown when there is
+                // something to manage. @Observable store → counts stay live.
+                if !HiddenPostsStore.shared.hiddenPostIDs.isEmpty
+                    || !HiddenPostsStore.shared.blockedAuthorDeviceIDs.isEmpty {
+                    Section {
+                        if !HiddenPostsStore.shared.hiddenPostIDs.isEmpty {
+                            Button {
+                                showUnhidePostsConfirmation = true
+                            } label: {
+                                HStack {
+                                    Label(L10n.t("Hidden Clouds", "已隐藏的云朵"), systemImage: "eye.slash")
+                                    Spacer()
+                                    Text("\(HiddenPostsStore.shared.hiddenPostIDs.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityLabel(L10n.t("Unhide all hidden clouds", "恢复所有已隐藏的云朵"))
+                        }
+                        if !HiddenPostsStore.shared.blockedAuthorDeviceIDs.isEmpty {
+                            Button {
+                                showUnblockAuthorsConfirmation = true
+                            } label: {
+                                HStack {
+                                    Label(L10n.t("Hidden Authors", "已隐藏的作者"), systemImage: "person.slash")
+                                    Spacer()
+                                    Text("\(HiddenPostsStore.shared.blockedAuthorDeviceIDs.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityLabel(L10n.t("Unhide all hidden authors", "恢复所有已隐藏的作者"))
+                        }
+                    } header: {
+                        Text(L10n.t("Moderation", "内容管理"))
+                    } footer: {
+                        Text(L10n.t(
+                            "Clouds you report or hide, and authors you hide, stay hidden across launches. Restoring them lets their clouds appear in grabs again.",
+                            "你举报或隐藏的云朵、以及隐藏的作者，会在多次启动间保持隐藏。恢复后，抓云时可能再次出现。"
+                        ))
+                    }
+                }
+
                 // Subscription section (mock)
                 Section(L10n.t("Subscription", "订阅")) {
                     HStack {
@@ -411,6 +456,36 @@ struct SettingsView: View {
                 Button(L10n.t("OK", "好"), role: .cancel) { }
             } message: {
                 Text(deleteErrorMessage ?? "")
+            }
+            .confirmationDialog(
+                L10n.t("Unhide all hidden clouds?", "恢复所有已隐藏的云朵？"),
+                isPresented: $showUnhidePostsConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(L10n.t("Unhide All", "全部恢复")) {
+                    HiddenPostsStore.shared.unhideAllPosts()
+                }
+                Button(L10n.t("Cancel", "取消"), role: .cancel) { }
+            } message: {
+                Text(L10n.t(
+                    "Clouds you reported or hid can appear in grabs again.",
+                    "你举报或隐藏过的云朵可能再次被抓到。"
+                ))
+            }
+            .confirmationDialog(
+                L10n.t("Unhide all hidden authors?", "恢复所有已隐藏的作者？"),
+                isPresented: $showUnblockAuthorsConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(L10n.t("Unhide All", "全部恢复")) {
+                    HiddenPostsStore.shared.unblockAllAuthors()
+                }
+                Button(L10n.t("Cancel", "取消"), role: .cancel) { }
+            } message: {
+                Text(L10n.t(
+                    "Clouds from these authors can appear in grabs again.",
+                    "这些作者的云朵可能再次被抓到。"
+                ))
             }
         }
     }

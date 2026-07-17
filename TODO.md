@@ -43,5 +43,5 @@ Delete items as you finish them.
 
 ## 4. Before next TestFlight archive
 - Bump `CURRENT_PROJECT_VERSION` (last shipped build: 14).
-- `make test-full` should be green (339 unit + 22 UI as of the report/hide +
+- `make test-full` should be green (342 unit + 22 UI as of the report/hide +
   accessibility batch).

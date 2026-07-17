@@ -28,7 +28,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Economy | Food / Decoration Tokens / Gems currencies, 4 daily task types (titles localized at render time), 4 weekly challenge types, login streak rewards, daily login bonus claimable once per day (persisted), CloudKit-duplicated Economy/DailyTask rows deduped on load, shop (buy food with tokens) |
 | Privacy Lock | Apple-style 4-digit passcode (Keychain stored), FaceID / TouchID, lock My Clouds and/or Journal independently, gate page before passcode entry, re-locks automatically when the app is backgrounded |
 | Onboarding | 4-page flow: welcome, features, privacy & aliases, get started (Apple Sign-In or Guest) |
-| Settings | Account, alias explanation, privacy lock, appearance (language / dark mode), iCloud sync status (real CKContainer.accountStatus check, requires Apple sign-in), full account deletion (aborts safely if the cloud wipe fails — nothing local is touched; also removes the user's comments/reactions; calls the `delete_my_data` RPC first and transparently falls back to `delete_my_posts` + client-side cleanup until the migration is applied), [privacy policy](https://c-square04.github.io/Treehole/privacy.html), developer debug panel (Debug builds only, 5-tap version trigger) |
+| Settings | Account, alias explanation, privacy lock, appearance (language / dark mode), iCloud sync status (real CKContainer.accountStatus check, requires Apple sign-in), full account deletion (aborts safely if the cloud wipe fails — nothing local is touched; also removes the user's comments/reactions; calls the `delete_my_data` RPC first and transparently falls back to `delete_my_posts` + client-side cleanup until the migration is applied), moderation management (unhide clouds / authors), [privacy policy](https://c-square04.github.io/Treehole/privacy.html), developer debug panel (Debug builds only, 5-tap version trigger) |
 | Authentication | Apple Sign-In (ASAuthorizationAppleIDCredential), Guest mode, device-to-account post migration with persisted retry (on launch/foreground until it succeeds) |
 | iCloud Sync | SwiftData + CloudKit for local data (pet / plant / journal / economy), iCloud ubiquity container for journal photos, Supabase for social data; the SwiftData store is never auto-deleted — on unrecoverable failure it is moved aside as `Backup-*` and recreated |
 | Push Notifications | Feeding reminder (4 h), watering reminder (24 h), daily check-in (9 AM) |
@@ -54,7 +54,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Keychain | Security framework (passcode storage) |
 | Notifications | UserNotifications framework |
 | Navigation | TabView (5 tabs) + NavigationStack |
-| Testing | Swift Testing (339 unit tests) + XCTest (22 UI tests) |
+| Testing | Swift Testing (342 unit tests) + XCTest (22 UI tests) |
 
 ---
 
@@ -153,7 +153,7 @@ Treehole/Treehole/                          (59 Swift files)
     ├── CameraPicker.swift
     └── SharedComponents.swift               # MoodPicker (pills / pleasantness slider)
 
-TreeholeTests/                               # 339 unit tests (Swift Testing)
+TreeholeTests/                               # 341 unit tests (Swift Testing)
 TreeholeUITests/                             # 22 UI tests (XCTest)
 ```
 
@@ -220,7 +220,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 
 Or use the Makefile shortcuts from the repo root: `make test` (unit only, ~15s), `make test-full` (unit + UI), `make build`, `make archive`.
 
-**Current test count:** 361 total (339 unit tests via Swift Testing + 22 UI tests via XCTest)
+**Current test count:** 364 total (342 unit tests via Swift Testing + 22 UI tests via XCTest)
 
 ---
 
@@ -276,7 +276,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 经济系统 | 食物/装饰代币/宝石三种货币、4 类每日任务（标题在渲染时本地化）、4 类每周挑战、登录连续奖励、每日登录奖励每天仅可领取一次（持久化存储）、CloudKit 同步产生的重复 Economy/DailyTask 行会在加载时去重、商店（用代币购买食物） |
 | 隐私锁 | 苹果风格 4 位数字密码（Keychain 存储）、FaceID/TouchID、独立锁定我的云朵和/或日记、密码输入前的闸门页面、应用进入后台时自动重新上锁 |
 | 新手引导 | 4 页流程：欢迎、功能介绍、隐私与别名说明、开始（Apple 登录或游客模式） |
-| 设置 | 账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态页（真实 CKContainer.accountStatus 检测，需 Apple 登录）、完整账户删除（云端清除失败时安全中止——不动任何本地数据；同时删除用户的评论/反应；优先调用 `delete_my_data` RPC，迁移执行前自动透明回退到 `delete_my_posts` + 客户端清理）、[隐私政策](https://c-square04.github.io/Treehole/privacy.html)、开发者调试面板（仅 Debug 构建，连击 5 次版本号触发） |
+| 设置 | 账户、别名说明、隐私锁、外观（语言/深色模式）、iCloud 同步状态页（真实 CKContainer.accountStatus 检测，需 Apple 登录）、完整账户删除（云端清除失败时安全中止——不动任何本地数据；同时删除用户的评论/反应；优先调用 `delete_my_data` RPC，迁移执行前自动透明回退到 `delete_my_posts` + 客户端清理）、内容管理（恢复已隐藏的云朵/作者）、[隐私政策](https://c-square04.github.io/Treehole/privacy.html)、开发者调试面板（仅 Debug 构建，连击 5 次版本号触发） |
 | 身份验证 | Apple Sign-In（ASAuthorizationAppleIDCredential）、游客模式、设备帖子迁移至账户（持久化重试——启动/回到前台时自动重试直至成功） |
 | iCloud 同步 | SwiftData + CloudKit 同步本地数据（宠物/植物/日记/经济），iCloud 容器存储日记照片，Supabase 存储社交数据；SwiftData 存储永不自动删除——遇到不可恢复的错误时会被移到 `Backup-*` 备份后重建 |
 | 推送通知 | 喂食提醒（4 小时）、浇水提醒（24 小时）、每日签到（上午 9 点） |
@@ -302,7 +302,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 钥匙串 | Security 框架（密码存储） |
 | 通知 | UserNotifications 框架 |
 | 导航 | TabView（5 标签）+ NavigationStack |
-| 测试 | Swift Testing（339 个单元测试）+ XCTest（22 个 UI 测试） |
+| 测试 | Swift Testing（342 个单元测试）+ XCTest（22 个 UI 测试） |
 
 ---
 
@@ -401,7 +401,7 @@ Treehole/Treehole/                          （共 59 个 Swift 文件）
     ├── CameraPicker.swift
     └── SharedComponents.swift               # MoodPicker（胶囊按钮 / 愉悦度滑条）
 
-TreeholeTests/                               # 339 个单元测试（Swift Testing）
+TreeholeTests/                               # 342 个单元测试（Swift Testing）
 TreeholeUITests/                             # 22 个 UI 测试（XCTest）
 ```
 
@@ -468,7 +468,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 
 也可以在仓库根目录使用 Makefile 快捷命令：`make test`（仅单元测试，约 15 秒）、`make test-full`（单元 + UI）、`make build`、`make archive`。
 
-**当前测试总数：** 361（339 个单元测试，Swift Testing + 22 个 UI 测试，XCTest）
+**当前测试总数：** 364（342 个单元测试，Swift Testing + 22 个 UI 测试，XCTest）
 
 ---
 

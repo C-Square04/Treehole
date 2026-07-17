@@ -94,6 +94,14 @@ Journal entries, photos, voice notes, pet, and plant data are stored on-device
 (SwiftData) and synced only to the user's private iCloud (CloudKit) — the
 developer has no access to them.
 
+### Privacy Manifest
+
+`Treehole/Treehole/PrivacyInfo.xcprivacy` ships in the app bundle and mirrors
+this label: no tracking, UserDefaults as the only required-reason API
+(CA92.1), and the collected data types above (Device ID, User ID, product
+interaction, other user content — none linked to identity, none used for
+tracking). Keep the manifest and this label in sync when data practices change.
+
 ---
 
 ## Review Notes (for App Review team)

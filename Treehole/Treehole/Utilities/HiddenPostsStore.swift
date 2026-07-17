@@ -55,14 +55,24 @@ final class HiddenPostsStore {
         defaults.set(blockedAuthorDeviceIDs.sorted(), forKey: Self.blockedAuthorsKey)
     }
 
+    /// Clears all hidden posts (they can show up in grabs again).
+    func unhideAllPosts() {
+        hiddenPostIDs = []
+        defaults.removeObject(forKey: Self.hiddenPostsKey)
+    }
+
+    /// Clears all blocked authors (their clouds can show up in grabs again).
+    func unblockAllAuthors() {
+        blockedAuthorDeviceIDs = []
+        defaults.removeObject(forKey: Self.blockedAuthorsKey)
+    }
+
     /// Clears all hidden/blocked state. Called after a full account deletion
     /// wipes UserDefaults — otherwise the stale in-memory sets would be
     /// re-persisted on the next hide/block call, resurrecting "deleted" data.
     func reset() {
-        hiddenPostIDs = []
-        blockedAuthorDeviceIDs = []
-        defaults.removeObject(forKey: Self.hiddenPostsKey)
-        defaults.removeObject(forKey: Self.blockedAuthorsKey)
+        unhideAllPosts()
+        unblockAllAuthors()
     }
 
     func isHidden(_ post: RemoteCloudPost) -> Bool {

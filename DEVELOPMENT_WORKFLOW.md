@@ -61,7 +61,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
   2>&1 | grep -E "(Test Case|passed|failed)" | tail -30
 ```
 
-**Current test count: 361 total — 339 unit tests (Swift Testing, `@Test`/`#expect`) + 22 UI tests (XCTest)**
+**Current test count: 364 total — 342 unit tests (Swift Testing, `@Test`/`#expect`) + 22 UI tests (XCTest)**
 
 New features must ship with accompanying tests before merging.
 

@@ -104,6 +104,9 @@ Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for t
 - [ ] FaceID toggle enables biometric unlock when passcode is set / 设置密码后，FaceID 开关可启用生物识别解锁
 - [ ] AI Insights toggle disables/enables AI features visibly / AI 洞察开关可见地开关 AI 功能
 - [ ] iCloud sync status shows correct account state (signed in / not signed in) / iCloud 同步状态显示正确的账户状态（已登录/未登录）
+- [ ] With at least one hidden cloud or author, Settings shows the "Moderation" section with live counts; the section disappears when nothing is hidden / 存在已隐藏云朵或作者时，设置中显示"内容管理"区域及实时计数；无隐藏内容时该区域消失
+- [ ] "Hidden Clouds" → "Unhide All" → confirm: all hidden clouds are restored and can be grabbed again / "已隐藏的云朵"→"全部恢复"→ 确认：所有隐藏云朵恢复，抓云时可能再次出现
+- [ ] "Hidden Authors" → "Unhide All" → confirm: clouds from those authors can appear again / "已隐藏的作者"→"全部恢复"→ 确认：这些作者的云朵可再次出现
 - [ ] "Privacy Policy" link opens correctly / "隐私政策"链接正确打开
 - [ ] Developer debug panel unlocks after 5 taps on the version number (Debug builds only — absent from TestFlight/Release builds) / 在版本号上连击 5 次后解锁开发者调试面板（仅 Debug 构建——TestFlight/Release 版本中不存在）
 

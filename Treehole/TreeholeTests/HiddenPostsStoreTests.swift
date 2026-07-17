@@ -15,7 +15,7 @@ import Foundation
 @Suite("HiddenPostsStore Tests", .serialized)
 final class HiddenPostsStoreTests {
 
-    private static let suiteName = "HiddenPostsStoreTests"
+    nonisolated private static let suiteName = "HiddenPostsStoreTests"
     private let defaults: UserDefaults
 
     init() {
@@ -137,5 +137,41 @@ final class HiddenPostsStoreTests {
         #expect(reloaded.hiddenPostIDs.isEmpty)
         #expect(reloaded.blockedAuthorDeviceIDs.isEmpty)
         #expect(reloaded.isHidden(makePost(id: "post-1", deviceId: "device-bad")) == false)
+    }
+
+    // MARK: - Unhide / unblock all (Settings management)
+
+    @Test func testUnhideAllPostsKeepsBlockedAuthors() {
+        let store = HiddenPostsStore(defaults: defaults)
+        store.hidePost(id: "post-1")
+        store.blockAuthor(deviceId: "device-bad")
+
+        store.unhideAllPosts()
+
+        #expect(store.hiddenPostIDs.isEmpty)
+        #expect(store.blockedAuthorDeviceIDs == ["device-bad"])
+        // Persists: a fresh instance sees the same split
+        let reloaded = HiddenPostsStore(defaults: defaults)
+        #expect(reloaded.hiddenPostIDs.isEmpty)
+        #expect(reloaded.blockedAuthorDeviceIDs == ["device-bad"])
+        // The previously hidden post is visible again; the blocked author is not
+        #expect(reloaded.isHidden(makePost(id: "post-1", deviceId: "device-ok")) == false)
+        #expect(reloaded.isHidden(makePost(id: "post-9", deviceId: "device-bad")))
+    }
+
+    @Test func testUnblockAllAuthorsKeepsHiddenPosts() {
+        let store = HiddenPostsStore(defaults: defaults)
+        store.hidePost(id: "post-1")
+        store.blockAuthor(deviceId: "device-bad")
+
+        store.unblockAllAuthors()
+
+        #expect(store.hiddenPostIDs == ["post-1"])
+        #expect(store.blockedAuthorDeviceIDs.isEmpty)
+        let reloaded = HiddenPostsStore(defaults: defaults)
+        #expect(reloaded.hiddenPostIDs == ["post-1"])
+        #expect(reloaded.blockedAuthorDeviceIDs.isEmpty)
+        #expect(reloaded.isHidden(makePost(id: "post-1", deviceId: "device-bad")))
+        #expect(reloaded.isHidden(makePost(id: "post-2", deviceId: "device-bad")) == false)
     }
 }

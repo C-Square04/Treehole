@@ -170,9 +170,9 @@ Supabase project URL: `https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | `cloud_reactions` | Breeze / hug / starlight reactions (unique per device per post; `apple_user_id` added by migration #3 so account deletion can wipe a signed-in user's reactions across installs) |
 | `grabbed_posts` | Tracks which posts each user has already grabbed (apple_user_id or device_id), prevents duplicates |
 | `npc_reply_templates` | Pre-written NPC response templates |
-| `post_reports` | User reports of cloud posts (post_id, reporter_device_id, reason; one report per device per post; insert-only for anonymous clients) — **pending migration, see TODO below** |
+| `post_reports` | User reports of cloud posts (post_id, reporter_device_id, reason; one report per device per post; insert-only for anonymous clients) |
 | `post_reaction_counts` | View: aggregated reaction counts per post |
-| `reported_posts_summary` | View: reported posts ranked by report count for manual review — **pending migration, see TODO below** |
+| `reported_posts_summary` | View: reported posts ranked by report count for manual review (anon/authenticated SELECT revoked — dashboard only) |
 | `analytics_events` | Anonymous analytics events (device_id, event name, properties) |
 
 **Edge Functions:** `moderate-post`, `generate-npc-reply`, `pet-chat`, `pet-tts`, `summarize-journal` (all proxy MiniMax — API key stays server-side via `MINIMAX_API_KEY` env var)
@@ -186,12 +186,9 @@ Supabase project URL: `https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | `get_my_unread_count(device_id, apple_user_id)` | Unread comment/reaction counts for check-in notifications |
 | `migrate_posts_to_apple_user(p_device_id, p_apple_user_id)` | Re-attributes guest posts to the Apple account after sign-in |
 | `delete_my_posts(requesting_device_id, requesting_apple_user_id)` | Account deletion: wipes the user's cloud posts (matches device_id OR apple_user_id, SECURITY DEFINER) |
+| `delete_my_data(requesting_device_id, requesting_apple_user_id)` | Account deletion: wipes the user's posts AND comments AND reactions across both identities (SECURITY DEFINER, supersedes `delete_my_posts`) |
 
-**TODO — pending server-side migration #1:** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` adds a `delete_my_data` RPC that also wipes the user's comments and reactions server-side. Review it against the live schema and run it in the Supabase SQL editor. The client already calls `rpc/delete_my_data` first and transparently falls back to `delete_my_posts` + client-side cleanup while the function is missing (PostgREST 404).
-
-**TODO — pending server-side migration #2:** `supabase/migrations/20260717_post_reports.sql` creates the `post_reports` table (insert-only for anonymous clients, one report per device per post) and the `reported_posts_summary` review view behind the in-app "Report Cloud" button. Until it is run, report uploads fail silently server-side — the local hide still always works. After running it, review `reported_posts_summary` periodically and delete offending posts. Idempotent — safe to re-run.
-
-**TODO — pending server-side migration #3:** `supabase/migrations/20260717_reactions_apple_user_id.sql` adds `apple_user_id` to `cloud_reactions` and upgrades `delete_my_data` so a signed-in user's reactions are wiped even when they were left under a rotated device_id (e.g. before a reinstall). The client already sends `apple_user_id` on new reactions and retries once without it while the column is missing (PostgREST 400), so the migration can be applied in any order with the client.
+**Migrations applied (2026-07-17):** all files under `supabase/migrations/` are live, including `20260716120000_delete_my_data_wipes_comments_reactions.sql` (`delete_my_data` RPC), `20260717090000_post_reports.sql` (report table + review view), and `20260717090100_reactions_apple_user_id.sql` (reactions wiped across rotated device ids for signed-in users). History is recorded in `supabase_migrations.schema_migrations` for future `supabase db push` runs. The client still keeps its transparent fallbacks (404 → `delete_my_posts`, 400 → reaction without `apple_user_id`) so older servers/self-hosted instances work too.
 
 ---
 
@@ -420,9 +417,9 @@ Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | `cloud_reactions` | 微风/拥抱/星光反应（每设备每帖唯一；迁移 #3 新增 `apple_user_id` 列，使账户删除能清除已登录用户跨设备的反应） |
 | `grabbed_posts` | 按用户记录已抓取的云朵（apple_user_id 优先，否则 device_id），避免重复 |
 | `npc_reply_templates` | NPC 预设回复模板 |
-| `post_reports` | 用户对云朵的举报（post_id、reporter_device_id、reason；每设备每帖限一次举报；匿名客户端仅可插入）——**待执行迁移，见下方 TODO** |
+| `post_reports` | 用户对云朵的举报（post_id、reporter_device_id、reason；每设备每帖限一次举报；匿名客户端仅可插入） |
 | `post_reaction_counts` | 视图：每帖反应数聚合统计 |
-| `reported_posts_summary` | 视图：被举报的帖子按举报次数排序，供人工审阅——**待执行迁移，见下方 TODO** |
+| `reported_posts_summary` | 视图：被举报的帖子按举报次数排序，供人工审阅（已撤销 anon/authenticated 读取权限——仅限后台查看） |
 | `analytics_events` | 匿名分析事件（device_id、事件名、属性） |
 
 **Edge Functions：** `moderate-post`、`generate-npc-reply`、`pet-chat`、`pet-tts`、`summarize-journal`（全部代理 MiniMax — API key 保存在服务端 `MINIMAX_API_KEY` 环境变量）
@@ -436,12 +433,9 @@ Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | `get_my_unread_count(device_id, apple_user_id)` | 未读评论/反应计数，用于签到通知 |
 | `migrate_posts_to_apple_user(p_device_id, p_apple_user_id)` | Apple 登录后将游客帖子归属到 Apple 账户 |
 | `delete_my_posts(requesting_device_id, requesting_apple_user_id)` | 账户删除：清除用户的云朵帖子（匹配 device_id 或 apple_user_id，SECURITY DEFINER） |
+| `delete_my_data(requesting_device_id, requesting_apple_user_id)` | 账户删除：一并清除用户的帖子、评论与反应（两种身份均匹配，SECURITY DEFINER，取代 `delete_my_posts`） |
 
-**TODO——待执行的服务端迁移 #1：** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` 新增 `delete_my_data` RPC，在服务端一并清除用户的评论和反应。请先对照线上 schema 审阅，然后在 Supabase SQL 编辑器中执行。客户端已优先调用 `rpc/delete_my_data`，在函数尚不存在时（PostgREST 404）自动透明回退到 `delete_my_posts` + 客户端清理。
-
-**TODO——待执行的服务端迁移 #2：** `supabase/migrations/20260717_post_reports.sql` 创建 `post_reports` 表（匿名客户端仅可插入，每设备每帖限一次举报）与 `reported_posts_summary` 审阅视图，支撑应用内的"举报云朵"按钮。执行前，举报上传会在服务端静默失败——本地隐藏始终生效。执行后请定期查看 `reported_posts_summary` 并删除违规帖子。幂等——可安全重复执行。
-
-**TODO——待执行的服务端迁移 #3：** `supabase/migrations/20260717_reactions_apple_user_id.sql` 为 `cloud_reactions` 增加 `apple_user_id` 列并升级 `delete_my_data`，使已登录用户在旧 device_id（如重装前）留下的反应也能被彻底清除。客户端已立即在新反应上发送 `apple_user_id`，列不存在时（PostgREST 400）自动重试不带该字段的请求，因此迁移与客户端可按任意顺序上线。
+**迁移已全部执行（2026-07-17）：** `supabase/migrations/` 下所有迁移均已上线，包括 `20260716120000_delete_my_data_wipes_comments_reactions.sql`（`delete_my_data` RPC）、`20260717090000_post_reports.sql`（举报表 + 审阅视图）、`20260717090100_reactions_apple_user_id.sql`（已登录用户跨设备的反应也能被彻底清除）。迁移历史已写入 `supabase_migrations.schema_migrations`，便于未来 `supabase db push`（例如迁移到自托管实例）。客户端仍保留透明回退（404 → `delete_my_posts`，400 → 不带 `apple_user_id` 的反应），因此旧服务端或自托管实例也能正常工作。
 
 ---
 

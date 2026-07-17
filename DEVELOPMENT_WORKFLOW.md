@@ -150,7 +150,7 @@ Core loop: 4-page onboarding, cloud posts with NPC replies, virtual pet (feed/pe
 2. **Accessibility** — VoiceOver labels on all interactive elements, Dynamic Type support throughout, Reduce Motion fallbacks for all animations.
 3. **Performance** — Profile SwiftData query costs, reduce main-thread work in list views, optimize CloudKit sync frequency.
 4. **AI Enhancements** — Improved NPC personas, mood-aware reply generation.
-5. **Backend TODO** — Review and run `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` in the Supabase SQL editor (the client already calls `rpc/delete_my_data` first and falls back transparently until the function exists).
+5. **Backend — DONE (2026-07-17)** — All three migrations are live: `delete_my_data` RPC, `post_reports` + review view (anon SELECT revoked), and `cloud_reactions.apple_user_id` matched in the wipe. History recorded in `supabase_migrations.schema_migrations`; `delete_my_posts`/`get_my_unread_count` also had `search_path = public` pinned. Client fallbacks remain for older/self-hosted servers.
 
 ---
 
@@ -244,4 +244,31 @@ TreeholeUITests/                             # 22 UI tests (XCTest)
 - Required Xcode capabilities: iCloud (CloudKit + Documents), Push Notifications, Sign In with Apple, Keychain Sharing.
 - Passcode is stored in Keychain only — never in SwiftData, never in Supabase.
 - AI calls (moderation, NPC reply, pet chat, pet TTS, journal summaries) are always routed through Supabase Edge Functions (`moderate-post`, `generate-npc-reply`, `pet-chat`, `pet-tts`, `summarize-journal`), not called directly from the client.
-- Pending server-side migrations in `supabase/migrations/`: `20260716_delete_my_data_wipes_comments_reactions.sql` (adds `delete_my_data` RPC — the client already calls it first and falls back to `delete_my_posts` + client-side cleanup while missing), `20260717_post_reports.sql` (report table + review view, idempotent), `20260717_reactions_apple_user_id.sql` (`cloud_reactions.apple_user_id` so deletion wipes a signed-in user's reactions across installs; client sends it with a 400 fallback). Run them in the Supabase SQL editor.
+- Server-side migrations in `supabase/migrations/` are all applied (2026-07-17) and recorded in `supabase_migrations.schema_migrations` — new environments (e.g. self-hosted) can replay them with `supabase db push`. The client keeps transparent fallbacks (`delete_my_data` 404 → `delete_my_posts`; reaction insert 400 → retry without `apple_user_id`) so it works against servers that haven't run them yet.
+
+---
+
+## Migrating to Self-Hosted Supabase (planned)
+
+Current: Supabase Cloud free plan, project `gjtiqwkhrepwhtoyjeix`. When moving
+to a self-hosted instance:
+
+1. **Deploy the stack** (Supabase self-hosting guide / Docker compose) and note
+   the new project's URL + anon key.
+2. **Replay migrations**: `supabase link --project-ref <new>` then
+   `supabase db push` — the history recorded on 2026-07-17 keeps this clean
+   (nothing double-applies).
+3. **Edge Functions** — the sources for `moderate-post`, `generate-npc-reply`,
+   `pet-chat`, `pet-tts`, `summarize-journal` currently live ONLY in the cloud
+   dashboard. Export them first (dashboard → Edge Functions → download, or
+   `supabase functions download <name>`), add them under
+   `supabase/functions/`, then `supabase functions deploy`.
+4. **Secrets**: set `MINIMAX_API_KEY` on the new instance
+   (`supabase secrets set MINIMAX_API_KEY=...`).
+5. **Data** (optional): export/import with `pg_dump`/`pg_restore` if existing
+   cloud posts/comments must carry over.
+6. **Client**: update `SupabaseConfig.projectURL` and `SupabaseConfig.anonKey`
+   in `Services/SupabaseService.swift`. Nothing else changes — the client only
+   talks REST + RPC + Edge Functions.
+7. **Unaffected**: SwiftData/CloudKit data (journal, pet, plants) lives on the
+   user's device + their private iCloud — it never touches Supabase.

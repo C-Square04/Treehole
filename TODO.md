@@ -3,28 +3,22 @@
 Things only you can do (Claude noted these during the 2026-07-17 health pass).
 Delete items as you finish them.
 
-## 1. Run the three Supabase migrations (10 min) — do this first
-- Open the Supabase SQL editor for project `gjtiqwkhrepwhtoyjeix`.
-- Review and run, in order:
-  1. [supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql](supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql)
-     — sanity-check the column assumptions in the file header first
-     (`cloud_comments.apple_user_id` existing, etc.).
-  2. [supabase/migrations/20260717_post_reports.sql](supabase/migrations/20260717_post_reports.sql)
-     — the report-post table behind the new in-app "Report" button.
-     Safe to re-run (idempotent).
-  3. [supabase/migrations/20260717_reactions_apple_user_id.sql](supabase/migrations/20260717_reactions_apple_user_id.sql)
-     — adds `apple_user_id` to `cloud_reactions` and upgrades `delete_my_data`
-     so a signed-in user's reactions are wiped even after a reinstall.
-- The iOS client calls `rpc/delete_my_data` first and silently falls back to
-  the old `delete_my_posts` path until the function exists, so there is no
-  deadline — but until you run #1, comments/reactions from re-installed
-  devices can't be fully wiped on account deletion. Until you run #2,
-  reports are hidden locally for the reporter but not recorded server-side.
-  Until you run #3, reactions from a signed-in user's older installs survive
-  account deletion (the client already sends `apple_user_id` on new
-  reactions and retries without it while the column is missing).
-- After #2: check `reported_posts_summary` in Supabase occasionally and
-  delete offending posts.
+## 1. ~~Run the Supabase migrations~~ — DONE 2026-07-17
+Applied via the Management API and verified live:
+- `delete_my_data` RPC exists (SECURITY DEFINER, search_path=public) — anon
+  call with fake ids returns 0 instead of 404
+- `post_reports` table live with insert-only RLS for anon; anon SELECT
+  returns no rows
+- `reported_posts_summary` view live; anon/authenticated SELECT is revoked
+  (42501) — moderation queue is not world-readable
+- `delete_my_data` upgraded to wipe reactions by apple_user_id too
+  (`cloud_reactions.apple_user_id` already existed and the client now sends it)
+- Bonus hardening: `delete_my_posts` and `get_my_unread_count` also got
+  `search_path = public` pinned
+- History rows recorded in `supabase_migrations.schema_migrations`, so a
+  future `supabase db push` (e.g. to a self-hosted instance) won't re-apply
+- Remaining habit: check `reported_posts_summary` occasionally and delete
+  offending posts.
 
 ## 2. Review AppStoreMetadata.md wording (10 min)
 - The old file claimed "no data collected / 100% local / no network requests" —

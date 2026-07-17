@@ -41,7 +41,7 @@ Applied via the Management API and verified live:
   to see the localized dialog live.
 
 ## 4. Before next TestFlight archive
-- `CURRENT_PROJECT_VERSION` is already 15 (last shipped build: 14) — if App
-  Store Connect says 15 is taken, bump to 16.
+- `CURRENT_PROJECT_VERSION` is 16 (15 was already taken on App Store Connect).
+  Next time: bump before archiving.
 - `make test-full` should be green (344 unit + 22 UI as of the report/hide +
   accessibility batch).

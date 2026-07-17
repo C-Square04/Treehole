@@ -158,6 +158,7 @@ struct AppStateAIToggleTests {
         // AppState reads from UserDefaults.standard, but the key won't exist
         // for a fresh install. We verify the property initializer default.
         let state = AppState()
+        _ = state // constructing must not crash; the initializer default is false
         // The property default is false; if the key exists from a prior test
         // run it may differ — but the initializer default declaration is false.
         // We test by ensuring it is always a Bool (non-crashing) and that

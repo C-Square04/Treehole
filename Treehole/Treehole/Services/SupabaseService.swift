@@ -862,6 +862,35 @@ enum SupabaseService {
         )
     }
 
+    // MARK: - Fetch reaction counts for many posts (batched, one request per chunk)
+
+    /// Batch variant of fetchReactionCounts(postId:) — one PostgREST `in.`
+    /// query per 100 ids instead of N per-post requests (My Clouds cards).
+    static func fetchReactionCounts(postIds: [String]) async throws -> [String: ReactionCounts] {
+        guard !postIds.isEmpty else { return [:] }
+        var result: [String: ReactionCounts] = [:]
+        // Chunked: an unbounded in. list can exceed the gateway's URL limit
+        for start in stride(from: 0, to: postIds.count, by: 100) {
+            let chunk = postIds[start..<min(start + 100, postIds.count)]
+            let urlString = "\(SupabaseConfig.restURL)/post_reaction_counts?post_id=in.(\(chunk.joined(separator: ",")))"
+            guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
+
+            var request = URLRequest(url: url)
+            request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+            request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
+            }
+
+            for count in try JSONDecoder().decode([ReactionCounts].self, from: data) {
+                result[count.postId] = count
+            }
+        }
+        return result
+    }
+
     // MARK: - Fetch unread interaction counts (comments + reactions on own posts)
 
     static func fetchUnreadCount(since: Date) async -> (commentCount: Int, reactionCount: Int) {

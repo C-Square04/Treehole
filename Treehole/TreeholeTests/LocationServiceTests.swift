@@ -29,6 +29,7 @@ struct LocationServiceTests {
     // Verify that fetchCurrentLocation returns nil immediately when called
     // in a unit test context (no real GPS / permission denied).
     // This is a smoke test — we just ensure no crash.
+    @MainActor
     @Test func testFetchCurrentLocationDoesNotCrash() async {
         let service = LocationService()
         // In the test sandbox, this should return nil quickly (denied or timeout).

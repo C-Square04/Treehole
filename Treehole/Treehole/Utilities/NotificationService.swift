@@ -171,10 +171,10 @@ enum NotificationService {
             content: content,
             trigger: nil // fire immediately
         )
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error {
-                print("[Notification] checkUnreadInteractionsAndNotify failed: \(error)")
-            }
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            print("[Notification] checkUnreadInteractionsAndNotify failed: \(error)")
         }
 
         // Update timestamps after firing

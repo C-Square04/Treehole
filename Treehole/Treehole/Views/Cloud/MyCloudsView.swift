@@ -205,18 +205,9 @@ struct MyCloudsView: View {
     }
 
     private func loadAllReactions() async {
-        await withTaskGroup(of: (String, ReactionCounts?).self) { group in
-            for post in myPosts {
-                group.addTask {
-                    let counts = try? await SupabaseService.fetchReactionCounts(postId: post.id)
-                    return (post.id, counts)
-                }
-            }
-            for await (id, counts) in group {
-                if let counts = counts {
-                    reactionMap[id] = counts
-                }
-            }
+        // One batched query for all posts instead of N per-post requests
+        if let counts = try? await SupabaseService.fetchReactionCounts(postIds: myPosts.map(\.id)) {
+            reactionMap = counts
         }
         totalReactions = reactionMap.values.reduce(0) { $0 + $1.totalCount }
     }

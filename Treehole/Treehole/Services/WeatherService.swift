@@ -65,11 +65,19 @@ enum WeatherService {
 
     // MARK: - Fetch
 
+    /// Builds the Open-Meteo request URL. Coordinates are rounded to 2
+    /// decimals (~1.1 km) — plenty of precision for weather, and the user's
+    /// exact GPS never leaves the device.
+    nonisolated static func requestURL(lat: Double, lng: Double) -> URL? {
+        let roundedLat = (lat * 100).rounded() / 100
+        let roundedLng = (lng * 100).rounded() / 100
+        return URL(string: "https://api.open-meteo.com/v1/forecast?latitude=\(roundedLat)&longitude=\(roundedLng)&current=temperature_2m,weather_code")
+    }
+
     /// Fetches current weather from Open-Meteo (free, no key).
     /// Returns nil on any error — never throws, never crashes.
     static func fetchWeather(lat: Double, lng: Double, language: String) async -> WeatherInfo? {
-        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lng)&current=temperature_2m,weather_code"
-        guard let url = URL(string: urlString) else {
+        guard let url = requestURL(lat: lat, lng: lng) else {
             print("[WeatherService] Invalid URL")
             return nil
         }

@@ -17,19 +17,13 @@ final class PrivacyLockManager {
     var isCloudUnlocked: Bool = false
     var isJournalUnlocked: Bool = false
 
-    // Biometric availability
-    var biometricType: BiometricType {
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            return .none
-        }
-        switch context.biometryType {
-        case .faceID: return .faceID
-        case .touchID: return .touchID
-        default: return .none
-        }
-    }
+    // Biometric availability. Evaluated once at init — LAContext allocation
+    // and policy evaluation aren't free, and the passcode pad re-reads this
+    // several times per digit tap. Enrollment changes mid-session are picked
+    // up on the next launch.
+    private let cachedBiometricType: BiometricType
+
+    var biometricType: BiometricType { cachedBiometricType }
 
     enum BiometricType {
         case none, faceID, touchID
@@ -53,7 +47,23 @@ final class PrivacyLockManager {
 
     enum LockType { case cloud, journal }
 
-    init() { load() }
+    init() {
+        cachedBiometricType = Self.evaluateBiometricType()
+        load()
+    }
+
+    private static func evaluateBiometricType() -> BiometricType {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            return .none
+        }
+        switch context.biometryType {
+        case .faceID: return .faceID
+        case .touchID: return .touchID
+        default: return .none
+        }
+    }
 
     // MARK: - Passcode Management
 

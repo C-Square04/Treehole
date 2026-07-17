@@ -110,6 +110,7 @@ tracking). Keep the manifest and this label in sync when data practices change.
 - The anonymous social feature ("clouds") posts user-chosen text to a Supabase backend. Content passes 3-layer moderation: client keyword check, server-side AI moderation (MiniMax via Supabase Edge Functions), and a database trigger.
 - AI features (NPC replies, pet chat, opt-in journal summaries) call Supabase Edge Functions which proxy to MiniMax; no user identity is attached to these requests.
 - Anonymous usage analytics are sent to the developer's Supabase database: event names and categorical metadata only, never journal or post text.
+- If the user adds a location to a journal entry, coordinates are rounded to ~1 km before the one-shot weather lookup (Open-Meteo); the exact GPS never leaves the device, and the location itself stays on-device / in the user's private iCloud.
 - Notifications are local only (UNUserNotificationCenter); no remote push server is used.
 - The app does not require an account. A guest alias is auto-generated on first launch; Sign in with Apple is optional (enables cross-device post ownership).
 - Test account: Not required — tap "Continue as Guest" on the welcome screen.

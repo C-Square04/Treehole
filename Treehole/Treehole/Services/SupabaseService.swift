@@ -738,34 +738,39 @@ enum SupabaseService {
         let urlString = "\(SupabaseConfig.restURL)/cloud_reactions"
         guard let url = URL(string: urlString) else { throw SupabaseError.invalidURL }
 
-        struct AddReactionRequest: Codable {
-            let postId: String
-            let reactionType: String
-            let deviceId: String
-            enum CodingKeys: String, CodingKey {
-                case postId = "post_id"
-                case reactionType = "reaction_type"
-                case deviceId = "device_id"
-            }
+        // apple_user_id lets the account-deletion RPC wipe a signed-in user's
+        // reactions regardless of device_id rotation (migration
+        // 20260717_reactions_apple_user_id.sql). Until that migration is
+        // applied the column doesn't exist and PostgREST rejects the insert
+        // with 400 — retry once without the key.
+        var payload: [String: String] = [
+            "post_id": postId,
+            "reaction_type": type,
+            "device_id": SupabaseConfig.deviceId
+        ]
+        if let appleUserId = SupabaseConfig.appleUserID {
+            payload["apple_user_id"] = appleUserId
         }
 
-        let body = AddReactionRequest(
-            postId: postId,
-            reactionType: type,
-            deviceId: SupabaseConfig.deviceId
-        )
+        func send(_ payload: [String: String]) async throws -> HTTPURLResponse? {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+            request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.addValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
+            request.httpBody = try JSONEncoder().encode(payload)
+            let (_, response) = try await session.data(for: request)
+            return response as? HTTPURLResponse
+        }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
-        request.addValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
-        request.httpBody = try JSONEncoder().encode(body)
-
-        let (_, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...204).contains(httpResponse.statusCode) else {
-            throw SupabaseError.serverError((response as? HTTPURLResponse)?.statusCode, nil)
+        var httpResponse = try await send(payload)
+        if httpResponse?.statusCode == 400, payload["apple_user_id"] != nil {
+            payload["apple_user_id"] = nil
+            httpResponse = try await send(payload)
+        }
+        guard let httpResponse, (200...204).contains(httpResponse.statusCode) else {
+            throw SupabaseError.serverError(httpResponse?.statusCode, nil)
         }
     }
 

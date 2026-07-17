@@ -159,7 +159,9 @@ Run with VoiceOver (Settings → Accessibility → VoiceOver), Reduce Motion, an
 - [ ] VoiceOver on passcode screens: the dot row announces "N of 4 digits entered" as digits are typed, and the biometric (Face ID/Touch ID) and delete keys are named / VoiceOver 下密码界面：输入数字时圆点行播报"已输入 N/4 位"，生物识别键（Face ID/Touch ID）与删除键均有名称
 - [ ] VoiceOver on stranger clouds: the ellipsis menu announces "More options" and the report/hide actions are reachable / VoiceOver 下陌生人云朵：省略号菜单播报"更多选项"，举报/隐藏操作可达
 - [ ] Shop buy buttons announce the full action, e.g. "Buy Small Pack for 1 tokens" / 商店购买按钮播报完整操作，如"用 1 代币购买小食包"
-- [ ] With Reduce Motion ON, these are all static: pet idle bounce/tail, plant sway, lock-screen and welcome-page pulse, chat typing dots, recording-bar pulse, feed/water feedback transitions / 开启"减弱动态效果"后以下动画全部静止：宠物待机弹跳/尾巴、植物摇摆、锁屏与欢迎页脉冲、聊天输入指示点、录音条脉冲、喂食/浇水反馈过渡
+- [ ] With Reduce Motion ON, these are all static: pet idle bounce/tail, plant sway, lock-screen and welcome-page pulse, chat typing dots, recording-bar pulse, feed/water feedback transitions, cloud-screen floating decorations / 开启"减弱动态效果"后以下动画全部静止：宠物待机弹跳/尾巴、植物摇摆、锁屏与欢迎页脉冲、聊天输入指示点、录音条脉冲、喂食/浇水反馈过渡、云朵页漂浮装饰云
+- [ ] Feeding the pet (mood → happy) starts the idle bounce immediately; when the mood later leaves happy/excited the cat settles back instead of freezing mid-bounce / 喂食后（心情变为开心）猫咪立即开始待机弹跳；心情之后变为非开心/兴奋时，猫咪会平稳落回，而不是停在半空
+- [ ] Toggling Reduce Motion in iOS Settings WHILE the app is open stops/starts the pet and plant animations live / 应用打开状态下在 iOS 设置中切换"减弱动态效果"，宠物与植物动画会即时停止/恢复
 - [ ] At Dynamic Type AX5 (largest accessibility size): mood pill labels, slider captions (VERY UNPLEASANT/PLEASANT), and pet-chat mode captions scale without clipping or overlap / 动态字体调至 AX5（最大辅助功能字号）时：心情胶囊标签、滑条两端说明（非常不愉快/愉快）与宠物聊天模式说明文字正常缩放，无裁切或重叠
 
 ---

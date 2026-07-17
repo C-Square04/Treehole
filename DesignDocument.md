@@ -537,7 +537,9 @@ Reported posts joined with their report counts and last-reported timestamps, ran
 
 > **Pending migration #1:** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` adds a `delete_my_data` RPC that extends account deletion to the user's comments and reactions server-side. It must be reviewed and run in the Supabase SQL editor. The client already calls `rpc/delete_my_data` first and transparently falls back to `delete_my_posts` + client-side cleanup while the function is missing (PostgREST 404).
 >
-> **Pending migration #2:** `supabase/migrations/20260717_post_reports.sql` creates the `post_reports` table and the `reported_posts_summary` review view behind the in-app "Report Cloud" button. Until it is run, report uploads fail silently — the reporter's local hide still always works. After running it, review `reported_posts_summary` periodically and delete offending posts.
+> **Pending migration #2:** `supabase/migrations/20260717_post_reports.sql` creates the `post_reports` table and the `reported_posts_summary` review view behind the in-app "Report Cloud" button. Until it is run, report uploads fail silently — the reporter's local hide still always works. After running it, review `reported_posts_summary` periodically and delete offending posts. Idempotent — safe to re-run.
+
+> **Pending migration #3:** `supabase/migrations/20260717_reactions_apple_user_id.sql` adds `apple_user_id` to `cloud_reactions` and upgrades `delete_my_data` so a signed-in user's reactions are wiped even when left under a rotated device_id (e.g. before a reinstall). The client already sends `apple_user_id` on new reactions and retries once without it while the column is missing (PostgREST 400), so the migration and the client can ship in any order.
 
 ---
 
@@ -769,7 +771,7 @@ Economy system, shop, daily tasks, weekly challenges, login streaks, 5 plant spe
 Apple Sign-In, CloudKit sync, Privacy Lock (passcode + biometrics), drift bottle reactions (breeze / hug / starlight), My Clouds management, Supabase social layer, MiniMax AI moderation + NPC replies, journal photos (iCloud), mood statistics page, developer debug panel.
 
 ### Phase 4 — CURRENT
-**Shipped so far:** journal redesign (floating toolbar editor, voice notes + transcription, search, edit, location + weather, two dates, iPad adaptive split view), 16-mood system with pills / 1D pleasantness slider, real Year mood statistics view, per-entry + Monday-anchored weekly AI summaries (`summarize-journal`), pet chat with TTS voice selection (`pet-chat` / `pet-tts`), no-repeat cloud grabbing (`grabbed_posts`), anonymous analytics (`analytics_events`), account-deletion hardening (abort-on-failure + comment/reaction cleanup, `delete_my_data` RPC with transparent fallback), privacy-lock re-lock on backgrounding, daily-login-bonus persistence + CloudKit dedupe, cloud report/hide/block UGC moderation UI (`post_reports` + `HiddenPostsStore`, App Review 1.2), accessibility pass (VoiceOver labels/traits across all screens, Dynamic Type conversions, Reduce Motion gating), `CloudPostAPI` DI seam for testable cloud networking, deterministic rewrite of the 3 formerly flaky UI tests. Test suite: 342 unit tests (Swift Testing) + 22 UI tests (XCTest) = 364 total.
+**Shipped so far:** journal redesign (floating toolbar editor, voice notes + transcription, search, edit, location + weather, two dates, iPad adaptive split view), 16-mood system with pills / 1D pleasantness slider, real Year mood statistics view, per-entry + Monday-anchored weekly AI summaries (`summarize-journal`), pet chat with TTS voice selection (`pet-chat` / `pet-tts`), no-repeat cloud grabbing (`grabbed_posts`), anonymous analytics (`analytics_events`), account-deletion hardening (abort-on-failure + comment/reaction cleanup, `delete_my_data` RPC with transparent fallback), privacy-lock re-lock on backgrounding, daily-login-bonus persistence + CloudKit dedupe, cloud report/hide/block UGC moderation UI (`post_reports` + `HiddenPostsStore`, App Review 1.2), accessibility pass (VoiceOver labels/traits across all screens, Dynamic Type conversions, Reduce Motion gating), `CloudPostAPI` DI seam for testable cloud networking, deterministic rewrite of the 3 formerly flaky UI tests. Test suite: 344 unit tests (Swift Testing) + 22 UI tests (XCTest) = 366 total.
 
 **Remaining:**
 - UI polish pass aligned to Figma design specs
@@ -898,7 +900,7 @@ L10n.t() 贯穿全局，运行时切换语言，中英字符串完全同步
 - `post_reaction_counts`：反应数聚合视图
 - `reported_posts_summary`：被举报帖子按举报次数排序的审阅视图——**待执行迁移**
 
-**RPC：** `get_random_post`、`get_my_posts`、`get_my_unread_count`、`migrate_posts_to_apple_user`、`delete_my_posts`（均为 SECURITY DEFINER，匹配 device_id 或 apple_user_id）。**待执行迁移 #1：** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` 新增 `delete_my_data`（连同评论/反应一并删除）——需在 Supabase SQL 编辑器审阅并执行；客户端已优先调用该 RPC，函数缺失时（PostgREST 404）自动回退到 `delete_my_posts` + 客户端清理。**待执行迁移 #2：** `supabase/migrations/20260717_post_reports.sql` 创建 `post_reports` 表与 `reported_posts_summary` 审阅视图——执行前举报上传静默失败（本地隐藏始终生效），执行后请定期审阅该视图并删除违规帖子。
+**RPC：** `get_random_post`、`get_my_posts`、`get_my_unread_count`、`migrate_posts_to_apple_user`、`delete_my_posts`（均为 SECURITY DEFINER，匹配 device_id 或 apple_user_id）。**待执行迁移 #1：** `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` 新增 `delete_my_data`（连同评论/反应一并删除）——需在 Supabase SQL 编辑器审阅并执行；客户端已优先调用该 RPC，函数缺失时（PostgREST 404）自动回退到 `delete_my_posts` + 客户端清理。**待执行迁移 #2：** `supabase/migrations/20260717_post_reports.sql` 创建 `post_reports` 表与 `reported_posts_summary` 审阅视图——执行前举报上传静默失败（本地隐藏始终生效），执行后请定期审阅该视图并删除违规帖子。幂等，可安全重复执行。**待执行迁移 #3：** `supabase/migrations/20260717_reactions_apple_user_id.sql` 为 `cloud_reactions` 增加 `apple_user_id` 列并升级 `delete_my_data`，使已登录用户在旧 device_id（如重装前）留下的反应也能被彻底清除；客户端已在新反应上发送该字段，列不存在时（PostgREST 400）自动重试不带字段的请求，迁移与客户端可按任意顺序上线。
 
 Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 
@@ -946,5 +948,5 @@ Supabase 项目 URL：`https://gjtiqwkhrepwhtoyjeix.supabase.co`
 | Phase 1 | 核心闭环 | 已完成 |
 | Phase 2 | 经济系统、任务、双语、通知 | 已完成 |
 | Phase 3 | Apple 登录、CloudKit、隐私锁、反应、漂流瓶社交 | 已完成 |
-| Phase 4 | 已交付：日记改版（语音/搜索/位置天气/双日期/iPad 分栏）、16 心情 + 愉悦度滑条、年视图、AI 摘要、宠物聊天 + TTS、不重复抓云、匿名分析、账户删除加固（`delete_my_data` + 透明回退）、云朵举报/隐藏/屏蔽（App Review 1.2）、无障碍代码整改（VoiceOver/动态字体/减弱动态效果）、`CloudPostAPI` 依赖注入接缝、3 个不稳定 UI 测试确定性重写（测试：342 单元 + 22 UI = 364）；进行中：UI 精修、动效、真机无障碍人工验证 | 当前阶段 |
+| Phase 4 | 已交付：日记改版（语音/搜索/位置天气/双日期/iPad 分栏）、16 心情 + 愉悦度滑条、年视图、AI 摘要、宠物聊天 + TTS、不重复抓云、匿名分析、账户删除加固（`delete_my_data` + 透明回退）、云朵举报/隐藏/屏蔽（App Review 1.2）、无障碍代码整改（VoiceOver/动态字体/减弱动态效果）、`CloudPostAPI` 依赖注入接缝、3 个不稳定 UI 测试确定性重写（测试：344 单元 + 22 UI = 366）；进行中：UI 精修、动效、真机无障碍人工验证 | 当前阶段 |
 | Phase 5 | App Store 上架、TestFlight 公测、IAP | 规划中 |

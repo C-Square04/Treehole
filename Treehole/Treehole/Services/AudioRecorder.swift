@@ -24,6 +24,14 @@ final class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     // MARK: - Notification name for max duration reached
     static let maxDurationReachedNotification = Notification.Name("AudioRecorder.maxDurationReached")
 
+    // Safety net: an abandoned recorder must never leave the mic open or the
+    // repeating meter timer scheduled (the runloop retains the timer, not
+    // self, so without invalidation it becomes a permanent 10 Hz no-op).
+    deinit {
+        timer?.invalidate()
+        recorder?.stop()
+    }
+
     // MARK: - Permission
 
     func requestPermission() async -> Bool {

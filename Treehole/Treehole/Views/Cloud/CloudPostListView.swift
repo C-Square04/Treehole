@@ -8,6 +8,7 @@ struct CloudPostListView: View {
     @Environment(AppState.self) private var appState
     @Environment(PrivacyLockManager.self) private var lockManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var economies: [Economy]
     @Query private var dailyTasks: [DailyTask]
     @Query private var weeklyChallenges: [WeeklyChallenge]
@@ -250,9 +251,11 @@ struct CloudPostListView: View {
                 await viewModel.fetchPosts()
                 _ = economyVM.ensureEconomyExists(context: modelContext, economies: economies)
                 try? modelContext.save()
-                // Start floating animations
-                for i in 0..<6 {
-                    floatOffsets[i] = (i % 2 == 0) ? 8 : -8
+                // Start floating animations (static under Reduce Motion)
+                if !reduceMotion {
+                    for i in 0..<6 {
+                        floatOffsets[i] = (i % 2 == 0) ? 8 : -8
+                    }
                 }
             }
     }

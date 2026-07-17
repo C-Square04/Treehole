@@ -100,4 +100,23 @@ struct WeatherServiceTests {
         let desc = WeatherService.description(for: 0, language: "fr")
         #expect(desc == "Clear")
     }
+
+    // MARK: - Request URL (privacy rounding)
+
+    @Test func testRequestURLRoundsCoordinatesToTwoDecimals() {
+        let url = WeatherService.requestURL(lat: 49.282730, lng: -123.120735)
+        let s = try! #require(url?.absoluteString)
+        // ~1.1 km precision — weather doesn't need the user's exact GPS
+        #expect(s.contains("latitude=49.28"))
+        #expect(s.contains("longitude=-123.12"))
+        #expect(!s.contains("49.282730"))
+    }
+
+    @Test func testRequestURLHandlesShortRoundedValues() {
+        let url = WeatherService.requestURL(lat: 49.2, lng: -123.1)
+        let s = try! #require(url?.absoluteString)
+        #expect(s.contains("latitude=49.2"))
+        #expect(s.contains("longitude=-123.1"))
+        #expect(s.contains("current=temperature_2m,weather_code"))
+    }
 }

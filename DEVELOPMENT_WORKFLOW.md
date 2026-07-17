@@ -61,7 +61,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
   2>&1 | grep -E "(Test Case|passed|failed)" | tail -30
 ```
 
-**Current test count: 364 total — 342 unit tests (Swift Testing, `@Test`/`#expect`) + 22 UI tests (XCTest)**
+**Current test count: 366 total — 344 unit tests (Swift Testing, `@Test`/`#expect`) + 22 UI tests (XCTest)**
 
 New features must ship with accompanying tests before merging.
 
@@ -244,4 +244,4 @@ TreeholeUITests/                             # 22 UI tests (XCTest)
 - Required Xcode capabilities: iCloud (CloudKit + Documents), Push Notifications, Sign In with Apple, Keychain Sharing.
 - Passcode is stored in Keychain only — never in SwiftData, never in Supabase.
 - AI calls (moderation, NPC reply, pet chat, pet TTS, journal summaries) are always routed through Supabase Edge Functions (`moderate-post`, `generate-npc-reply`, `pet-chat`, `pet-tts`, `summarize-journal`), not called directly from the client.
-- Pending server-side migration: `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` (adds `delete_my_data` RPC) — run in the Supabase SQL editor; the client already calls `rpc/delete_my_data` first and falls back to `delete_my_posts` + client-side cleanup while the function is missing.
+- Pending server-side migrations in `supabase/migrations/`: `20260716_delete_my_data_wipes_comments_reactions.sql` (adds `delete_my_data` RPC — the client already calls it first and falls back to `delete_my_posts` + client-side cleanup while missing), `20260717_post_reports.sql` (report table + review view, idempotent), `20260717_reactions_apple_user_id.sql` (`cloud_reactions.apple_user_id` so deletion wipes a signed-in user's reactions across installs; client sends it with a 400 fallback). Run them in the Supabase SQL editor.

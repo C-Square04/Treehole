@@ -54,6 +54,8 @@ struct CartoonCatView: View {
                             .frame(height: 20)
                     }
                     .frame(width: 90)
+                    // Smooth the eye-height morph when the mood changes
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: mood)
                 }
 
                 // Body
@@ -83,7 +85,12 @@ struct CartoonCatView: View {
         }
         .scaleEffect(showFeedingAnimation ? 1.1 : breatheScale)
         .onAppear { if !reduceMotion { startAnimations() } }
-        .onDisappear { blinkTimer?.invalidate(); blinkTimer = nil }
+        .onDisappear { stopBlinkTimer() }
+        .onChange(of: mood) { _, _ in updateBounceForMood() }
+        .onChange(of: reduceMotion) { _, reduce in
+            // Reduce Motion toggled mid-session — settle or restart live
+            if reduce { stopAnimations() } else { startAnimations() }
+        }
         .accessibilityLabel(L10n.t(
             "Your pet companion, feeling \(mood.labelEN)",
             "你的宠物伙伴，现在感觉\(mood.labelZH)"
@@ -99,6 +106,7 @@ struct CartoonCatView: View {
     }
 
     private func startAnimations() {
+        guard !reduceMotion else { return }
         blinkTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 0.15)) { isBlinking = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -110,15 +118,38 @@ struct CartoonCatView: View {
             tailPosition = 15
         }
 
-        if mood == .happy || mood == .excited {
-            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                bounceOffset = -8
-            }
-        }
+        updateBounceForMood()
 
         withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
             breatheScale = 1.02
         }
+    }
+
+    /// Bounce only while happy/excited. Runs on appear AND on every mood
+    /// change — previously a post-feed mood jump never started the bounce,
+    /// and leaving the happy mood froze the body mid-air at offset -8.
+    private func updateBounceForMood() {
+        let shouldBounce = mood == .happy || mood == .excited
+        if shouldBounce && !reduceMotion {
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                bounceOffset = -8
+            }
+        } else {
+            withAnimation(.easeInOut(duration: 0.3)) { bounceOffset = 0 }
+        }
+    }
+
+    private func stopBlinkTimer() {
+        blinkTimer?.invalidate()
+        blinkTimer = nil
+    }
+
+    private func stopAnimations() {
+        stopBlinkTimer()
+        isBlinking = false
+        tailPosition = 0
+        breatheScale = 1.0
+        withAnimation(.easeInOut(duration: 0.3)) { bounceOffset = 0 }
     }
 }
 

@@ -29,18 +29,33 @@ struct PlantVisualView: View {
                 }
                 Spacer()
             }
+            // Gentle whole-plant sway — previously only the seed dot and
+            // blooming petals reacted to isGrowing; the plant itself was static
+            .rotationEffect(.degrees(isGrowing ? 1.2 : -1.2), anchor: .bottom)
         }
         .frame(height: 300)
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                isGrowing = true
+            startSway()
+        }
+        .onChange(of: reduceMotion) { _, reduce in
+            // Reduce Motion toggled mid-session — settle or restart live
+            if reduce {
+                withAnimation(.easeInOut(duration: 0.3)) { isGrowing = false }
+            } else {
+                startSway()
             }
         }
         .accessibilityLabel(L10n.t(
             "Plant at \(growthStage.labelEN) stage, hydration \(hydrationLevel)%",
             "植物处于\(growthStage.labelZH)阶段，水分\(hydrationLevel)%"
         ))
+    }
+
+    private func startSway() {
+        withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+            isGrowing = true
+        }
     }
 }
 

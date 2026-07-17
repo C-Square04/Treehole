@@ -26,6 +26,7 @@ struct AdaptiveNavigationTests {
         #expect(viewType == CloudPostListView.self)
     }
 
+    @MainActor
     @Test("RemoteCloudPost is Identifiable and Codable")
     func remoteCloudPostConformances() throws {
         // Verify the type used for split view selection conforms to needed protocols.

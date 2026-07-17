@@ -1330,6 +1330,11 @@ struct JournalEntryEditor: View {
     /// editing session but never attached to a saved entry (Cancel or swipe
     /// dismissal) — otherwise the m4a (local + iCloud copy) is orphaned forever.
     private func discardUnsavedRecording() {
+        // An in-progress recording must never outlive the editor — otherwise
+        // the mic (and its 10 Hz meter timer) keeps running after dismissal.
+        if audioRecorder.isRecording {
+            audioRecorder.cancelRecording()
+        }
         guard !didFinishEditing, let fn = draftAudioFilename else { return }
         // Never delete audio already attached to a saved entry.
         guard existingEntry?.audioFilename != fn else { return }

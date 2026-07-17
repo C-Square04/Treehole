@@ -29,20 +29,19 @@ Applied via the Management API and verified live:
 - Also decide the age rating: the cloud space is user-generated content, so
   App Review guideline 1.2 expects moderation (you have it, 3 layers) plus a
   user-facing way to report/flag a post — the app now has both: "Report Cloud"
-  (4 reasons) and "Hide Clouds from This Author" on strangers' clouds. The
-  server side of reporting only works after you run migration #2 above, and
-  remember to check `reported_posts_summary` periodically once it's live.
+  (4 reasons) and "Hide Clouds from This Author" on strangers' clouds, and the
+  server side (post_reports + reported_posts_summary) is live since
+  2026-07-17. Remember to check `reported_posts_summary` periodically.
+  Current draft says 4+ — UGC apps usually rate 12+; decide before submission.
 
-## 3. Verify localized permission dialogs after next Xcode build (2 min)
-- `Treehole/InfoPlist.xcstrings` was added for zh-Hans permission strings
-  (camera/mic/location/photos/Face ID).
-- After the next build in Xcode: Product → Show Build Folder, confirm
-  `zh-Hans.lproj/InfoPlist.strings` exists in Treehole.app, or just switch a
-  simulator to Chinese and trigger the camera permission prompt.
-- If it didn't take: Xcode → project → Info → Localizations → add Chinese
-  (Simplified), then rebuild.
+## 3. ~~Verify localized permission dialogs~~ — DONE 2026-07-17
+- Verified in the release archive (build 15): `zh-Hans.lproj/InfoPlist.strings`
+  exists in Treehole.app, alongside `PrivacyInfo.xcprivacy`.
+- Optional: switch a device to Chinese and trigger the camera/mic prompt once
+  to see the localized dialog live.
 
 ## 4. Before next TestFlight archive
-- Bump `CURRENT_PROJECT_VERSION` (last shipped build: 14).
+- `CURRENT_PROJECT_VERSION` is already 15 (last shipped build: 14) — if App
+  Store Connect says 15 is taken, bump to 16.
 - `make test-full` should be green (344 unit + 22 UI as of the report/hide +
   accessibility batch).

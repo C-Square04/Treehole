@@ -34,7 +34,9 @@ final class CloudPostViewModel {
         isLoading = true
         errorMessage = nil
         do {
-            remotePosts = try await api.fetchPosts(limit: 50)
+            // Never surface reported/blocked clouds in any feed — the grab
+            // flows already skip them, keep the feed consistent.
+            remotePosts = HiddenPostsStore.shared.filter(try await api.fetchPosts(limit: 50))
         } catch {
             errorMessage = error.localizedDescription
         }

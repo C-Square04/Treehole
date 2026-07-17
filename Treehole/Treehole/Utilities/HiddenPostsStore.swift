@@ -26,7 +26,7 @@ enum CloudReportReason: String, CaseIterable {
 /// Hidden post IDs and blocked author device IDs persist in UserDefaults so
 /// reported/blocked content stays gone across launches — server-side takedown
 /// is asynchronous and must never be the only thing protecting the user.
-@Observable
+@MainActor @Observable
 final class HiddenPostsStore {
     static let shared = HiddenPostsStore()
 
@@ -53,6 +53,16 @@ final class HiddenPostsStore {
     func blockAuthor(deviceId: String) {
         blockedAuthorDeviceIDs.insert(deviceId)
         defaults.set(blockedAuthorDeviceIDs.sorted(), forKey: Self.blockedAuthorsKey)
+    }
+
+    /// Clears all hidden/blocked state. Called after a full account deletion
+    /// wipes UserDefaults — otherwise the stale in-memory sets would be
+    /// re-persisted on the next hide/block call, resurrecting "deleted" data.
+    func reset() {
+        hiddenPostIDs = []
+        blockedAuthorDeviceIDs = []
+        defaults.removeObject(forKey: Self.hiddenPostsKey)
+        defaults.removeObject(forKey: Self.blockedAuthorsKey)
     }
 
     func isHidden(_ post: RemoteCloudPost) -> Bool {

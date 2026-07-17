@@ -204,6 +204,24 @@ final class AppState {
         saveState()
     }
 
+    /// Resets all account state after a full account deletion and persists the
+    /// final snapshot in ONE save. Must be called AFTER the UserDefaults wipe —
+    /// it rewrites the plist with post-deletion values. Assigning the observed
+    /// properties individually from the caller would save mid-reset snapshots
+    /// and never persist isGuest / hasCompletedOnboarding / currentAlias at all
+    /// (they have no didSet), so a relaunch would restore the stale account and
+    /// skip onboarding.
+    func resetAfterAccountDeletion() {
+        isSubscribed = false
+        appleUserID = nil
+        appleUserEmail = nil
+        isDeveloperMode = false
+        isGuest = true
+        hasCompletedOnboarding = false
+        currentAlias = "Anonymous"
+        saveState()
+    }
+
     // MARK: - Persistence (UserDefaults for preferences)
 
     private func saveState() {

@@ -397,6 +397,7 @@ struct GrabbedCloudView: View {
 
     // UGC moderation (App Review guideline 1.2)
     @State private var showReportDialog = false
+    @State private var showBlockConfirmation = false
     @State private var moderationConfirmation: String? = nil
 
     // Reactions
@@ -591,6 +592,9 @@ struct GrabbedCloudView: View {
                         .padding()
                     }
                     .id(currentPost.id) // Force scroll view refresh when post changes
+                    // Freeze the post once a report/block is confirmed — the banner
+                    // stays readable for a beat while the view behind it is inert.
+                    .allowsHitTesting(moderationConfirmation == nil)
                 }
 
                 // Reaction visual effects overlay
@@ -636,7 +640,7 @@ struct GrabbedCloudView: View {
                                 Label(L10n.t("Report Cloud", "举报云朵"), systemImage: "flag")
                             }
                             Button(role: .destructive) {
-                                blockAuthor(currentPost)
+                                showBlockConfirmation = true
                             } label: {
                                 Label(L10n.t("Hide Clouds from This Author", "隐藏此作者的云朵"), systemImage: "hand.raised")
                             }
@@ -661,6 +665,23 @@ struct GrabbedCloudView: View {
                         }
                     }
                 }
+            }
+            .confirmationDialog(
+                L10n.t("Hide all clouds from this author?", "隐藏此作者的所有云朵？"),
+                isPresented: $showBlockConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(L10n.t("Hide Author", "隐藏作者"), role: .destructive) {
+                    if let currentPost = post {
+                        blockAuthor(currentPost)
+                    }
+                }
+                Button(L10n.t("Cancel", "取消"), role: .cancel) { }
+            } message: {
+                Text(L10n.t(
+                    "You won't grab their clouds again. This can't be undone.",
+                    "你将不会再抓到TA的云朵。此操作无法撤销。"
+                ))
             }
             .task(id: post?.id) {
                 guard post != nil else { return }

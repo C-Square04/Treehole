@@ -14,9 +14,10 @@
 -- If cloud_reactions has no apple_user_id column, the function below already
 -- handles that by matching reactions on device_id only.)
 --
--- NOTE: the iOS client does not call this function yet. After applying it,
--- switch SettingsView's deletion flow to call rpc/delete_my_data instead of
--- rpc/delete_my_posts + the client-side comment/reaction cleanup.
+-- NOTE: the iOS client already calls rpc/delete_my_data FIRST and falls back
+-- to delete_my_posts + client-side comment/reaction cleanup only while this
+-- function is missing (PostgREST 404). Applying this migration simply moves
+-- the whole wipe server-side — no client change needed.
 
 create or replace function delete_my_data(
   requesting_device_id text,

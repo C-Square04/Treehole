@@ -119,4 +119,23 @@ final class HiddenPostsStoreTests {
         #expect(reloaded.hiddenPostIDs.count == 1)
         #expect(reloaded.blockedAuthorDeviceIDs.count == 1)
     }
+
+    // MARK: - Reset (account deletion)
+
+    @Test func testResetClearsMemoryAndPersistence() {
+        let store = HiddenPostsStore(defaults: defaults)
+        store.hidePost(id: "post-1")
+        store.blockAuthor(deviceId: "device-bad")
+
+        store.reset()
+
+        #expect(store.hiddenPostIDs.isEmpty)
+        #expect(store.blockedAuthorDeviceIDs.isEmpty)
+        // A fresh instance over the same defaults must see nothing — the wipe
+        // has to reach disk, not just the in-memory sets.
+        let reloaded = HiddenPostsStore(defaults: defaults)
+        #expect(reloaded.hiddenPostIDs.isEmpty)
+        #expect(reloaded.blockedAuthorDeviceIDs.isEmpty)
+        #expect(reloaded.isHidden(makePost(id: "post-1", deviceId: "device-bad")) == false)
+    }
 }

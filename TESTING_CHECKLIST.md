@@ -34,7 +34,7 @@ Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for t
 - [ ] (iPad) Reporting a cloud from the split-view detail column shows the banner and clears the detail pane / （iPad）在分栏详情列中举报云朵后显示横幅并清空详情栏
 - [ ] A reported cloud never reappears via "Grab a Cloud" / "Grab Another", including after force-quit and relaunch / 被举报的云朵不会再通过"抓一朵云"/"再抓一朵"出现，强制退出并重启后依然保持隐藏
 - [ ] Reporting works offline too — the cloud is hidden locally even if the report upload fails / 离线状态下举报同样生效——即使举报上传失败，云朵也会在本地被隐藏
-- [ ] "Hide Clouds from This Author" hides the cloud and future grabs skip all clouds from that author / "隐藏此作者的云朵"隐藏当前云朵，之后抓云会跳过该作者的所有云朵
+- [ ] "Hide Clouds from This Author" asks for confirmation, then hides the cloud, and future grabs skip all clouds from that author / "隐藏此作者的云朵"先弹出确认框，确认后隐藏当前云朵，之后抓云会跳过该作者的所有云朵
 - [ ] The report/hide menu never appears on the user's own clouds (My Clouds detail) / 举报/隐藏菜单绝不会出现在用户自己的云朵上（"我的云朵"详情）
 
 ---

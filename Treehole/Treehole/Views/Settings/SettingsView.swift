@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var deleteTimer: Timer?
     @State private var deleteErrorMessage: String? = nil
     @State private var showDeleteError = false
+    @State private var isDeleting = false
 
     // Binding helpers that present setup if no passcode yet
     private var cloudLockBinding: Binding<Bool> {
@@ -317,8 +318,15 @@ struct SettingsView: View {
                     Button(role: .destructive) {
                         showDeleteDataStep1 = true
                     } label: {
-                        Label(L10n.t("Delete Account & Data", "删除账户和数据"), systemImage: "trash.fill")
+                        HStack {
+                            Label(L10n.t("Delete Account & Data", "删除账户和数据"), systemImage: "trash.fill")
+                            if isDeleting {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
                     }
+                    .disabled(isDeleting)
                 } header: {
                     Text(L10n.t("Danger Zone", "危险区域"))
                 } footer: {
@@ -415,24 +423,22 @@ struct SettingsView: View {
         // Bug history: previously this was fire-and-forget, so UserDefaults got
         // wiped first → SupabaseService.deletePost sent the wrong x-device-id
         // header → server's RLS policy silently rejected the deletes.
+        guard !isDeleting else { return }
+        isDeleting = true
         Task {
             await deleteEverything()
+            isDeleting = false
         }
     }
 
     @MainActor
     private func deleteEverything() async {
-        // 1. SNAPSHOT credentials BEFORE wiping anything.
-        //    These are used for the Supabase deletes below.
-        let savedDeviceId = SupabaseConfig.deviceId
-        let savedAppleUserId = SupabaseConfig.appleUserID
-
-        // 2. Delete cloud posts from Supabase via SECURITY DEFINER RPC.
+        // 1. Delete cloud posts from Supabase via SECURITY DEFINER RPC.
         //    Bypasses RLS and matches by device_id OR apple_user_id, so it
         //    deletes posts even if the user's device_id has rotated since
         //    they posted (e.g. reinstall). AWAIT — do not fire-and-forget.
         //
-        //    ABORT on failure: once UserDefaults is wiped (step 8), device_id
+        //    ABORT on failure: once UserDefaults is wiped (step 7), device_id
         //    rotates and a guest user's posts can never be deleted by anyone.
         //    Nothing local has been touched yet, so the user can just retry.
         do {
@@ -453,9 +459,9 @@ struct SettingsView: View {
         // Tell our analytics events table to forget us too — best effort.
         // (No dedicated API; the rows stay anonymized by design.)
 
-        // 3. Delete all SwiftData rows. With cloudKitDatabase: .automatic,
+        // 2. Delete all SwiftData rows. With cloudKitDatabase: .automatic,
         //    SwiftData propagates these deletes to CloudKit asynchronously —
-        //    the explicit zone wipe in step 4 is a belt-and-suspenders backup.
+        //    the explicit zone wipe in step 3 is a belt-and-suspenders backup.
         do {
             try modelContext.delete(model: Pet.self)
             try modelContext.delete(model: Plant.self)
@@ -471,18 +477,18 @@ struct SettingsView: View {
             print("[DELETE] SwiftData error: \(error)")
         }
 
-        // 4. Wipe the SwiftData CloudKit zone explicitly. This guarantees the
+        // 3. Wipe the SwiftData CloudKit zone explicitly. This guarantees the
         //    user's iCloud copy is gone even if the SwiftData → CloudKit sync
-        //    in step 3 hasn't finished pushing yet.
+        //    in step 2 hasn't finished pushing yet.
         await wipeCloudKitZone()
 
-        // 5+6. Delete passcode from Keychain and reset PrivacyLockManager
+        // 4+5. Delete passcode from Keychain and reset PrivacyLockManager
         //      (including hasPasscode, so a stale lock can't demand a
         //      passcode that no longer exists).
         lockManager.resetAfterAccountDeletion()
         print("[DELETE] Keychain + privacy lock cleared")
 
-        // 7. Delete photos + audio (local + iCloud ubiquity container)
+        // 6. Delete photos + audio (local + iCloud ubiquity container)
         let fm = FileManager.default
         if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
             try? fm.removeItem(at: docs.appendingPathComponent("journal_photos"))
@@ -495,24 +501,20 @@ struct SettingsView: View {
         }
         print("[DELETE] Photos + audio cleared")
 
-        // 8. Clear ALL UserDefaults — only AFTER Supabase deletes are done.
+        // 7. Clear ALL UserDefaults — only AFTER Supabase deletes are done.
         if let domain = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: domain)
             UserDefaults.standard.synchronize()
         }
+        // The domain wipe clears hidden/blocked clouds on disk — drop the
+        // in-memory sets too, or the next hide/block call re-persists them.
+        HiddenPostsStore.shared.reset()
         print("[DELETE] UserDefaults cleared")
 
-        _ = savedDeviceId  // captured for clarity; SupabaseConfig.deviceId still
-        _ = savedAppleUserId  // returns valid values until UserDefaults is cleared.
-
-        // 9. Reset app state (must be LAST)
-        appState.isSubscribed = false
-        appState.appleUserID = nil
-        appState.appleUserEmail = nil
-        appState.isDeveloperMode = false
-        appState.isGuest = true
-        appState.hasCompletedOnboarding = false
-        appState.currentAlias = "Anonymous"
+        // 8. Reset app state (must be LAST — rewrites the plist with the
+        //    post-deletion snapshot in a single save; doing it property by
+        //    property would leave onboarding state stale on disk).
+        appState.resetAfterAccountDeletion()
         print("[DELETE] Account deletion complete")
     }
 

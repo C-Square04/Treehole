@@ -54,7 +54,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Keychain | Security framework (passcode storage) |
 | Notifications | UserNotifications framework |
 | Navigation | TabView (5 tabs) + NavigationStack |
-| Testing | Swift Testing (338 unit tests) + XCTest (22 UI tests) |
+| Testing | Swift Testing (339 unit tests) + XCTest (22 UI tests) |
 
 ---
 
@@ -69,13 +69,13 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 │  └────────────┘  └──────────────┘  └─────────────────┘  │
 │       │                │                    │            │
 │  ┌────▼───────────────────────────────────▼──────────┐  │
-│  │          Services (8) & Utilities (11)             │  │
+│  │          Services (8) & Utilities (12)             │  │
 │  │  Supabase · CloudPostAPI · PetChat · PetVoice    │  │
 │  │  Weather · Location · Analytics · AudioRecorder  │  │
 │  │  L10n · NotificationService · PhotoStorage       │  │
 │  │  AudioStorage · PrivacyLockManager · WeekAnchor  │  │
 │  │  JournalSearch · JournalTranscription            │  │
-│  │  HiddenPostsStore                                │  │
+│  │  HiddenPostsStore · UITestSupport · MoodByDay    │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
          │                    │                 │
@@ -94,7 +94,7 @@ Cloud-post network calls go through the `CloudPostAPI` protocol (`Services/Cloud
 ## File Structure
 
 ```
-Treehole/Treehole/                          (58 Swift files)
+Treehole/Treehole/                          (59 Swift files)
 ├── TreeholeApp.swift                        # @main entry, SwiftData container (never auto-deletes the store — moves it aside as Backup-* on unrecoverable failure)
 ├── ContentView.swift                        # Onboarding gate + TabView (5 tabs)
 ├── InfoPlist.xcstrings                      # Localized iOS permission dialogs (en + zh-Hans)
@@ -116,7 +116,7 @@ Treehole/Treehole/                          (58 Swift files)
 │   └── PostMigrationCoordinator.swift       # Persisted retry for device→account post migration
 ├── Views/
 │   ├── Onboarding/                          # 4-page onboarding flow
-│   ├── Cloud/                               # 4 files: list, create, detail, My Clouds
+│   ├── Cloud/                               # 4 files: list, create, reaction components, My Clouds
 │   ├── Pet/                                 # 4 files: home, cat art, chat, voice selector
 │   ├── Plant/                               # 2 files: garden, plant visuals
 │   ├── Journal/                             # 3 files: journal + editor, entry detail, mood stats
@@ -133,7 +133,7 @@ Treehole/Treehole/                          (58 Swift files)
 │   ├── PetVoiceService.swift
 │   ├── SupabaseService.swift
 │   └── WeatherService.swift
-├── Utilities/                               # 11 files
+├── Utilities/                               # 12 files
 │   ├── AudioStorage.swift
 │   ├── HiddenPostsStore.swift               # Hidden/blocked clouds (report/hide) — UserDefaults persisted
 │   ├── JournalSearch.swift
@@ -144,6 +144,7 @@ Treehole/Treehole/                          (58 Swift files)
 │   ├── PhotoStorage.swift
 │   ├── PhotoThumbnailLoader.swift           # Async, cached, downsampled photo thumbnails
 │   ├── PrivacyLockManager.swift
+│   ├── UITestSupport.swift                  # Debug-only --uitest-reset-state launch hook
 │   └── WeekAnchor.swift                     # Monday-anchored week math
 ├── Theme/
 │   └── TreeholeTheme.swift
@@ -152,7 +153,7 @@ Treehole/Treehole/                          (58 Swift files)
     ├── CameraPicker.swift
     └── SharedComponents.swift               # MoodPicker (pills / pleasantness slider)
 
-TreeholeTests/                               # 338 unit tests (Swift Testing)
+TreeholeTests/                               # 339 unit tests (Swift Testing)
 TreeholeUITests/                             # 22 UI tests (XCTest)
 ```
 
@@ -219,7 +220,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 
 Or use the Makefile shortcuts from the repo root: `make test` (unit only, ~15s), `make test-full` (unit + UI), `make build`, `make archive`.
 
-**Current test count:** 360 total (338 unit tests via Swift Testing + 22 UI tests via XCTest)
+**Current test count:** 361 total (339 unit tests via Swift Testing + 22 UI tests via XCTest)
 
 ---
 
@@ -301,7 +302,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 钥匙串 | Security 框架（密码存储） |
 | 通知 | UserNotifications 框架 |
 | 导航 | TabView（5 标签）+ NavigationStack |
-| 测试 | Swift Testing（338 个单元测试）+ XCTest（22 个 UI 测试） |
+| 测试 | Swift Testing（339 个单元测试）+ XCTest（22 个 UI 测试） |
 
 ---
 
@@ -316,13 +317,13 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 │  └────────────┘  └──────────────┘  └─────────────────┘  │
 │       │                │                    │            │
 │  ┌────▼───────────────────────────────────▼──────────┐  │
-│  │          服务层（8）与工具层（9）                 │  │
+│  │          服务层（8）与工具层（12）                │  │
 │  │  Supabase · CloudPostAPI · PetChat · PetVoice    │  │
 │  │  Weather · Location · Analytics · AudioRecorder  │  │
 │  │  L10n · NotificationService · PhotoStorage       │  │
 │  │  AudioStorage · PrivacyLockManager · WeekAnchor  │  │
 │  │  JournalSearch · JournalTranscription            │  │
-│  │  HiddenPostsStore                                │  │
+│  │  HiddenPostsStore · UITestSupport · MoodByDay    │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
          │                    │                 │
@@ -341,7 +342,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 ## 文件结构
 
 ```
-Treehole/Treehole/                          （共 58 个 Swift 文件）
+Treehole/Treehole/                          （共 59 个 Swift 文件）
 ├── TreeholeApp.swift                        # @main 入口，SwiftData 容器（永不自动删除存储——不可恢复时移为 Backup-* 备份）
 ├── ContentView.swift                        # 引导闸门 + TabView（5 标签）
 ├── InfoPlist.xcstrings                      # iOS 权限弹窗本地化（英文 + 简体中文）
@@ -363,7 +364,7 @@ Treehole/Treehole/                          （共 58 个 Swift 文件）
 │   └── PostMigrationCoordinator.swift       # 设备→账户帖子迁移的持久化重试
 ├── Views/
 │   ├── Onboarding/                          # 4 页新手引导
-│   ├── Cloud/                               # 4 个文件：列表、发帖、详情、我的云朵
+│   ├── Cloud/                               # 4 个文件：列表、发帖、反应组件、我的云朵
 │   ├── Pet/                                 # 4 个文件：宠物家园、猫咪绘制、聊天、语音选择
 │   ├── Plant/                               # 2 个文件：花园、植物视觉
 │   ├── Journal/                             # 3 个文件：日记 + 编辑器、条目详情、心情统计
@@ -380,7 +381,7 @@ Treehole/Treehole/                          （共 58 个 Swift 文件）
 │   ├── PetVoiceService.swift
 │   ├── SupabaseService.swift
 │   └── WeatherService.swift
-├── Utilities/                               # 11 个文件
+├── Utilities/                               # 12 个文件
 │   ├── AudioStorage.swift
 │   ├── HiddenPostsStore.swift               # 已隐藏/已屏蔽云朵（举报/隐藏）——UserDefaults 持久化
 │   ├── JournalSearch.swift
@@ -391,6 +392,7 @@ Treehole/Treehole/                          （共 58 个 Swift 文件）
 │   ├── PhotoStorage.swift
 │   ├── PhotoThumbnailLoader.swift           # 异步、带缓存的降采样照片缩略图
 │   ├── PrivacyLockManager.swift
+│   ├── UITestSupport.swift                  # 仅 Debug 的 --uitest-reset-state 启动钩子
 │   └── WeekAnchor.swift                     # 以周一为起点的周计算
 ├── Theme/
 │   └── TreeholeTheme.swift
@@ -399,7 +401,7 @@ Treehole/Treehole/                          （共 58 个 Swift 文件）
     ├── CameraPicker.swift
     └── SharedComponents.swift               # MoodPicker（胶囊按钮 / 愉悦度滑条）
 
-TreeholeTests/                               # 338 个单元测试（Swift Testing）
+TreeholeTests/                               # 339 个单元测试（Swift Testing）
 TreeholeUITests/                             # 22 个 UI 测试（XCTest）
 ```
 
@@ -466,7 +468,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
 
 也可以在仓库根目录使用 Makefile 快捷命令：`make test`（仅单元测试，约 15 秒）、`make test-full`（单元 + UI）、`make build`、`make archive`。
 
-**当前测试总数：** 360（338 个单元测试，Swift Testing + 22 个 UI 测试，XCTest）
+**当前测试总数：** 361（339 个单元测试，Swift Testing + 22 个 UI 测试，XCTest）
 
 ---
 

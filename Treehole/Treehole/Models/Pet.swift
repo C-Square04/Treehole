@@ -122,10 +122,10 @@ final class Pet {
 
     var hungerDescription: String {
         switch hungerLevel {
-        case 75...100: "Satisfied"
-        case 50..<75: "Content"
-        case 25..<50: "Hungry"
-        default: "Starving"
+        case 75...100: L10n.t("Satisfied", "吃饱了")
+        case 50..<75: L10n.t("Content", "还不错")
+        case 25..<50: L10n.t("Hungry", "饿了")
+        default: L10n.t("Starving", "饿坏了")
         }
     }
 

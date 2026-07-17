@@ -11,7 +11,7 @@ import UIKit
 enum PhotoThumbnailLoader {
 
     /// Pixel cap for grid thumbnails — covers the largest cell (~170pt @3x).
-    static let gridThumbnailMaxPixel: CGFloat = 512
+    nonisolated static let gridThumbnailMaxPixel: CGFloat = 512
 
     nonisolated(unsafe) private static let cache: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
@@ -48,9 +48,9 @@ enum PhotoThumbnailLoader {
 /// and encoding runs off the caller's actor.
 enum PhotoImportPipeline {
 
-    static let maxPixelSize: CGFloat = 1024
-    static let jpegQuality: CGFloat = 0.7
-    static let maxBytes = 2_000_000
+    nonisolated static let maxPixelSize: CGFloat = 1024
+    nonisolated static let jpegQuality: CGFloat = 0.7
+    nonisolated static let maxBytes = 2_000_000
 
     enum Outcome: Sendable {
         case imported(jpeg: Data, thumbnail: UIImage?)

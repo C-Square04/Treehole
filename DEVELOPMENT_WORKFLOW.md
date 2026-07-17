@@ -61,7 +61,7 @@ xcodebuild test -project Treehole.xcodeproj -scheme Treehole \
   2>&1 | grep -E "(Test Case|passed|failed)" | tail -30
 ```
 
-**Current test count: 332 total — 310 unit tests (Swift Testing, `@Test`/`#expect`) + 22 UI tests (XCTest)**
+**Current test count: 361 total — 339 unit tests (Swift Testing, `@Test`/`#expect`) + 22 UI tests (XCTest)**
 
 New features must ship with accompanying tests before merging.
 
@@ -85,15 +85,15 @@ New features must ship with accompanying tests before merging.
 
 ---
 
-## Current State: 54 Swift Files
+## Current State: 59 Swift Files
 
 | Layer | Files | Description |
 |---|---|---|
 | Models (9) | ChatMessage, ChatMode, CloudPost, Economy (+DailyTask), JournalEntry, JournalSummary, Pet, Plant, WeeklyChallenge | SwiftData @Model classes + enums |
 | ViewModels (5) | AppState, CloudPostViewModel, PetViewModel, EconomyViewModel, PostMigrationCoordinator | @Observable business logic + migration retry |
 | Views (19) | Onboarding, Cloud (4), Pet (4), Plant (2), Journal (3), Shop, Settings (2), Auth, PrivacyLockView | Full UI |
-| Services (7) | SupabaseService, PetChatService, PetVoiceService, WeatherService, LocationService, AnalyticsService, AudioRecorder | Network / device services |
-| Utilities (8) | L10n, NotificationService, PhotoStorage, PrivacyLockManager, AudioStorage, WeekAnchor, JournalSearch, JournalTranscription | Shared helpers |
+| Services (8) | SupabaseService, CloudPostAPI, PetChatService, PetVoiceService, WeatherService, LocationService, AnalyticsService, AudioRecorder | Network / device services |
+| Utilities (12) | L10n, NotificationService, PhotoStorage, PrivacyLockManager, AudioStorage, WeekAnchor, JournalSearch, JournalTranscription, HiddenPostsStore, MoodByDay, PhotoThumbnailLoader, UITestSupport | Shared helpers |
 | Theme (1) | TreeholeTheme | Design system (colors, spacing, typography) |
 | Components (3) | SharedComponents, AudioPlayerView, CameraPicker | MoodPicker (pills/slider), StatBadge, audio player, camera |
 | Core (2) | TreeholeApp, ContentView | App entry + tab navigation |
@@ -150,7 +150,7 @@ Core loop: 4-page onboarding, cloud posts with NPC replies, virtual pet (feed/pe
 2. **Accessibility** — VoiceOver labels on all interactive elements, Dynamic Type support throughout, Reduce Motion fallbacks for all animations.
 3. **Performance** — Profile SwiftData query costs, reduce main-thread work in list views, optimize CloudKit sync frequency.
 4. **AI Enhancements** — Improved NPC personas, mood-aware reply generation.
-5. **Backend TODO** — Review and run `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` in the Supabase SQL editor, then switch the client's deletion flow to `rpc/delete_my_data`.
+5. **Backend TODO** — Review and run `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` in the Supabase SQL editor (the client already calls `rpc/delete_my_data` first and falls back transparently until the function exists).
 
 ---
 
@@ -165,7 +165,7 @@ Core loop: 4-page onboarding, cloud posts with NPC replies, virtual pet (feed/pe
 ## File Structure
 
 ```
-Treehole/Treehole/                          (54 Swift files)
+Treehole/Treehole/                          (59 Swift files)
 ├── TreeholeApp.swift                        # @main entry, SwiftData + CloudKit container (moves store aside as Backup-* on unrecoverable failure — never auto-deletes)
 ├── ContentView.swift                        # Onboarding gate + TabView (5 tabs)
 ├── InfoPlist.xcstrings                      # Localized iOS permission dialogs (en + zh-Hans)
@@ -187,7 +187,7 @@ Treehole/Treehole/                          (54 Swift files)
 │   └── PostMigrationCoordinator.swift       # Persisted retry for device→account post migration
 ├── Views/
 │   ├── Onboarding/                          # 4-page onboarding flow
-│   ├── Cloud/                               # 4 files: list, create, detail, My Clouds
+│   ├── Cloud/                               # 4 files: list, create, reaction components, My Clouds
 │   ├── Pet/                                 # 4 files: home, cat art, chat, voice selector
 │   ├── Plant/                               # 2 files: garden, plant visuals
 │   ├── Journal/                             # 3 files: journal + editor, entry detail, mood stats
@@ -195,22 +195,27 @@ Treehole/Treehole/                          (54 Swift files)
 │   ├── Settings/                            # 2 files: main settings, debug panel (Debug builds only)
 │   ├── Auth/                                # Apple Sign-In + guest flow
 │   └── PrivacyLockView.swift                # Passcode gate & biometric unlock
-├── Services/                                # 7 files
+├── Services/                                # 8 files
 │   ├── AnalyticsService.swift               # Anonymous events → analytics_events
 │   ├── AudioRecorder.swift                  # Voice notes, 5-min cap (capped takes kept & attached)
+│   ├── CloudPostAPI.swift                   # DI seam: cloud-post network protocol + live impl
 │   ├── LocationService.swift                # One-shot GPS fetch, 10s timeout
 │   ├── PetChatService.swift                 # pet-chat Edge Function + scripted fallback
 │   ├── PetVoiceService.swift                # pet-tts Edge Function + AVSpeech fallback
 │   ├── SupabaseService.swift                # Supabase REST API + Edge Functions + RPCs
 │   └── WeatherService.swift                 # Open-Meteo weather for journal entries
-├── Utilities/                               # 8 files
+├── Utilities/                               # 12 files
 │   ├── AudioStorage.swift                   # Voice-note file storage (local + iCloud)
+│   ├── HiddenPostsStore.swift               # Hidden/blocked clouds (report/hide) — UserDefaults persisted
 │   ├── JournalSearch.swift                  # Entry filter (text/title/transcript/location)
 │   ├── JournalTranscription.swift           # Apple Speech transcription pipeline
 │   ├── L10n.swift                           # L10n.t() localization helper
+│   ├── MoodByDay.swift                      # One-pass day→mood lookup for the week strip
 │   ├── NotificationService.swift            # Local push notification scheduling
 │   ├── PhotoStorage.swift                   # iCloud ubiquity container photo read/write
+│   ├── PhotoThumbnailLoader.swift           # Async, cached, downsampled photo thumbnails
 │   ├── PrivacyLockManager.swift             # Keychain passcode + LocalAuthentication
+│   ├── UITestSupport.swift                  # Debug-only --uitest-reset-state launch hook
 │   └── WeekAnchor.swift                     # Monday-anchored week math
 ├── Theme/
 │   └── TreeholeTheme.swift                  # Design system: colors, spacing, typography
@@ -219,7 +224,7 @@ Treehole/Treehole/                          (54 Swift files)
     ├── CameraPicker.swift                   # UIImagePickerController camera bridge
     └── SharedComponents.swift               # MoodPicker (pills/slider), StatBadge, etc.
 
-TreeholeTests/                               # 310 unit tests (Swift Testing)
+TreeholeTests/                               # 339 unit tests (Swift Testing)
 TreeholeUITests/                             # 22 UI tests (XCTest)
 ```
 
@@ -239,4 +244,4 @@ TreeholeUITests/                             # 22 UI tests (XCTest)
 - Required Xcode capabilities: iCloud (CloudKit + Documents), Push Notifications, Sign In with Apple, Keychain Sharing.
 - Passcode is stored in Keychain only — never in SwiftData, never in Supabase.
 - AI calls (moderation, NPC reply, pet chat, pet TTS, journal summaries) are always routed through Supabase Edge Functions (`moderate-post`, `generate-npc-reply`, `pet-chat`, `pet-tts`, `summarize-journal`), not called directly from the client.
-- Pending server-side migration: `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` (adds `delete_my_data` RPC) — run in the Supabase SQL editor, then switch the client to `rpc/delete_my_data`.
+- Pending server-side migration: `supabase/migrations/20260716_delete_my_data_wipes_comments_reactions.sql` (adds `delete_my_data` RPC) — run in the Supabase SQL editor; the client already calls `rpc/delete_my_data` first and falls back to `delete_my_posts` + client-side cleanup while the function is missing.

@@ -278,6 +278,31 @@ struct CloudPostViewModelNetworkTests {
         #expect(vm.isLoading == false)
     }
 
+    @Test func testFetchPostsFiltersHiddenAndBlockedPosts() async {
+        let api = MockCloudPostAPI()
+        api.fetchPostsResult = .success([
+            makeRemotePost(id: "post-1"),
+            makeRemotePost(id: "post-2"),
+            RemoteCloudPost(
+                id: "post-3", authorAlias: "Tester", moodTag: MoodTag.calm.rawValue,
+                text: "from a blocked author", npcReplyText: nil, sourceLanguage: "en",
+                deviceId: "blocked-device", appleUserId: nil,
+                createdAt: "2026-01-01T00:00:00Z", flagged: false
+            )
+        ])
+        let vm = CloudPostViewModel(api: api)
+
+        // Reported/blocked content must never reach any feed, not just grab flows
+        HiddenPostsStore.shared.hidePost(id: "post-2")
+        HiddenPostsStore.shared.blockAuthor(deviceId: "blocked-device")
+        defer { HiddenPostsStore.shared.reset() }
+
+        await vm.fetchPosts()
+
+        #expect(vm.remotePosts.map(\.id) == ["post-1"])
+        #expect(vm.errorMessage == nil)
+    }
+
     @Test func testFetchPostsErrorSetsErrorMessageAndStopsLoading() async {
         let api = MockCloudPostAPI()
         api.fetchPostsResult = .failure(MockAPIError())

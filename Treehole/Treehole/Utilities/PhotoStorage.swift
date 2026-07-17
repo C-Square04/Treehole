@@ -40,7 +40,7 @@ enum PhotoStorage {
     // on ubiquityIdentityToken (cheap to read) so iCloud sign-in/out
     // mid-session still switches directories exactly like the previous
     // per-call resolution.
-    nonisolated(unsafe) private static let directoryLock = NSLock()
+    private static let directoryLock = NSLock()
     nonisolated(unsafe) private static var cachedDirectory: URL?
     nonisolated(unsafe) private static var cachedToken: (any NSCoding & NSCopying & NSObjectProtocol)?
 

@@ -97,7 +97,12 @@ Test on a physical iPhone with iOS 18.1+, plus an iPad (or iPad simulator) for t
 
 - [ ] Settings page loads from the "Me" tab / 设置页面从"我"标签加载
 - [ ] Language switch (EN ↔ ZH) in Settings updates the entire app UI immediately / 设置中切换语言（英/中）立即更新整个应用界面
-- [ ] Dark mode toggle changes the app appearance / 深色模式开关切换应用外观
+- [ ] Dark mode: Clouds tab sky background switches to a night sky and all text stays readable / 深色模式：云朵页天空背景变为夜空，所有文字清晰可读
+- [ ] Dark mode: every pet home theme (Daylight/Night/Sunset/Garden) keeps the pet name and stats readable; the Night theme shows light text in BOTH modes / 深色模式：所有宠物家园主题（白天/夜晚/日落/花园）下宠物名与数值清晰可读；夜晚主题在两种模式下都显示浅色文字
+- [ ] Primary buttons (Feed/Pet/Rest, Water, Buy, Get Started) show dark text on pastel fills in both modes / 主要按钮（喂食/抚摸/休息、浇水、购买、开始）在两种模式下均为浅色底配深色文字
+- [ ] Me tab shows the alias hero card (alias + rotation countdown), streak/currencies card, task progress, and themed Shop/Settings links / "我"标签显示别名卡片（别名 + 轮换倒计时）、连续记录/货币卡片、任务进度与主题化的商店/设置入口
+- [ ] Me tab bar badge shows remaining daily tasks and clears when all 4 are done / "我"标签角标显示剩余每日任务数，4 个全部完成后消失
+- [ ] A grabbed cloud drifts up into view on arrival (static under Reduce Motion) / 抓到的云朵以漂浮动画进入视图（"减弱动态效果"下静止）
 - [ ] Dark mode preference persists after app relaunch / 深色模式偏好在重启应用后保留
 - [ ] Language preference persists after app relaunch / 语言偏好在重启应用后保留
 - [ ] Passcode lock can be enabled and a 4-digit code set / 可启用密码锁并设置 4 位数字密码

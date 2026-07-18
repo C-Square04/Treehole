@@ -340,7 +340,10 @@ struct LoginBonusPersistenceTests {
 
 // MARK: - Task Title Localization Tests
 
-@Suite("Task Title Localization Tests")
+// Serialized: these tests mutate the global L10n.lang, so they must not run
+// in parallel with each other (each also restores the previous value so
+// other suites are unaffected).
+@Suite("Task Title Localization Tests", .serialized)
 struct TaskTitleLocalizationTests {
 
     @Test func testTaskTypeChineseTitlesExist() throws {
@@ -351,6 +354,8 @@ struct TaskTitleLocalizationTests {
     }
 
     @Test func testDailyTaskLocalizedTitleFollowsLanguage() throws {
+        let original = L10n.lang
+        defer { L10n.lang = original }
         let task = DailyTask(type: .post)
         L10n.lang = "zh-Hans"
         #expect(task.localizedTitle == TaskType.post.titleZH)
@@ -359,13 +364,14 @@ struct TaskTitleLocalizationTests {
     }
 
     @Test func testLocalizedTitleIgnoresPersistedEnglishTitle() throws {
+        let original = L10n.lang
+        defer { L10n.lang = original }
         // The stored title is English at creation time; display must derive
         // from the type, not the persisted string
         let task = DailyTask(type: .writeJournal)
         #expect(task.title == TaskType.writeJournal.title)
         L10n.lang = "zh-Hans"
         #expect(task.localizedTitle == TaskType.writeJournal.titleZH)
-        L10n.lang = "en"
     }
 }
 

@@ -296,6 +296,10 @@ struct GrabbedCloudView: View {
     @State private var showBlockConfirmation = false
     @State private var moderationConfirmation: String? = nil
 
+    // Arrival moment — the cloud drifts up into view when it appears
+    @State private var arrivalProgress: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     // Reactions
     @State private var reactionCounts: ReactionCounts? = nil
     @State private var myReactions: Set<String> = []
@@ -481,6 +485,10 @@ struct GrabbedCloudView: View {
                         .padding()
                     }
                     .id(currentPost.id) // Force scroll view refresh when post changes
+                    // Arrival moment: the cloud drifts up and settles in
+                    .offset(y: (1 - arrivalProgress) * 60)
+                    .opacity(arrivalProgress)
+                    .scaleEffect(0.96 + 0.04 * arrivalProgress)
                     // Freeze the post once a report/block is confirmed — the banner
                     // stays readable for a beat while the view behind it is inert.
                     .allowsHitTesting(moderationConfirmation == nil)
@@ -574,6 +582,19 @@ struct GrabbedCloudView: View {
             }
             .task(id: post?.id) {
                 guard post != nil else { return }
+                // Replay the arrival drift for each new cloud (static under
+                // Reduce Motion). The reset must commit without animation
+                // first, or the spring would run from the old value.
+                var reset = Transaction()
+                reset.disablesAnimations = true
+                withTransaction(reset) { arrivalProgress = 0 }
+                if reduceMotion {
+                    arrivalProgress = 1
+                } else {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.8)) {
+                        arrivalProgress = 1
+                    }
+                }
                 await loadComments()
                 await loadReactions()
             }

@@ -171,6 +171,19 @@ Run with VoiceOver (Settings → Accessibility → VoiceOver), Reduce Motion, an
 
 ---
 
+## Home-Screen Widget / 主屏小组件
+
+- [ ] Add the widget (small): shows pet mood emoji, name, level, hunger bar, task progress / 添加小组件（小号）：显示宠物心情、名字、等级、饥饿条、任务进度
+- [ ] Add the widget (medium): shows pet block + garden stage/count + tasks + unread replies / 添加小组件（中号）：显示宠物区 + 花园阶段/株数 + 任务 + 未读回复
+- [ ] Hunger on the widget drops by 1 per hour even without opening the app / 不打开 app 时，widget 上的饥饿值也按每小时 1 点下降
+- [ ] Between 23:00 and 7:00 the widget cat shows the sleeping state / 23:00–7:00 之间 widget 上的猫咪显示睡觉状态
+- [ ] After feeding in the app, the widget updates shortly after / 在 app 内喂食后，widget 很快更新
+- [ ] Tapping the small widget opens the Pet tab; medium's left half opens Pet, right half opens Garden / 点击小号 widget 进入宠物标签；中号左半进入宠物、右半进入花园
+- [ ] Widget text follows the app language (EN/ZH) / widget 文字跟随 app 语言（中/英）
+- [ ] With unread cloud replies, the 🫧 badge appears on the widget / 有未读云朵回复时，widget 显示 🫧 角标
+
+---
+
 ## Edge Cases / 边缘情况
 
 - [ ] App behaves gracefully with no internet connection (offline mode) / 无网络连接时应用优雅降级（离线模式）

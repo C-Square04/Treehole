@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5722FA1D300B2BD000BE63B2 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5722FA1C300B2BD000BE63B2 /* WidgetKit.framework */; };
+		5722FA1F300B2BD000BE63B2 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5722FA1E300B2BD000BE63B2 /* SwiftUI.framework */; };
+		5722FA30300B2BD100BE63B2 /* widgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5722FA1A300B2BD000BE63B2 /* widgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		278D02012EBDB92200A1DFFD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +27,47 @@
 			remoteGlobalIDString = 278D01F22EBDB92100A1DFFD;
 			remoteInfo = Treehole;
 		};
+		5722FA2E300B2BD100BE63B2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 278D01EB2EBDB92100A1DFFD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5722FA19300B2BD000BE63B2;
+			remoteInfo = widgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5722FA31300B2BD100BE63B2 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5722FA30300B2BD100BE63B2 /* widgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		278D01F32EBDB92100A1DFFD /* Treehole.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Treehole.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		278D02002EBDB92200A1DFFD /* TreeholeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TreeholeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		278D020A2EBDB92200A1DFFD /* TreeholeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TreeholeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5722FA1A300B2BD000BE63B2 /* widgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = widgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5722FA1C300B2BD000BE63B2 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		5722FA1E300B2BD000BE63B2 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5722FA34300B2BD100BE63B2 /* Exceptions for "widget" folder in "widgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5722FA19300B2BD000BE63B2 /* widgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		278D01F52EBDB92100A1DFFD /* Treehole */ = {
@@ -43,6 +83,14 @@
 		278D020D2EBDB92200A1DFFD /* TreeholeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TreeholeUITests;
+			sourceTree = "<group>";
+		};
+		5722FA20300B2BD000BE63B2 /* widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5722FA34300B2BD100BE63B2 /* Exceptions for "widget" folder in "widgetExtension" target */,
+			);
+			path = widget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,6 +117,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5722FA17300B2BD000BE63B2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5722FA1F300B2BD000BE63B2 /* SwiftUI.framework in Frameworks */,
+				5722FA1D300B2BD000BE63B2 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -78,6 +135,8 @@
 				278D01F52EBDB92100A1DFFD /* Treehole */,
 				278D02032EBDB92200A1DFFD /* TreeholeTests */,
 				278D020D2EBDB92200A1DFFD /* TreeholeUITests */,
+				5722FA20300B2BD000BE63B2 /* widget */,
+				5722FA1B300B2BD000BE63B2 /* Frameworks */,
 				278D01F42EBDB92100A1DFFD /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,8 +147,18 @@
 				278D01F32EBDB92100A1DFFD /* Treehole.app */,
 				278D02002EBDB92200A1DFFD /* TreeholeTests.xctest */,
 				278D020A2EBDB92200A1DFFD /* TreeholeUITests.xctest */,
+				5722FA1A300B2BD000BE63B2 /* widgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5722FA1B300B2BD000BE63B2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5722FA1C300B2BD000BE63B2 /* WidgetKit.framework */,
+				5722FA1E300B2BD000BE63B2 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -102,10 +171,12 @@
 				278D01EF2EBDB92100A1DFFD /* Sources */,
 				278D01F02EBDB92100A1DFFD /* Frameworks */,
 				278D01F12EBDB92100A1DFFD /* Resources */,
+				5722FA31300B2BD100BE63B2 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5722FA2F300B2BD100BE63B2 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				278D01F52EBDB92100A1DFFD /* Treehole */,
@@ -163,6 +234,28 @@
 			productReference = 278D020A2EBDB92200A1DFFD /* TreeholeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		5722FA19300B2BD000BE63B2 /* widgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5722FA35300B2BD100BE63B2 /* Build configuration list for PBXNativeTarget "widgetExtension" */;
+			buildPhases = (
+				5722FA16300B2BD000BE63B2 /* Sources */,
+				5722FA17300B2BD000BE63B2 /* Frameworks */,
+				5722FA18300B2BD000BE63B2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5722FA20300B2BD000BE63B2 /* widget */,
+			);
+			name = widgetExtension;
+			packageProductDependencies = (
+			);
+			productName = widgetExtension;
+			productReference = 5722FA1A300B2BD000BE63B2 /* widgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -170,7 +263,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2610;
+				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					278D01F22EBDB92100A1DFFD = {
@@ -183,6 +276,9 @@
 					278D02092EBDB92200A1DFFD = {
 						CreatedOnToolsVersion = 26.1;
 						TestTargetID = 278D01F22EBDB92100A1DFFD;
+					};
+					5722FA19300B2BD000BE63B2 = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -203,6 +299,7 @@
 				278D01F22EBDB92100A1DFFD /* Treehole */,
 				278D01FF2EBDB92200A1DFFD /* TreeholeTests */,
 				278D02092EBDB92200A1DFFD /* TreeholeUITests */,
+				5722FA19300B2BD000BE63B2 /* widgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +320,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		278D02082EBDB92200A1DFFD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5722FA18300B2BD000BE63B2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +357,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5722FA16300B2BD000BE63B2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +376,11 @@
 			isa = PBXTargetDependency;
 			target = 278D01F22EBDB92100A1DFFD /* Treehole */;
 			targetProxy = 278D020B2EBDB92200A1DFFD /* PBXContainerItemProxy */;
+		};
+		5722FA2F300B2BD100BE63B2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5722FA19300B2BD000BE63B2 /* widgetExtension */;
+			targetProxy = 5722FA2E300B2BD100BE63B2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -397,13 +513,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Treehole/Treehole.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = 2X7NPHCVS7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "Unlock your private clouds and journal entries";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos to attach to journal entries";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Unlock your private clouds and journal entries";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Optionally tag journal entries with your location";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to your pet companion using voice";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save journal photos to your library";
@@ -439,13 +555,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Treehole/Treehole.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = 2X7NPHCVS7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "Unlock your private clouds and journal entries";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos to attach to journal entries";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Unlock your private clouds and journal entries";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Optionally tag journal entries with your location";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to your pet companion using voice";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save journal photos to your library";
@@ -479,7 +595,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = 2X7NPHCVS7;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -501,7 +617,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = 2X7NPHCVS7;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -522,7 +638,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = 2X7NPHCVS7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -542,7 +658,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = 2X7NPHCVS7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -555,6 +671,70 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Treehole;
+			};
+			name = Release;
+		};
+		5722FA32300B2BD100BE63B2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = widget/widgetExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 17;
+				DEVELOPMENT_TEAM = 2X7NPHCVS7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = widget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.csquare04.Treehole.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5722FA33300B2BD100BE63B2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = widget/widgetExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 17;
+				DEVELOPMENT_TEAM = 2X7NPHCVS7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = widget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.csquare04.Treehole.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -593,6 +773,15 @@
 			buildConfigurations = (
 				278D021B2EBDB92200A1DFFD /* Debug */,
 				278D021C2EBDB92200A1DFFD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5722FA35300B2BD100BE63B2 /* Build configuration list for PBXNativeTarget "widgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5722FA32300B2BD100BE63B2 /* Debug */,
+				5722FA33300B2BD100BE63B2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

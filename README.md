@@ -34,6 +34,7 @@ Treehole is an iOS app for anonymous emotional expression and gentle self-care. 
 | Push Notifications | Feeding reminder (4 h), watering reminder (24 h), daily check-in (9 AM) |
 | Localization | Full English + Simplified Chinese, L10n.t() throughout, runtime language switch, iOS permission dialogs localized via InfoPlist.xcstrings (zh-Hans) |
 | Accessibility | VoiceOver labels/traits across journal, pet, plant, shop, settings, onboarding, privacy-lock, and cloud screens; Dynamic Type conversions for formerly fixed tiny fonts; Reduce Motion gating for looping/spring animations |
+| Home-Screen Widget | Living pet on the home screen (hunger decays in real time, sleeps overnight 23:00–7:00), garden stage + plant count, daily-task progress, unread cloud replies (🫧); small + medium sizes, hourly timeline, App Group snapshot pushed on backgrounding and after pet/garden actions, deep-links into the right tab |
 | Developer Panel | Debug-builds-only panel: pet / plant / economy sliders, quick actions, device info (5-tap unlock) |
 
 ---
@@ -94,7 +95,7 @@ Cloud-post network calls go through the `CloudPostAPI` protocol (`Services/Cloud
 ## File Structure
 
 ```
-Treehole/Treehole/                          (59 Swift files)
+Treehole/Treehole/                          (60 Swift files)
 ├── TreeholeApp.swift                        # @main entry, SwiftData container (never auto-deletes the store — moves it aside as Backup-* on unrecoverable failure)
 ├── ContentView.swift                        # Onboarding gate + TabView (5 tabs)
 ├── InfoPlist.xcstrings                      # Localized iOS permission dialogs (en + zh-Hans)
@@ -133,7 +134,7 @@ Treehole/Treehole/                          (59 Swift files)
 │   ├── PetVoiceService.swift
 │   ├── SupabaseService.swift
 │   └── WeatherService.swift
-├── Utilities/                               # 12 files
+├── Utilities/                               # 13 files
 │   ├── AudioStorage.swift
 │   ├── HiddenPostsStore.swift               # Hidden/blocked clouds (report/hide) — UserDefaults persisted
 │   ├── JournalSearch.swift
@@ -145,7 +146,8 @@ Treehole/Treehole/                          (59 Swift files)
 │   ├── PhotoThumbnailLoader.swift           # Async, cached, downsampled photo thumbnails
 │   ├── PrivacyLockManager.swift
 │   ├── UITestSupport.swift                  # Debug-only --uitest-reset-state launch hook
-│   └── WeekAnchor.swift                     # Monday-anchored week math
+│   ├── WeekAnchor.swift                     # Monday-anchored week math
+│   └── WidgetStateStore.swift               # App Group snapshot for the home-screen widget
 ├── Theme/
 │   └── TreeholeTheme.swift
 └── Components/                              # 3 files
@@ -153,8 +155,9 @@ Treehole/Treehole/                          (59 Swift files)
     ├── CameraPicker.swift
     └── SharedComponents.swift               # MoodPicker (pills / pleasantness slider)
 
-TreeholeTests/                               # 341 unit tests (Swift Testing)
+TreeholeTests/                               # 344 unit tests (Swift Testing)
 TreeholeUITests/                             # 22 UI tests (XCTest)
+widget/                                      # Home-screen widget extension (App Group snapshot, small + medium)
 ```
 
 ---
@@ -281,6 +284,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 | 推送通知 | 喂食提醒（4 小时）、浇水提醒（24 小时）、每日签到（上午 9 点） |
 | 双语本地化 | 全界面英文 + 简体中文，L10n.t() 贯穿全局，运行时语言切换，iOS 系统权限弹窗通过 InfoPlist.xcstrings 本地化（简体中文） |
 | 无障碍 | 日记、宠物、植物、商店、设置、引导、隐私锁与云朵界面全面添加 VoiceOver 标签/特征；原先固定小字号文本改用动态字体（Dynamic Type）；循环/弹簧动画在"减弱动态效果"开启时停用 |
+| 主屏小组件 | 主屏上的"活"宠物（饥饿值实时衰减，夜间 23:00–7:00 睡觉）、花园阶段与株数、每日任务进度、未读云朵回复（🫧）；小号 + 中号两种尺寸，逐小时时间线，App Group 快照在退后台及宠物/花园操作后推送，点击直达对应标签页 |
 | 开发者面板 | 仅 Debug 构建的调试面板：宠物/植物/经济数值滑条、快捷操作、设备信息（连击 5 次解锁） |
 
 ---
@@ -341,7 +345,7 @@ Treehole（树洞）是一款 iOS 匿名情绪表达与温柔自愈应用。灵�
 ## 文件结构
 
 ```
-Treehole/Treehole/                          （共 59 个 Swift 文件）
+Treehole/Treehole/                          （共 60 个 Swift 文件）
 ├── TreeholeApp.swift                        # @main 入口，SwiftData 容器（永不自动删除存储——不可恢复时移为 Backup-* 备份）
 ├── ContentView.swift                        # 引导闸门 + TabView（5 标签）
 ├── InfoPlist.xcstrings                      # iOS 权限弹窗本地化（英文 + 简体中文）
@@ -380,7 +384,7 @@ Treehole/Treehole/                          （共 59 个 Swift 文件）
 │   ├── PetVoiceService.swift
 │   ├── SupabaseService.swift
 │   └── WeatherService.swift
-├── Utilities/                               # 12 个文件
+├── Utilities/                               # 13 个文件
 │   ├── AudioStorage.swift
 │   ├── HiddenPostsStore.swift               # 已隐藏/已屏蔽云朵（举报/隐藏）——UserDefaults 持久化
 │   ├── JournalSearch.swift
@@ -392,7 +396,8 @@ Treehole/Treehole/                          （共 59 个 Swift 文件）
 │   ├── PhotoThumbnailLoader.swift           # 异步、带缓存的降采样照片缩略图
 │   ├── PrivacyLockManager.swift
 │   ├── UITestSupport.swift                  # 仅 Debug 的 --uitest-reset-state 启动钩子
-│   └── WeekAnchor.swift                     # 以周一为起点的周计算
+│   ├── WeekAnchor.swift                     # 以周一为起点的周计算
+│   └── WidgetStateStore.swift               # 主屏小组件的 App Group 快照
 ├── Theme/
 │   └── TreeholeTheme.swift
 └── Components/                              # 3 个文件
@@ -400,8 +405,9 @@ Treehole/Treehole/                          （共 59 个 Swift 文件）
     ├── CameraPicker.swift
     └── SharedComponents.swift               # MoodPicker（胶囊按钮 / 愉悦度滑条）
 
-TreeholeTests/                               # 342 个单元测试（Swift Testing）
+TreeholeTests/                               # 344 个单元测试（Swift Testing）
 TreeholeUITests/                             # 22 个 UI 测试（XCTest）
+widget/                                      # 主屏小组件扩展（App Group 快照，小号 + 中号）
 ```
 
 ---

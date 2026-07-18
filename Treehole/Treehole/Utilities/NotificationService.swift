@@ -150,6 +150,8 @@ enum NotificationService {
 
         let (commentCount, reactionCount) = await SupabaseService.fetchUnreadCount(since: since)
         let total = commentCount + reactionCount
+        // Keep the home-screen widget's unread state fresh either way.
+        WidgetStateStore.setUnreadCount(total)
 
         guard total > 0 else {
             // Update check timestamp even when no unread, so we move window forward

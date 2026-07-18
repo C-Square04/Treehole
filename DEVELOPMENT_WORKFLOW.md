@@ -85,7 +85,7 @@ New features must ship with accompanying tests before merging.
 
 ---
 
-## Current State: 59 Swift Files
+## Current State: 60 Swift Files (+ widget extension)
 
 | Layer | Files | Description |
 |---|---|---|
@@ -93,10 +93,11 @@ New features must ship with accompanying tests before merging.
 | ViewModels (5) | AppState, CloudPostViewModel, PetViewModel, EconomyViewModel, PostMigrationCoordinator | @Observable business logic + migration retry |
 | Views (19) | Onboarding, Cloud (4), Pet (4), Plant (2), Journal (3), Shop, Settings (2), Auth, PrivacyLockView | Full UI |
 | Services (8) | SupabaseService, CloudPostAPI, PetChatService, PetVoiceService, WeatherService, LocationService, AnalyticsService, AudioRecorder | Network / device services |
-| Utilities (12) | L10n, NotificationService, PhotoStorage, PrivacyLockManager, AudioStorage, WeekAnchor, JournalSearch, JournalTranscription, HiddenPostsStore, MoodByDay, PhotoThumbnailLoader, UITestSupport | Shared helpers |
+| Utilities (13) | L10n, NotificationService, PhotoStorage, PrivacyLockManager, AudioStorage, WeekAnchor, JournalSearch, JournalTranscription, HiddenPostsStore, MoodByDay, PhotoThumbnailLoader, UITestSupport, WidgetStateStore | Shared helpers |
 | Theme (1) | TreeholeTheme | Design system (colors, spacing, typography) |
 | Components (3) | SharedComponents, AudioPlayerView, CameraPicker | MoodPicker (pills/slider), StatBadge, audio player, camera |
 | Core (2) | TreeholeApp, ContentView | App entry + tab navigation |
+| Widget ext (3) | TreeholeWidget, Snapshot, WidgetL10n (`widget/`) | Home-screen widget, small + medium, App Group snapshot |
 
 ---
 
@@ -245,6 +246,7 @@ TreeholeUITests/                             # 22 UI tests (XCTest)
 - Passcode is stored in Keychain only — never in SwiftData, never in Supabase.
 - AI calls (moderation, NPC reply, pet chat, pet TTS, journal summaries) are always routed through Supabase Edge Functions (`moderate-post`, `generate-npc-reply`, `pet-chat`, `pet-tts`, `summarize-journal`), not called directly from the client.
 - Server-side migrations in `supabase/migrations/` are all applied (2026-07-17) and recorded in `supabase_migrations.schema_migrations` — new environments (e.g. self-hosted) can replay them with `supabase db push`. The client keeps transparent fallbacks (`delete_my_data` 404 → `delete_my_posts`; reaction insert 400 → retry without `apple_user_id`) so it works against servers that haven't run them yet.
+- The home-screen widget (`widgetExtension` target, `widget/`) reads a versioned snapshot from the App Group `group.com.csquare04.Treehole`, pushed by `WidgetStateStore` on backgrounding and after pet/garden actions; deep links use `treehole://<tab>` URLs. The widget's snapshot model mirrors the app's — keep fields in sync.
 
 ---
 

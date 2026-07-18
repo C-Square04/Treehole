@@ -88,6 +88,11 @@ struct TreeholeApp: App {
                         // Re-lock protected sections whenever the app leaves the
                         // foreground, regardless of which screen is showing.
                         lockManager.lockAll()
+                        // Hand the home-screen widget a fresh snapshot.
+                        WidgetStateStore.pushSnapshot(
+                            context: sharedModelContainer.mainContext,
+                            language: appState.preferredLanguage
+                        )
                     }
                 }
         }

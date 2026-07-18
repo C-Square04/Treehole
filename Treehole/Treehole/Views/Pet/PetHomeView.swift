@@ -107,6 +107,7 @@ struct PetHomeView: View {
                                 try? modelContext.save()
                                 AnalyticsService.track("pet_fed")
                                 NotificationService.scheduleFeedingReminder()
+                                WidgetStateStore.pushSnapshot(context: modelContext, language: appState.preferredLanguage)
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                     viewModel.showFeedingAnimation = false
                                 }
@@ -213,6 +214,7 @@ struct PetHomeView: View {
             economyVM.createDailyTasks(context: modelContext, existingTasks: dailyTasks)
             appState.grantSubscriberDailyBonus(economy: economy)
             try? modelContext.save()
+            WidgetStateStore.pushSnapshot(context: modelContext, language: appState.preferredLanguage)
         }
     }
 

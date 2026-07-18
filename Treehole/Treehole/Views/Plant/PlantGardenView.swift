@@ -248,6 +248,7 @@ struct PlantGardenView: View {
             try? modelContext.save()
             AnalyticsService.track("plant_watered")
             NotificationService.scheduleWateringReminder()
+            WidgetStateStore.pushSnapshot(context: modelContext, language: appState.preferredLanguage)
             showFeedback(L10n.t("+40 Hydration, +5 XP, +3 🍖", "+40 水分, +5 经验, +3 🍖"))
         } label: {
             Label(L10n.t("Water Plant", "浇水"), systemImage: "drop.fill")

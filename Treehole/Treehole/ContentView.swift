@@ -1,6 +1,11 @@
 import SwiftUI
 import SwiftData
 
+extension Notification.Name {
+    /// Deep-link requests from the widget (treehole://pet etc.) to switch tabs.
+    static let treeholeOpenTab = Notification.Name("treeholeOpenTab")
+}
+
 struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
@@ -17,6 +22,10 @@ struct ContentView: View {
             #if DEBUG
             UITestSupport.applyLaunchOverridesIfNeeded(context: modelContext)
             #endif
+        }
+        .onOpenURL { url in
+            guard url.scheme == "treehole", let host = url.host else { return }
+            NotificationCenter.default.post(name: .treeholeOpenTab, object: host)
         }
     }
 }
@@ -52,6 +61,17 @@ struct MainTabView: View {
                 .badge(remainingTasks)
         }
         .tint(TreeholeTheme.accentPurple)
+        .onReceive(NotificationCenter.default.publisher(for: .treeholeOpenTab)) { note in
+            guard let host = note.object as? String else { return }
+            switch host {
+            case "clouds": selectedTab = 0
+            case "pet": selectedTab = 1
+            case "garden": selectedTab = 2
+            case "journal": selectedTab = 3
+            case "me": selectedTab = 4
+            default: break
+            }
+        }
     }
 }
 

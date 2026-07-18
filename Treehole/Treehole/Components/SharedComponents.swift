@@ -328,6 +328,26 @@ struct ProgressBar: View {
     }
 }
 
+// MARK: - Error Banner
+
+/// Shared top-of-screen error capsule — replaces the previously duplicated
+/// hardcoded red banners. Wrap positioning at the call site (overlay with a
+/// VStack + Spacer, or inline in a list).
+struct ErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.caption)
+            .foregroundStyle(.white)
+            .padding(.horizontal, TreeholeTheme.spacingSmall)
+            .padding(.vertical, 6)
+            .background(TreeholeTheme.errorRed.opacity(0.9), in: Capsule())
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .accessibilityLabel(L10n.t("Error", "错误") + ": " + message)
+    }
+}
+
 // MARK: - Empty State View
 
 struct EmptyStateView: View {
@@ -354,6 +374,7 @@ struct EmptyStateView: View {
                 Button(actionLabel, action: action)
                     .buttonStyle(.borderedProminent)
                     .tint(TreeholeTheme.coral)
+                    .foregroundStyle(TreeholeTheme.buttonText)
             }
         }
         .padding(TreeholeTheme.spacingXL)

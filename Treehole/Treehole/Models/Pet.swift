@@ -25,16 +25,47 @@ enum HomeTheme: String, Codable, CaseIterable {
         }
     }
 
+    private static func themed(_ light: (Double, Double, Double), _ dark: (Double, Double, Double)) -> Color {
+        Color(UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: dark.0, green: dark.1, blue: dark.2, alpha: 1)
+                : UIColor(red: light.0, green: light.1, blue: light.2, alpha: 1)
+        })
+    }
+
+    /// Theme gradient — adaptive dark variants so the pet's name and stats
+    /// stay readable when the system is in dark mode.
     var gradient: (Color, Color) {
         switch self {
         case .daylight:
-            return (Color(red: 0.85, green: 0.92, blue: 0.98), Color(red: 1.0, green: 0.97, blue: 0.93))
+            return (Self.themed((0.85, 0.92, 0.98), (0.11, 0.17, 0.25)),
+                    Self.themed((1.0, 0.97, 0.93), (0.13, 0.11, 0.09)))
         case .night:
-            return (Color(red: 0.15, green: 0.18, blue: 0.35), Color(red: 0.22, green: 0.25, blue: 0.45))
+            return (Self.themed((0.15, 0.18, 0.35), (0.09, 0.11, 0.24)),
+                    Self.themed((0.22, 0.25, 0.45), (0.14, 0.16, 0.32)))
         case .sunset:
-            return (Color(red: 1.0, green: 0.75, blue: 0.55), Color(red: 0.95, green: 0.60, blue: 0.65))
+            return (Self.themed((1.0, 0.75, 0.55), (0.35, 0.20, 0.14)),
+                    Self.themed((0.95, 0.60, 0.65), (0.30, 0.16, 0.20)))
         case .garden:
-            return (Color(red: 0.75, green: 0.92, blue: 0.78), Color(red: 0.90, green: 0.96, blue: 0.92))
+            return (Self.themed((0.75, 0.92, 0.78), (0.12, 0.22, 0.15)),
+                    Self.themed((0.90, 0.96, 0.92), (0.13, 0.15, 0.11)))
+        }
+    }
+
+    /// Primary text color on this theme's gradient. Night is dark in BOTH
+    /// schemes, so it always takes a light color; the others take dark brown.
+    var textColor: Color {
+        switch self {
+        case .night: Color(red: 0.93, green: 0.91, blue: 0.89)
+        default: Color(red: 0.25, green: 0.22, blue: 0.20)
+        }
+    }
+
+    /// Secondary text color on this theme's gradient.
+    var secondaryTextColor: Color {
+        switch self {
+        case .night: Color(red: 0.72, green: 0.70, blue: 0.76)
+        default: Color(red: 0.45, green: 0.40, blue: 0.37)
         }
     }
 }

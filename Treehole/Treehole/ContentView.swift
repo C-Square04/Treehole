@@ -44,7 +44,7 @@ struct MainTabView: View {
                 .tabItem { Label(L10n.t("Me", "我"), systemImage: "person.fill") }
                 .tag(4)
         }
-        .tint(TreeholeTheme.softPurple)
+        .tint(TreeholeTheme.accentPurple)
     }
 }
 

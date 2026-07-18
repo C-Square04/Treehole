@@ -59,10 +59,10 @@ struct PetHomeView: View {
                     VStack(spacing: 4) {
                         Text(pet.name)
                             .font(.title2.bold())
-                            .foregroundStyle(TreeholeTheme.textPrimary)
+                            .foregroundStyle(pet.homeTheme.textColor)
                         Text("\(pet.mood.emoji) \(lang == "zh-Hans" ? pet.mood.labelZH : pet.mood.labelEN)")
                             .font(.subheadline)
-                            .foregroundStyle(TreeholeTheme.textSecondary)
+                            .foregroundStyle(pet.homeTheme.secondaryTextColor)
                     }
 
                     VStack(spacing: TreeholeTheme.spacingSmall) {
@@ -88,6 +88,7 @@ struct PetHomeView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(TreeholeTheme.warmGold)
+                    .foregroundStyle(TreeholeTheme.buttonText)
                     .padding(.horizontal)
 
                     // Action buttons
@@ -120,7 +121,7 @@ struct PetHomeView: View {
                                 if let economy = economies.first {
                                     Text("🍖 \(economy.food)")
                                         .font(.caption2)
-                                        .foregroundStyle(.white.opacity(0.85))
+                                        .foregroundStyle(TreeholeTheme.buttonText.opacity(0.75))
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -128,6 +129,7 @@ struct PetHomeView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(TreeholeTheme.coral)
+                        .foregroundStyle(TreeholeTheme.buttonText)
                         .disabled(pet.hungerLevel >= 100)
 
                         Button {
@@ -142,6 +144,7 @@ struct PetHomeView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(TreeholeTheme.softPurple)
+                        .foregroundStyle(TreeholeTheme.buttonText)
                         .disabled(pet.energy >= 100)
 
                         Button {
@@ -156,6 +159,7 @@ struct PetHomeView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(TreeholeTheme.skyBlue)
+                        .foregroundStyle(TreeholeTheme.buttonText)
                         .disabled(pet.energy >= 100)
                     }
                     .padding(.horizontal)
@@ -164,7 +168,7 @@ struct PetHomeView: View {
                     VStack(alignment: .leading, spacing: TreeholeTheme.spacingSmall) {
                         Text(L10n.t("Home Theme", "主题"))
                             .font(.caption)
-                            .foregroundStyle(TreeholeTheme.textSecondary)
+                            .foregroundStyle(pet.homeTheme.secondaryTextColor)
                             .padding(.horizontal, 4)
 
                         HStack(spacing: TreeholeTheme.spacingSmall) {

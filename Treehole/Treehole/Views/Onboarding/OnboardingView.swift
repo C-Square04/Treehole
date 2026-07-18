@@ -241,6 +241,7 @@ private struct GetStartedPage: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(TreeholeTheme.coral)
+                .foregroundStyle(TreeholeTheme.buttonText)
 
                 // Apple Sign-In
                 SignInWithAppleButton(.signIn) { request in

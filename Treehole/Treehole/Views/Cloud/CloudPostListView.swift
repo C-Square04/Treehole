@@ -60,15 +60,8 @@ struct CloudPostListView: View {
     @ViewBuilder
     private var cloudFeedSidebar: some View {
         ZStack {
-                // Sky gradient background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.75, green: 0.88, blue: 0.98),
-                        TreeholeTheme.warmPeach.opacity(0.3)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                // Sky gradient background (adaptive day/night)
+                TreeholeTheme.skyBackground
                 .ignoresSafeArea()
 
                 // Decorative floating clouds
@@ -162,14 +155,8 @@ struct CloudPostListView: View {
 
                         // Error display
                         if let error = grabError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, TreeholeTheme.spacingSmall)
-                                .padding(.vertical, 6)
-                                .background(.red.opacity(0.8), in: Capsule())
+                            ErrorBanner(message: error)
                                 .padding(.horizontal)
-                                .transition(.move(edge: .top).combined(with: .opacity))
                         }
 
                         // Bottom padding
@@ -183,16 +170,10 @@ struct CloudPostListView: View {
                 // viewModel error banner
                 if let error = viewModel.errorMessage {
                     VStack {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, TreeholeTheme.spacingSmall)
-                            .padding(.vertical, 6)
-                            .background(.red.opacity(0.8), in: Capsule())
+                        ErrorBanner(message: error)
                         Spacer()
                     }
                     .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .navigationTitle(L10n.t("Clouds", "云朵"))
@@ -327,14 +308,7 @@ struct GrabbedCloudView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.75, green: 0.88, blue: 0.98),
-                        TreeholeTheme.warmPeach.opacity(0.3)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                TreeholeTheme.skyBackground
                 .ignoresSafeArea()
 
                 if let currentPost = post {

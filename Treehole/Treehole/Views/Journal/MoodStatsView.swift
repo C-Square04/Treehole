@@ -616,6 +616,8 @@ private struct MoodBarRow: View {
                 .font(.subheadline)
                 .foregroundStyle(TreeholeTheme.textPrimary)
                 .frame(width: 65, alignment: .leading)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {

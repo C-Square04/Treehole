@@ -370,6 +370,7 @@ private struct LoginStreakCard: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(TreeholeTheme.warmGold)
+                .foregroundStyle(TreeholeTheme.buttonText)
             }
         }
         .glassCard()
@@ -596,6 +597,7 @@ private struct FoodPackCard: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(canAfford ? TreeholeTheme.coral : TreeholeTheme.textLight)
+                .foregroundStyle(TreeholeTheme.buttonText)
                 .disabled(!canAfford)
                 .accessibilityLabel(L10n.t(
                     "Buy \(name) for \(tokenCost) tokens",

@@ -57,7 +57,7 @@ struct PlantGardenView: View {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(plants.count >= maxPlants
                                 ? TreeholeTheme.textSecondary
-                                : TreeholeTheme.mintCream)
+                                : TreeholeTheme.accentGreen)
                             .font(.title3)
                     }
                     .disabled(plants.count >= maxPlants)
@@ -257,6 +257,7 @@ struct PlantGardenView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(TreeholeTheme.skyBlue)
+        .foregroundStyle(TreeholeTheme.buttonText)
         .disabled(plant.hydrationLevel >= 100)
         .padding(.horizontal)
     }
@@ -463,6 +464,7 @@ private struct AddPlantSheet: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(TreeholeTheme.mintCream)
+                        .foregroundStyle(TreeholeTheme.buttonText)
                         .padding(.horizontal)
                     }
                     .padding(.vertical, TreeholeTheme.spacingLarge)

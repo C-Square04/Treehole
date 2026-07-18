@@ -33,7 +33,7 @@ struct PlantVisualView: View {
             // blooming petals reacted to isGrowing; the plant itself was static
             .rotationEffect(.degrees(isGrowing ? 1.2 : -1.2), anchor: .bottom)
         }
-        .frame(height: 300)
+        .frame(height: 280)
         .onAppear {
             guard !reduceMotion else { return }
             startSway()

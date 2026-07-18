@@ -45,7 +45,7 @@ struct PrivacyLockView: View {
                     } label: {
                         Label(L10n.t("Tap to Unlock", "点击解锁"), systemImage: "lock.open.fill")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(TreeholeTheme.buttonText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, TreeholeTheme.spacingMedium)
                             .background(TreeholeTheme.softPurple, in: RoundedRectangle(cornerRadius: TreeholeTheme.cornerLarge))

@@ -68,6 +68,45 @@ enum TreeholeTheme {
     })
 
     // MARK: - Gradients (adaptive)
+    /// The Clouds tab's signature backdrop — day sky in light mode, night sky
+    /// in dark mode. Use this instead of hardcoding the blue→peach gradient
+    /// (the hardcoded version was unreadable light-on-light in dark mode).
+    static let skyBackground = LinearGradient(
+        colors: [
+            Color(UIColor { $0.userInterfaceStyle == .dark
+                ? UIColor(red: 0.10, green: 0.15, blue: 0.24, alpha: 1)  // night sky
+                : UIColor(red: 0.75, green: 0.88, blue: 0.98, alpha: 1)  // day sky
+            }),
+            Color(UIColor { $0.userInterfaceStyle == .dark
+                ? UIColor(red: 0.16, green: 0.13, blue: 0.14, alpha: 1)
+                : UIColor(red: 1.0, green: 0.85, blue: 0.75, alpha: 0.3)
+            })
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    // MARK: - Interactive Accents (contrast-safe)
+    /// Label color on pastel button fills — fixed dark brown (non-adaptive):
+    /// pastel fills read as light in both schemes, so the same dark label
+    /// keeps macaroon buttons readable everywhere (~5:1 light, ~3:1 dark on
+    /// large bold text).
+    static let buttonText = Color(red: 0.25, green: 0.22, blue: 0.20)
+
+    /// More saturated purple for interactive elements (tab bar tint, toggles,
+    /// links) — softPurple is too pale against light backgrounds.
+    static let accentPurple = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.78, green: 0.65, blue: 0.95, alpha: 1)
+            : UIColor(red: 0.60, green: 0.46, blue: 0.74, alpha: 1)
+    })
+
+    /// More saturated green for interactive elements (garden toolbar icons).
+    static let accentGreen = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.55, green: 0.80, blue: 0.60, alpha: 1)
+            : UIColor(red: 0.28, green: 0.55, blue: 0.33, alpha: 1)
+    })
+
     static let warmBackground = LinearGradient(
         colors: [
             Color(UIColor { $0.userInterfaceStyle == .dark
@@ -120,6 +159,13 @@ enum TreeholeTheme {
         ],
         startPoint: .top, endPoint: .bottom
     )
+
+    /// Error/warning accent for banner backgrounds (white text on top).
+    static let errorRed = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.85, green: 0.40, blue: 0.36, alpha: 1)
+            : UIColor(red: 0.80, green: 0.25, blue: 0.22, alpha: 1)
+    })
 
     // MARK: - Spacing
     static let spacingTight: CGFloat = 8

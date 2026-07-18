@@ -44,14 +44,7 @@ struct MyCloudsView: View {
 
     private var mainContent: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.75, green: 0.88, blue: 0.98),
-                    TreeholeTheme.warmPeach.opacity(0.3)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            TreeholeTheme.skyBackground
             .ignoresSafeArea()
 
             if isLoading && myPosts.isEmpty {
@@ -75,16 +68,10 @@ struct MyCloudsView: View {
             // Error banner
             if let error = errorMessage {
                 VStack {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, TreeholeTheme.spacingSmall)
-                        .padding(.vertical, 6)
-                        .background(.red.opacity(0.8), in: Capsule())
+                    ErrorBanner(message: error)
                     Spacer()
                 }
                 .padding(.top, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .task {
@@ -173,17 +160,11 @@ struct MyCloudsView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: TreeholeTheme.spacingMedium) {
-            Text("☁️")
-                .font(.system(size: 56))
-            Text(L10n.t("No clouds yet", "还没有云朵"))
-                .font(.headline)
-                .foregroundStyle(TreeholeTheme.textPrimary)
-            Text(L10n.t("Send your first cloud to see it here.", "放飞你的第一朵云，就会出现在这里。"))
-                .font(.subheadline)
-                .foregroundStyle(TreeholeTheme.textSecondary)
-                .multilineTextAlignment(.center)
-        }
+        EmptyStateView(
+            icon: "cloud",
+            title: L10n.t("No clouds yet", "还没有云朵"),
+            message: L10n.t("Send your first cloud to see it here.", "放飞你的第一朵云，就会出现在这里。")
+        )
         .padding()
         .refreshable {
             await loadMyPosts()

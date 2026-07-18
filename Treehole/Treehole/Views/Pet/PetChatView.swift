@@ -47,6 +47,17 @@ struct PetChatView: View {
                 VStack(spacing: 0) {
                     hungerBanner
 
+                    // Voice/pet errors were silently swallowed before —
+                    // surface them briefly at the top of the chat.
+                    if let error = errorMessage {
+                        ErrorBanner(message: error)
+                            .padding(.top, 4)
+                            .task(id: error) {
+                                try? await Task.sleep(for: .seconds(3))
+                                errorMessage = nil
+                            }
+                    }
+
                     chatScrollView
 
                     if isThinking {
